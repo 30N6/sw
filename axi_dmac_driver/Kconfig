@@ -1,0 +1,12 @@
+menu "AXI DMAC"
+
+config IIO_AXI_DMAC
+        tristate "ADI AXI DMAC driver"
+        select IIO_BUFFER
+        select IIO_BUFFER_DMA
+        select IIO_BUFFER_DMAENGINE
+        help
+          Say yes here to build support for the ADI AXI DMAC driver
+
+endmenu
+
