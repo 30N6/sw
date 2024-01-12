@@ -8,6 +8,10 @@
 #include <unistd.h>
 #include <errno.h>
 #include <assert.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <netdb.h>
 
 #define IIO_ENSURE(expr) { \
   if (!(expr)) { \
@@ -20,6 +24,7 @@
 #define D2H_DEVICE_NAME "iio:device4"
 #define H2D_DEVICE_NAME "iio:device5"
 
+#pragma pack(push, 1)
 typedef struct {
   uint32_t magic_num;
   uint8_t reset;
@@ -36,19 +41,22 @@ typedef struct {
   uint32_t message_crc;
   uint32_t message_data [4];
 } adsb_report_t;
+#pragma pack(pop)
 
 const uint32_t D2H_BUFFER_WORD_SIZE = sizeof(adsb_report_t) / DMA_WORD_BYTE_SIZE;
 const uint32_t H2D_BUFFER_WORD_SIZE = sizeof(adsb_config_t) / DMA_WORD_BYTE_SIZE;
 
 static const struct option options[] = {
   {"help",            no_argument,        0, 'h'},
-  {"address",         required_argument,  0, 'a'},
+  {"pluto_addr",      required_argument,  0, 'p'},
+  {"dump1090_addr",   required_argument,  0, 'd'},
   {0, 0, 0, 0},
 };
 
 static const char *options_descriptions[] = {
   "Show this help and quit.",
-  "IIO device address.",
+  "Pluto IIO device address.",
+  "dump1090 address.",
 };
 
 static void usage(char *argv[])
@@ -69,10 +77,11 @@ static struct iio_channel*  dma_chan_d2h    = NULL;
 static struct iio_buffer*   dma_buffer_h2d  = NULL;
 static struct iio_buffer*   dma_buffer_d2h  = NULL;
 
+static int sockfd_dump1090 = -1;
 static bool stop = false;
 
 /* cleanup and exit */
-void shutdown()
+void app_shutdown()
 {
   printf("* Destroying buffers\n");
   if (dma_buffer_h2d)
@@ -90,6 +99,12 @@ void shutdown()
   if (ctx)
     iio_context_destroy(ctx);
 
+  printf("* Closing dump1090 socket\n");
+  if(sockfd_dump1090)
+  {
+    close(sockfd_dump1090);
+  }
+
   exit(0);
 }
 
@@ -104,7 +119,7 @@ void print_buffer(const char *pref, const struct iio_channel* dma_chan, const st
   if ((pref == NULL) || (dma_buffer == NULL))
   {
     return;
-    }
+  }
 
   void *p_dat     = NULL;
   void *p_end     = iio_buffer_end(dma_buffer);
@@ -113,10 +128,32 @@ void print_buffer(const char *pref, const struct iio_channel* dma_chan, const st
   printf("%s", pref);
   for (p_dat = iio_buffer_first(dma_buffer, dma_chan); p_dat < p_end; p_dat += p_inc)
   {
-    printf("0x%08jx ", *(uint64_t *)p_dat);
+    printf("%08x ", *(uint32_t *)p_dat);
   }
   printf("\n");
 }
+
+void process_buffer(const char *pref, const struct iio_channel* dma_chan, const struct iio_buffer* dma_buffer)
+{
+  const adsb_report_t* report = (const adsb_report_t*)iio_buffer_first(dma_buffer, dma_chan);
+  printf("%s", pref);
+  printf("magic=%08X  seq=%08d  timestamp=%012ld  preamble=%4d/%4d SSNR=%3.1f crc=%d  msg=%08X %08X %08X %08X",
+    report->magic_num, report->sequence_num, report->timestamp, report->preamble_s, report->preamble_sn, (double)report->preamble_s / (double)report->preamble_sn,
+    report->message_crc, report->message_data[0], report->message_data[1], report->message_data[2], report->message_data[3]);
+
+  if(sockfd_dump1090)
+  {
+    char buffer[64];
+    sprintf(buffer, "*%08X%08X%08X%04X;\n", report->message_data[0], report->message_data[1], report->message_data[2], report->message_data[3] >> 16);
+    printf(" -- buf=%s", buffer);
+    write(sockfd_dump1090, buffer, strlen(buffer));
+  }
+  else
+  {
+    printf("\n");
+  }
+}
+
 
 void send_config()
 {
@@ -138,7 +175,7 @@ void send_config()
     if (!p_dat)
     {
       fprintf(stderr, "send_config: failed to get h2d buffer\n");
-      shutdown();
+      app_shutdown();
     }
     memcpy(p_dat, &(config_data[i]), sizeof(config_data[i]));
 
@@ -151,9 +188,67 @@ void send_config()
       {
         printf("send_config: Ensure that transmit buffer is getting emptied. Run RX first if in loopback.");
       }
-      shutdown();
+      app_shutdown();
     }
+    else
+    {
+      printf("send_config: %d bytes sent\n", n_bytes);
+    }
+    usleep(1000);
   }
+}
+
+void init_dump1090(const char* dump1090_addr)
+{
+    int portno = 30001;
+    int n;
+    struct sockaddr_in serv_addr;
+    struct hostent *server;
+
+    sockfd_dump1090 = socket(AF_INET, SOCK_STREAM, 0);
+    if (sockfd_dump1090 < 0)
+    {
+      fprintf(stderr, "init_dump1090: ERROR opening socket\n");
+      return;
+    }
+
+    server = gethostbyname(dump1090_addr);
+    if (server == NULL)
+    {
+        fprintf(stderr,"init_dump1090: ERROR, no such host\n");
+        close(sockfd_dump1090);
+        sockfd_dump1090 = -1;
+        return;
+    }
+
+    bzero((char *) &serv_addr, sizeof(serv_addr));
+    serv_addr.sin_family = AF_INET;
+    bcopy((char *)server->h_addr, (char *)&serv_addr.sin_addr.s_addr, server->h_length);
+    serv_addr.sin_port = htons(portno);
+
+    if (connect(sockfd_dump1090, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0)
+    {
+      fprintf(stderr, "init_dump1090: ERROR connecting");
+      close(sockfd_dump1090);
+      sockfd_dump1090 = -1;
+      return;
+    }
+
+    printf("init_dump1090: fd=%d\n", sockfd_dump1090);
+
+    /*printf("Please enter the message: ");
+    bzero(buffer,256);
+    fgets(buffer,255,stdin);
+    n = write(sockfd,buffer,strlen(buffer));
+    if (n < 0)
+         error("ERROR writing to socket");
+    bzero(buffer,256);
+    n = read(sockfd,buffer,255);
+    if (n < 0)
+         error("ERROR reading from socket");
+    printf("%s\n",buffer);
+    close(sockfd);
+    return 0;*/
 }
 
 /* simple configuration and streaming */
@@ -171,6 +266,7 @@ int main (int argc, char **argv)
   struct iio_device* dev_d2h = NULL;
 
   char* device_addr = 0;
+  char* dump1090_addr = 0;
 
   unsigned int i = 0;
   bool device_is_tx = false;
@@ -180,13 +276,17 @@ int main (int argc, char **argv)
   char unit;
   int ret = 0;
 
-  while ((i = getopt_long(argc, argv, "a:h", options, &option_index)) != -1)
+  while ((i = getopt_long(argc, argv, "p:d:h", options, &option_index)) != -1)
   {
     arg_index++;
     switch (i)
     {
-      case 'a':
+      case 'p':
         device_addr = optarg;
+        break;
+
+      case 'd':
+        dump1090_addr = optarg;
         break;
 
       case 'h':
@@ -205,12 +305,22 @@ int main (int argc, char **argv)
 
   if (device_addr)
   {
-    printf("Connecting to %s\n", device_addr);
+    printf("Connecting to Pluto: %s\n", device_addr);
   }
   else
   {
     fprintf(stderr, "Device address required.\n");
     return EXIT_FAILURE;
+  }
+
+  if (dump1090_addr)
+  {
+    printf("Connecting to dump1090: %s\n", dump1090_addr);
+    init_dump1090(dump1090_addr);
+  }
+  else
+  {
+    printf("dump1090 address not specified -- skipping\n");
   }
 
   // Listen to ctrl+c and assert
@@ -238,7 +348,10 @@ int main (int argc, char **argv)
 
   IIO_ENSURE(iio_channel_is_output(dma_chan_h2d) && "H2D expected to be an output channel");
 
-  send_config(dma_chan_h2d, dma_buffer_h2d);
+  for (int i = 0; i < 10; i++)
+  {
+    send_config(dma_chan_h2d, dma_buffer_h2d);
+  }
 
   while (!stop)
   {
@@ -249,14 +362,14 @@ int main (int argc, char **argv)
       printf("* Error refilling buffer %d: %s\n", n_bytes, err_str);
       if (n_bytes == -ETIMEDOUT)
       {
-        printf("* Ensure that receive buffer is getting filled in PL. Run TX if in loopback.");
+        printf("* Ensure that receive buffer is getting filled in PL. Run TX if in loopback.\n");
         if (!timeout)
           timeout = true;
 
         continue;
       }
 
-      shutdown();
+      app_shutdown();
       break;
     }
 
@@ -264,10 +377,12 @@ int main (int argc, char **argv)
       timeout = false;
 
     (void)snprintf(sbuf, sizeof(sbuf), "$ RX (%d): ", n_bytes);
-    print_buffer(sbuf, dma_chan_d2h, dma_buffer_d2h);
+    process_buffer(sbuf, dma_chan_d2h, dma_buffer_d2h);
+
+    usleep(10000);
   }
 
-  shutdown();
+  app_shutdown();
 
   return 0;
 }
