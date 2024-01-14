@@ -46,7 +46,8 @@ typedef struct {
   uint32_t magic_num;
   uint8_t reset;
   uint8_t enable;
-  uint16_t padding;
+  uint8_t crc_filter;
+  uint8_t preamble_s_threshold;
 } adsb_config_t;
 
 typedef struct {
@@ -67,7 +68,7 @@ typedef struct {
     long long   rf_bandwidth_hz;
     long long   sampling_frequency_hz;
     long long   lo_hz;
-    double      hw_gain_db;
+    long long   hw_gain_db;
     bool        filter_fir_en;
     bool        quadrature_tracking_en;
     bool        bb_dc_offset_tracking_en;
@@ -191,7 +192,7 @@ void send_adc_config(const adc_config* config)
   IIO_CHECK_WRITE_N(iio_channel_attr_write_longlong(chan_ad9361_rx_lo, "frequency",                config->lo_hz));
   IIO_CHECK_WRITE_N(iio_channel_attr_write_longlong(chan_ad9361_phy,   "rf_bandwidth",             config->rf_bandwidth_hz));
   IIO_CHECK_WRITE_N(iio_channel_attr_write_longlong(chan_ad9361_phy,   "sampling_frequency",       config->sampling_frequency_hz));
-  IIO_CHECK_WRITE_N(iio_channel_attr_write_double(chan_ad9361_phy,     "hardwaregain",             config->hw_gain_db));
+  IIO_CHECK_WRITE_N(iio_channel_attr_write_longlong(chan_ad9361_phy,   "hardwaregain",             config->hw_gain_db));
   IIO_CHECK_WRITE_N(iio_channel_attr_write_bool(chan_ad9361_phy,       "quadrature_tracking_en",   config->quadrature_tracking_en));
   IIO_CHECK_WRITE_N(iio_channel_attr_write_bool(chan_ad9361_phy,       "bb_dc_offset_tracking_en", config->bb_dc_offset_tracking_en));
   IIO_CHECK_WRITE_N(iio_channel_attr_write_bool(chan_ad9361_phy,       "rf_dc_offset_tracking_en", config->rf_dc_offset_tracking_en));
@@ -207,12 +208,14 @@ void send_adsb_config()
   char err_str[512];
 
   adsb_config_t config_data [2];
-  config_data[0].magic_num = 0xAD5B0101;
-  config_data[0].reset     = 1;
-  config_data[0].enable    = 0;
-  config_data[1].magic_num = 0xAD5B0101;
-  config_data[1].reset     = 0;
-  config_data[1].enable    = 1;
+  config_data[0].magic_num            = 0xAD5B0101;
+  config_data[0].reset                = 1;
+  config_data[0].enable               = 0;
+  config_data[1].magic_num            = 0xAD5B0101;
+  config_data[1].reset                = 0;
+  config_data[1].enable               = 1;
+  config_data[1].crc_filter           = 1;
+  config_data[1].preamble_s_threshold = 5;
 
   for (int i = 0; i < 2; i++)
   {
