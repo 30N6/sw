@@ -19,10 +19,27 @@
     (void) abort(); \
   } \
 }
+#define IIO_CHECK_WRITE_N(expr) { \
+  if ((expr) < 0) { \
+    (void) fprintf(stderr, "assertion failed (%s:%d) - expr=%d\n", __FILE__, __LINE__, (expr)); \
+    (void) abort(); \
+  } \
+}
+#define IIO_CHECK_WRITE_S(expr) { \
+  if ((expr) < 0) { \
+    (void) fprintf(stderr, "assertion failed (%s:%d) - expr=%ld\n", __FILE__, __LINE__, (expr)); \
+    (void) abort(); \
+  } \
+}
 
-#define DMA_WORD_BYTE_SIZE 4
-#define D2H_DEVICE_NAME "iio:device4"
-#define H2D_DEVICE_NAME "iio:device5"
+
+#define MHZ(x) ((long long)(x*1000000.0 + .5))
+#define GHZ(x) ((long long)(x*1000000000.0 + .5))
+
+#define DMA_WORD_BYTE_SIZE  4
+#define DEVICE_NAME_D2H     "axi-iio-dma-d2h"
+#define DEVICE_NAME_H2D     "axi-iio-dma-h2d"
+#define DEVICE_NAME_AD9361  "ad9361-phy"
 
 #pragma pack(push, 1)
 typedef struct {
@@ -45,6 +62,19 @@ typedef struct {
 
 const uint32_t D2H_BUFFER_WORD_SIZE = sizeof(adsb_report_t) / DMA_WORD_BYTE_SIZE;
 const uint32_t H2D_BUFFER_WORD_SIZE = sizeof(adsb_config_t) / DMA_WORD_BYTE_SIZE;
+
+typedef struct {
+    long long   rf_bandwidth_hz;
+    long long   sampling_frequency_hz;
+    long long   lo_hz;
+    double      hw_gain_db;
+    bool        filter_fir_en;
+    bool        quadrature_tracking_en;
+    bool        bb_dc_offset_tracking_en;
+    bool        rf_dc_offset_tracking_en;
+    const char* agc_mode;
+    const char* rf_port;
+} adc_config;
 
 static const struct option options[] = {
   {"help",            no_argument,        0, 'h'},
@@ -71,11 +101,13 @@ static void usage(char *argv[])
 }
 
 /* IIO structs required for streaming */
-static struct iio_context*  ctx             = NULL;
-static struct iio_channel*  dma_chan_h2d    = NULL;
-static struct iio_channel*  dma_chan_d2h    = NULL;
-static struct iio_buffer*   dma_buffer_h2d  = NULL;
-static struct iio_buffer*   dma_buffer_d2h  = NULL;
+static struct iio_context*  ctx               = NULL;
+static struct iio_channel*  chan_dma_h2d      = NULL;
+static struct iio_channel*  chan_dma_d2h      = NULL;
+static struct iio_channel*  chan_ad9361_phy   = NULL;
+static struct iio_channel*  chan_ad9361_rx_lo = NULL;
+static struct iio_buffer*   dma_buffer_h2d    = NULL;
+static struct iio_buffer*   dma_buffer_d2h    = NULL;
 
 static int sockfd_dump1090 = -1;
 static bool stop = false;
@@ -90,10 +122,10 @@ void app_shutdown()
     iio_buffer_destroy(dma_buffer_d2h);
 
   printf("* Disabling streaming channels\n");
-  if (dma_chan_h2d)
-    iio_channel_disable(dma_chan_h2d);
-  if (dma_chan_d2h)
-    iio_channel_disable(dma_chan_d2h);
+  if (chan_dma_h2d)
+    iio_channel_disable(chan_dma_h2d);
+  if (chan_dma_d2h)
+    iio_channel_disable(chan_dma_d2h);
 
   printf("* Destroying context\n");
   if (ctx)
@@ -154,8 +186,21 @@ void process_buffer(const char *pref, const struct iio_channel* dma_chan, const 
   }
 }
 
+void send_adc_config(const adc_config* config)
+{
+  IIO_CHECK_WRITE_N(iio_channel_attr_write_longlong(chan_ad9361_rx_lo, "frequency",                config->lo_hz));
+  IIO_CHECK_WRITE_N(iio_channel_attr_write_longlong(chan_ad9361_phy,   "rf_bandwidth",             config->rf_bandwidth_hz));
+  IIO_CHECK_WRITE_N(iio_channel_attr_write_longlong(chan_ad9361_phy,   "sampling_frequency",       config->sampling_frequency_hz));
+  IIO_CHECK_WRITE_N(iio_channel_attr_write_double(chan_ad9361_phy,     "hardwaregain",             config->hw_gain_db));
+  IIO_CHECK_WRITE_N(iio_channel_attr_write_bool(chan_ad9361_phy,       "quadrature_tracking_en",   config->quadrature_tracking_en));
+  IIO_CHECK_WRITE_N(iio_channel_attr_write_bool(chan_ad9361_phy,       "bb_dc_offset_tracking_en", config->bb_dc_offset_tracking_en));
+  IIO_CHECK_WRITE_N(iio_channel_attr_write_bool(chan_ad9361_phy,       "rf_dc_offset_tracking_en", config->rf_dc_offset_tracking_en));
+  IIO_CHECK_WRITE_N(iio_channel_attr_write_bool(chan_ad9361_phy,       "filter_fir_en",            config->filter_fir_en));
+  IIO_CHECK_WRITE_S(iio_channel_attr_write(chan_ad9361_phy,            "gain_control_mode",        config->agc_mode));
+  IIO_CHECK_WRITE_S(iio_channel_attr_write(chan_ad9361_phy,            "rf_port_select",           config->rf_port));
+}
 
-void send_config()
+void send_adsb_config()
 {
   void *p_dat = NULL;
   int n_bytes = 0;
@@ -171,10 +216,10 @@ void send_config()
 
   for (int i = 0; i < 2; i++)
   {
-    p_dat = iio_buffer_first(dma_buffer_h2d, dma_chan_h2d);
+    p_dat = iio_buffer_first(dma_buffer_h2d, chan_dma_h2d);
     if (!p_dat)
     {
-      fprintf(stderr, "send_config: failed to get h2d buffer\n");
+      fprintf(stderr, "send_adsb_config: failed to get h2d buffer\n");
       app_shutdown();
     }
     memcpy(p_dat, &(config_data[i]), sizeof(config_data[i]));
@@ -186,13 +231,13 @@ void send_config()
       printf("* Error pushing buffer %d: %s\n", n_bytes, err_str);
       if (n_bytes == -ETIMEDOUT)
       {
-        printf("send_config: Ensure that transmit buffer is getting emptied. Run RX first if in loopback.");
+        printf("send_adsb_config: Ensure that transmit buffer is getting emptied. Run RX first if in loopback.");
       }
       app_shutdown();
     }
     else
     {
-      printf("send_config: %d bytes sent\n", n_bytes);
+      printf("send_adsb_config: %d bytes sent\n", n_bytes);
     }
     usleep(1000);
   }
@@ -264,6 +309,7 @@ int main (int argc, char **argv)
 
   struct iio_device* dev_h2d = NULL;
   struct iio_device* dev_d2h = NULL;
+  struct iio_device* dev_ad9361 = NULL;
 
   char* device_addr = 0;
   char* dump1090_addr = 0;
@@ -328,17 +374,21 @@ int main (int argc, char **argv)
 
   IIO_ENSURE((ctx = iio_create_context_from_uri(device_addr)) && "No context");
   IIO_ENSURE(iio_context_get_devices_count(ctx) > 0 && "No devices");
-  IIO_ENSURE((dev_d2h = iio_context_find_device(ctx, D2H_DEVICE_NAME)) && "No D2H streaming device found");
-  IIO_ENSURE((dev_h2d = iio_context_find_device(ctx, H2D_DEVICE_NAME)) && "No H2D streaming device found");
+  IIO_ENSURE((dev_d2h     = iio_context_find_device(ctx, DEVICE_NAME_D2H))    && "No D2H streaming device found");
+  IIO_ENSURE((dev_h2d     = iio_context_find_device(ctx, DEVICE_NAME_H2D))    && "No H2D streaming device found");
+  IIO_ENSURE((dev_ad9361  = iio_context_find_device(ctx, DEVICE_NAME_AD9361)) && "No AD9361 device found");
 
   //IIO_ENSURE(iio_device_get_channels_count(dev) == 1 && "No channels");
-  IIO_ENSURE((dma_chan_d2h = iio_device_get_channel(dev_d2h, 0)) && "No D2H channel");
-  IIO_ENSURE((dma_chan_h2d = iio_device_get_channel(dev_h2d, 0)) && "No H2D channel");
-  IIO_ENSURE(iio_channel_is_scan_element(dma_chan_d2h) && "No D2H streaming capabilities");
-  IIO_ENSURE(iio_channel_is_scan_element(dma_chan_h2d) && "No H2D streaming capabilities");
+  IIO_ENSURE((chan_dma_d2h      = iio_device_get_channel(dev_d2h, 0))                         && "No D2H channel");
+  IIO_ENSURE((chan_dma_h2d      = iio_device_get_channel(dev_h2d, 0))                         && "No H2D channel");
+  IIO_ENSURE((chan_ad9361_phy   = iio_device_find_channel(dev_ad9361, "voltage0",     false)) && "No ADC9361-phy channel");
+  IIO_ENSURE((chan_ad9361_rx_lo = iio_device_find_channel(dev_ad9361, "altvoltage0",  true))  && "No ADC9361-rx_lo channel");
 
-  iio_channel_enable(dma_chan_d2h);
-  iio_channel_enable(dma_chan_h2d);
+  IIO_ENSURE(iio_channel_is_scan_element(chan_dma_d2h) && "No D2H streaming capabilities");
+  IIO_ENSURE(iio_channel_is_scan_element(chan_dma_h2d) && "No H2D streaming capabilities");
+
+  iio_channel_enable(chan_dma_d2h);
+  iio_channel_enable(chan_dma_h2d);
   iio_context_set_timeout(ctx, 1000);
 
   IIO_ENSURE((dma_buffer_d2h = iio_device_create_buffer(dev_d2h, D2H_BUFFER_WORD_SIZE, false)) && "Failed to create D2H buffer");
@@ -346,12 +396,22 @@ int main (int argc, char **argv)
 
   printf("Performing data transfer. Ctrl + c to terminate.\n");
 
-  IIO_ENSURE(iio_channel_is_output(dma_chan_h2d) && "H2D expected to be an output channel");
+  IIO_ENSURE(iio_channel_is_output(chan_dma_h2d) && "H2D expected to be an output channel");
 
-  for (int i = 0; i < 10; i++)
-  {
-    send_config(dma_chan_h2d, dma_buffer_h2d);
-  }
+  adc_config config;
+  config.rf_bandwidth_hz          = MHZ(3.0);
+  config.sampling_frequency_hz    = MHZ(8.0);
+  config.lo_hz                    = MHZ(1090);
+  config.hw_gain_db               = 70;
+  config.filter_fir_en            = 0;
+  config.quadrature_tracking_en   = 1;
+  config.bb_dc_offset_tracking_en = 1;
+  config.rf_dc_offset_tracking_en = 1;
+  config.agc_mode                 = "manual";
+  config.rf_port                  = "A_BALANCED";
+
+  send_adc_config(&config);
+  send_adsb_config(chan_dma_h2d, dma_buffer_h2d);
 
   while (!stop)
   {
@@ -377,7 +437,7 @@ int main (int argc, char **argv)
       timeout = false;
 
     (void)snprintf(sbuf, sizeof(sbuf), "$ RX (%d): ", n_bytes);
-    process_buffer(sbuf, dma_chan_d2h, dma_buffer_d2h);
+    process_buffer(sbuf, chan_dma_d2h, dma_buffer_d2h);
 
     usleep(10000);
   }
