@@ -9,7 +9,7 @@ ESM_CONTROL_MAGIC_NUM             = 0x45534D43
 ESM_MODULE_ID_CONTROL             = 0x00
 ESM_CONTROL_MESSAGE_TYPE_ENABLE   = 0x00
 
-class esm_config:
+class esm_dwell_controller:
   PACKED_ESM_CONFIG = struct.Struct("<" + PACKED_UINT32 + \
                                           PACKED_UINT32 + \
                                           "xx" + PACKED_UINT8 + PACKED_UINT8 + \
@@ -21,8 +21,6 @@ class esm_config:
     self.seq_num = 0
     #TODO: logger
 
-    #print(dir(chan_dma_h2d))
-    #print(chan_dma_h2d.__dict__)
     print(chan_dma_h2d.device)
     self.buffer = iio.Buffer(chan_dma_h2d.device, self.TRANSFER_SIZE, False)  #one full buffer per transfer
     print(self.buffer)

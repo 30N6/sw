@@ -6,6 +6,7 @@ import numpy as np
 #from PIL import Image
 import iio_info
 import esm_config
+import esm_dwell_controller
 import esm_reader
 
 config = []
@@ -39,8 +40,12 @@ def main():
 
   context.set_timeout(1000)
 
-  config = esm_config.esm_config(chan_dma_h2d)
-  reader = esm_reader.esm_reader(chan_dma_d2h)
+  config            = esm_config.esm_config(chan_dma_h2d)
+  #TODO: pull out buffer
+  #dwell_controller  = esm_dwell_controller.esm_dwell_controller(chan_dma_h2d)
+  reader            = esm_reader.esm_reader(chan_dma_d2h)
+
+
   config.send_reset()
   config.send_enables(3, 3, 1)
 

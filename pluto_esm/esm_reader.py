@@ -1,6 +1,7 @@
 import struct
 import iio
 import esm_status_reporter
+import esm_dwell_stats
 
 PACKED_UINT8  = "B"
 PACKED_UINT32 = "I"
@@ -26,12 +27,13 @@ class esm_reader:
   BUFFER_SIZE = 4*TRANSFER_SIZE // WORD_SIZE
 
   def __init__(self, chan_dma_d2h):
-    self.chan_dma_d2h = chan_dma_d2h
+    #TODO: logger
     self.next_seq_num = 0 #TODO: detect gaps
     self.buffer = iio.Buffer(chan_dma_d2h.device, self.BUFFER_SIZE, False)
     self.buffer.set_blocking_mode(True)
 
-    self.status_reporter = esm_status_reporter.esm_status_reporter(0)
+    self.status_reporter  = esm_status_reporter.esm_status_reporter(0)
+    self.dwell_stats      = esm_dwell_stats.esm_dwell_stats(0)
 
   def read(self):
     data = []
@@ -45,29 +47,6 @@ class esm_reader:
       print("timeout -- OSError: {}".format(e))
     except Exception as e:
       print("Exception: {}".format(e))
-
-  def send_reset(self):
-    packed_data = self.PACKED_ESM_CONFIG.pack(ESM_CONTROL_MAGIC_NUM,
-                                              self.seq_num,
-                                              ESM_MODULE_ID_CONTROL, ESM_CONTROL_MESSAGE_TYPE_ENABLE,
-                                              1, 0, 0, 0)
-    self.seq_num += 1
-    self._send_control(packed_data)
-
-  def send_enables(self, chan_enable, pdw_enable, status_enable):
-    packed_data = self.PACKED_ESM_CONFIG.pack(ESM_CONTROL_MAGIC_NUM,
-                                              self.seq_num,
-                                              ESM_MODULE_ID_CONTROL, ESM_CONTROL_MESSAGE_TYPE_ENABLE,
-                                              0, chan_enable, pdw_enable, status_enable)
-    self.seq_num += 1
-    self._send_control(packed_data)
-
-  def _send_control(self, data):
-    bytes_written = self.buffer.write(bytearray(data))
-    if bytes_written == 0:
-      raise Exception("failed to write buffer")
-    self.buffer.push()
-    print("wrote {} to buffer".format(data))
 
   def _process_buffer(self, data):
     assert ((len(data) % self.TRANSFER_SIZE) == 0)
