@@ -5,9 +5,10 @@ import numpy as np
 #import pygame
 #from PIL import Image
 import iio_info
+import dma_reader
+import dma_writer
 import esm_config
 import esm_dwell_controller
-import esm_reader
 
 config = []
 
@@ -40,14 +41,18 @@ def main():
 
   context.set_timeout(1000)
 
-  config            = esm_config.esm_config(chan_dma_h2d)
-  #TODO: pull out buffer
-  #dwell_controller  = esm_dwell_controller.esm_dwell_controller(chan_dma_h2d)
-  reader            = esm_reader.esm_reader(chan_dma_d2h)
-
+  reader            = dma_reader.dma_reader(chan_dma_d2h)
+  writer            = dma_writer.dma_writer(chan_dma_h2d)
+  config            = esm_config.esm_config(writer)
+  dwell_controller  = esm_dwell_controller.esm_dwell_controller(config)
 
   config.send_reset()
-  config.send_enables(3, 3, 1)
+  config.send_enables(3, 0, 1) #TODO: config.send_enables(3, 3, 1)
+
+  dwell_controller.send_default_dwell_program()
+  dwell_controller.send_default_dwell_entries()
+
+
 
   while True:
     reader.read()

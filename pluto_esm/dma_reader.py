@@ -13,14 +13,8 @@ ESM_REPORT_MESSAGE_TYPE_PDW_PULSE   = 0x20
 ESM_REPORT_MESSAGE_TYPE_PDW_SUMMARY = 0x21
 ESM_REPORT_MESSAGE_TYPE_STATUS      = 0x30
 
-class esm_reader:
+class dma_reader:
   PACKED_ESM_REPORT_HEADER = struct.Struct("<" + PACKED_UINT32 + PACKED_UINT32 + "xx" + PACKED_UINT8 + PACKED_UINT8)
-
-  #PACKED_ESM_CONFIG = struct.Struct("<" + PACKED_UINT32 + \
-  #                                        PACKED_UINT32 + \
-  #                                        PACKED_UINT8 + PACKED_UINT8 + "xx" + \
-  #                                        PACKED_UINT8 + PACKED_UINT8 + PACKED_UINT8 + PACKED_UINT8)
-  #
 
   WORD_SIZE = 4
   TRANSFER_SIZE = 256
