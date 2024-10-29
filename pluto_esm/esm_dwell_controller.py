@@ -117,14 +117,14 @@ class esm_dwell_controller:
 
   def send_default_dwell_entries(self):
     for i in range(4): #range(ESM_NUM_DWELL_ENTRIES):
-      dwell_entry = esm_message_dwell_entry(i, self.dwell_tag, i * 1000, int(0.010 / FAST_CLOCK_PERIOD), 0, i % ESM_NUM_FAST_LOCK_PROFILES, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFFFFFFFFFF, 0xFF)
+      dwell_entry = esm_message_dwell_entry(i, self.dwell_tag, i * 1000, int(1.00 / FAST_CLOCK_PERIOD), 0, i % ESM_NUM_FAST_LOCK_PROFILES, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFFFFFFFFFF, 0xFF)
       self.dwell_tag += 1
       self._send_dwell_entry(dwell_entry)
 
   def send_default_dwell_program(self):
     dwell_instructions = []
     for i in range(ESM_NUM_DWELL_INSTRUCTIONS):
-      dwell_instructions.append(esm_dwell_instruction(i < 4, 0, 0, 1, 1, 1, 0, i, (i + 1) % ESM_NUM_DWELL_INSTRUCTIONS))
+      dwell_instructions.append(esm_dwell_instruction(i < 5, 0, 0, 1, 1, 1, 0, i, (i + 1) % 4))
     dwell_program = esm_message_dwell_program(1, 0, 100, 200, dwell_instructions)
     self._send_dwell_program(dwell_program)
 

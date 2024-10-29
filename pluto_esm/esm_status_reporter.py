@@ -10,6 +10,7 @@ class esm_status_reporter:
 
   def __init__(self, logger):
     #TODO: logging
+    self.next_seq_num = 0
     self.last_timestamp = 0
     pass
 
@@ -23,6 +24,12 @@ class esm_status_reporter:
     timestamp     = (unpacked_report[6] << 32) | unpacked_report[7]
 
     print("status_reporter: seq_num={} enables={} status={} timestamp={:x} diff={}".format(seq_num, enables_word, status_word, timestamp, timestamp - self.last_timestamp))
+
+    if seq_num != self.next_seq_num:
+      #TODO: logging
+      print("Status reporter seq num gap: expected {}, received {}".format(self.next_seq_num, seq_num))
+    self.next_seq_num = (seq_num + 1) & 0xFFFFFFFF
+
 
     if status_word != 0:
       raise RuntimeError("Hardware error detected: {:x}".format(status_word))

@@ -18,12 +18,11 @@ class dma_reader:
 
   WORD_SIZE = 4
   TRANSFER_SIZE = 256
-  TRANSFERS_PER_BUFFER = 16
+  TRANSFERS_PER_BUFFER = 8
   BUFFER_SIZE = TRANSFERS_PER_BUFFER*TRANSFER_SIZE // WORD_SIZE
 
   def __init__(self, chan_dma_d2h):
     #TODO: logger
-    self.next_seq_num = 0 #TODO: detect gaps
     self.buffer = iio.Buffer(chan_dma_d2h.device, self.BUFFER_SIZE, False)
     self.buffer.set_blocking_mode(True)
 
@@ -35,7 +34,7 @@ class dma_reader:
     try:
       self.buffer.refill()
       data = self.buffer.read()
-      print(data)
+      #print(data)
       self._process_buffer(data)
 
     except OSError as e:
@@ -63,12 +62,6 @@ class dma_reader:
     if magic_num != ESM_REPORT_MAGIC_NUM:
       raise RuntimeError("Invalid magic number. header={} full_data={}".format(unpacked_header, full_data))
 
-    if seq_num != self.next_seq_num:
-      #TODO: logging
-      print("Seq num gap: expected {}, received {}".format(self.next_seq_num, seq_num))
-
-    self.next_seq_num = (seq_num + 1) & 0xFFFFFFFF
-
     if msg_type == ESM_REPORT_MESSAGE_TYPE_STATUS:
       self.status_reporter.process_message(full_data)
     elif msg_type in (ESM_REPORT_MESSAGE_TYPE_PDW_PULSE, ESM_REPORT_MESSAGE_TYPE_PDW_SUMMARY):
@@ -76,4 +69,4 @@ class dma_reader:
     elif msg_type == ESM_REPORT_MESSAGE_TYPE_DWELL_STATS:
       self.dwell_stats.process_message(full_data)
 
-    print(header)
+    #print(header)
