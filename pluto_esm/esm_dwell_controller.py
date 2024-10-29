@@ -19,7 +19,7 @@ FAST_CLOCK_PERIOD           = 1/(4*61.44e6)
 
 class esm_message_dwell_entry:
   PACKED_ESM_MESSAGE_DWELL_ENTRY = struct.Struct("<" +
-                                                  PACKED_UINT8 + "xxx" +
+                                                  PACKED_UINT8 + "xxx" + "xxxx" +
                                                   PACKED_UINT16 + PACKED_UINT16 +
                                                   PACKED_UINT32 +
                                                   PACKED_UINT8 + PACKED_UINT8 + "xx" +
@@ -57,10 +57,13 @@ class esm_message_dwell_entry:
 class esm_dwell_instruction:
   PACKED_DWELL_INSTRUCTION = struct.Struct("<" + PACKED_UINT8 + PACKED_UINT8 + PACKED_UINT8 + PACKED_UINT8)
 
-  def __init__(self, valid, global_counter_check, global_counter_dec, repeat_count, entry_index, next_instruction_index):
+  def __init__(self, valid, global_counter_check, global_counter_dec, skip_pll_prelock_wait, skip_pll_lock_check, skip_pll_postlock_wait, repeat_count, entry_index, next_instruction_index):
     assert (valid <= 1)
     assert (global_counter_check <= 1)
     assert (global_counter_dec <= 1)
+    assert (skip_pll_prelock_wait <= 1)
+    assert (skip_pll_lock_check <= 1)
+    assert (skip_pll_postlock_wait <= 1)
     assert (repeat_count < 16)
     assert (entry_index < ESM_NUM_DWELL_ENTRIES)
     assert (next_instruction_index < ESM_NUM_DWELL_INSTRUCTIONS)
@@ -68,12 +71,17 @@ class esm_dwell_instruction:
     self.valid                  = valid
     self.global_counter_check   = global_counter_check
     self.global_counter_dec     = global_counter_dec
+    self.skip_pll_prelock_wait  = skip_pll_prelock_wait
+    self.skip_pll_lock_check    = skip_pll_lock_check
+    self.skip_pll_postlock_wait = skip_pll_postlock_wait
     self.repeat_count           = repeat_count
     self.entry_index            = entry_index
     self.next_instruction_index = next_instruction_index
 
   def pack(self):
-    return self.PACKED_DWELL_INSTRUCTION.pack(self.valid | (self.global_counter_check << 1) | (self.global_counter_dec << 2), self.repeat_count, self.entry_index, self.next_instruction_index)
+    command_byte = self.valid | (self.global_counter_check << 1) | (self.global_counter_dec << 2) | \
+                   (self.skip_pll_prelock_wait << 3) | (self.skip_pll_lock_check << 4) | (self.skip_pll_postlock_wait << 5)
+    return self.PACKED_DWELL_INSTRUCTION.pack(command_byte, self.repeat_count, self.entry_index, self.next_instruction_index)
 
 class esm_message_dwell_program:
   PACKED_DWELL_PROGRAM = struct.Struct("<" + PACKED_UINT8 + PACKED_UINT8 + "xx" + PACKED_UINT32 + PACKED_UINT64)
@@ -108,7 +116,7 @@ class esm_dwell_controller:
   #TODO: load from file
 
   def send_default_dwell_entries(self):
-    for i in range(ESM_NUM_DWELL_ENTRIES):
+    for i in range(4): #range(ESM_NUM_DWELL_ENTRIES):
       dwell_entry = esm_message_dwell_entry(i, self.dwell_tag, i * 1000, int(0.010 / FAST_CLOCK_PERIOD), 0, i % ESM_NUM_FAST_LOCK_PROFILES, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFFFFFFFFFF, 0xFF)
       self.dwell_tag += 1
       self._send_dwell_entry(dwell_entry)
@@ -116,9 +124,7 @@ class esm_dwell_controller:
   def send_default_dwell_program(self):
     dwell_instructions = []
     for i in range(ESM_NUM_DWELL_INSTRUCTIONS):
-      dwell_instructions.append(esm_dwell_instruction(i < 10, 0, 0, 0, i, (i + 1) % ESM_NUM_DWELL_INSTRUCTIONS))
-      print("dwell_instruction[{}]".format(i))
-    print(len(dwell_instructions))
+      dwell_instructions.append(esm_dwell_instruction(i < 4, 0, 0, 1, 1, 1, 0, i, (i + 1) % ESM_NUM_DWELL_INSTRUCTIONS))
     dwell_program = esm_message_dwell_program(1, 0, 100, 200, dwell_instructions)
     self._send_dwell_program(dwell_program)
 
@@ -127,5 +133,5 @@ class esm_dwell_controller:
     self.dwells_by_tag[dwell_entry.tag] = dwell_entry
 
   def _send_dwell_program(self, dwell_program):
-    self.config_writer.send_module_data(ESM_MODULE_ID_DWELL_CONTROLLER, ESM_CONTROL_MESSAGE_TYPE_DWELL_PROGRAM, dwell_program.pack() + bytearray(b'T'))
+    self.config_writer.send_module_data(ESM_MODULE_ID_DWELL_CONTROLLER, ESM_CONTROL_MESSAGE_TYPE_DWELL_PROGRAM, dwell_program.pack())
     self.current_dwell_program = dwell_program

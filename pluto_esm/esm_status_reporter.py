@@ -24,4 +24,7 @@ class esm_status_reporter:
 
     print("status_reporter: seq_num={} enables={} status={} timestamp={:x} diff={}".format(seq_num, enables_word, status_word, timestamp, timestamp - self.last_timestamp))
 
+    if status_word != 0:
+      raise RuntimeError("Hardware error detected: {:x}".format(status_word))
+
     self.last_timestamp = timestamp

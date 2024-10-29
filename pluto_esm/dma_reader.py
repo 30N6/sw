@@ -18,7 +18,8 @@ class dma_reader:
 
   WORD_SIZE = 4
   TRANSFER_SIZE = 256
-  BUFFER_SIZE = 4*TRANSFER_SIZE // WORD_SIZE
+  TRANSFERS_PER_BUFFER = 16
+  BUFFER_SIZE = TRANSFERS_PER_BUFFER*TRANSFER_SIZE // WORD_SIZE
 
   def __init__(self, chan_dma_d2h):
     #TODO: logger
@@ -73,6 +74,6 @@ class dma_reader:
     elif msg_type in (ESM_REPORT_MESSAGE_TYPE_PDW_PULSE, ESM_REPORT_MESSAGE_TYPE_PDW_SUMMARY):
       print("PDW message: not implemented")
     elif msg_type == ESM_REPORT_MESSAGE_TYPE_DWELL_STATS:
-      print("Dwell stats: not implemented")
+      self.dwell_stats.process_message(full_data)
 
     print(header)

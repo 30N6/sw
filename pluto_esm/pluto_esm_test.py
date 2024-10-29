@@ -49,8 +49,9 @@ def main():
   config.send_reset()
   config.send_enables(3, 0, 1) #TODO: config.send_enables(3, 3, 1)
 
-  dwell_controller.send_default_dwell_program()
   dwell_controller.send_default_dwell_entries()
+  dwell_controller.send_default_dwell_program()
+  #
 
 
 
