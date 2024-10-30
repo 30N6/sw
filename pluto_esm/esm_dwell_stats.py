@@ -1,18 +1,5 @@
 import struct
-
-PACKED_UINT8  = "B"
-PACKED_UINT16 = "H"
-PACKED_UINT32 = "I"
-PACKED_UINT64 = "Q"
-
-ESM_REPORT_MAGIC_NUM                = 0x45534D52
-ESM_MODULE_ID_DWELL_STATS_NARROW    = 0x02
-ESM_MODULE_ID_DWELL_STATS_WIDE      = 0x03
-ESM_REPORT_MESSAGE_TYPE_DWELL_STATS = 0x11
-ESM_NUM_CHANNELS_WIDE               = 8
-ESM_NUM_CHANNELS_NARROW             = 64
-
-TRANSFER_SIZE = 256
+from esm_pkg import *
 
 class esm_dwell_stats:
   PACKED_HEADER = struct.Struct("<" + PACKED_UINT32 + PACKED_UINT32 + "xx" + PACKED_UINT8 + PACKED_UINT8 +
@@ -38,14 +25,12 @@ class esm_dwell_stats:
     #TODO: logging
     pass
 
-  def process_message(self, data):
+  def _process_common_header(self, data):
     assert (len(data) == TRANSFER_SIZE)
-
     #TODO: logging
-    #TODO: is this dwell header scheme reasonable? seems inefficient
 
     #print("dwell_stats: {}".format(data))
-    unpacked_header = self.PACKED_HEADER.unpack(data[:self.PACKED_HEADER.size])
+    unpacked_header = PACKED_ESM_REPORT_COMMON_HEADER.unpack(data[:PACKED_ESM_REPORT_COMMON_HEADER.size])
     #print(unpacked_header)
 
     magic_num   = unpacked_header[0]
@@ -61,6 +46,12 @@ class esm_dwell_stats:
       #TODO: logging
       print("Dwell stats seq num gap: expected {}, received {}".format(self.next_msg_seq_num, msg_seq_num))
     self.next_msg_seq_num = (msg_seq_num + 1) & 0xFFFFFFFF
+
+  def process_message(self, data):
+    self._process_common_header(data)
+    #TODO: is this dwell header scheme reasonable? seems inefficient
+
+    unpacked_header = self.PACKED_HEADER.unpack(data[:self.PACKED_HEADER.size])
 
     dwell_seq_num           = unpacked_header[4]
     frequency               = unpacked_header[5]

@@ -6,6 +6,7 @@ PACKED_UINT16 = "H"
 PACKED_UINT32 = "I"
 PACKED_UINT64 = "Q"
 
+#TODO: esm_pkg
 ESM_CONTROL_MAGIC_NUM                   = 0x45534D43
 ESM_MODULE_ID_DWELL_CONTROLLER          = 0x01
 ESM_CONTROL_MESSAGE_TYPE_DWELL_ENTRY    = 0x01
@@ -117,7 +118,7 @@ class esm_dwell_controller:
 
   def send_default_dwell_entries(self):
     for i in range(4): #range(ESM_NUM_DWELL_ENTRIES):
-      dwell_entry = esm_message_dwell_entry(i, self.dwell_tag, i * 1000, int(1.00 / FAST_CLOCK_PERIOD), 0, i % ESM_NUM_FAST_LOCK_PROFILES, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFFFFFFFFFF, 0xFF)
+      dwell_entry = esm_message_dwell_entry(i, self.dwell_tag, i * 1000, int(1.00 / FAST_CLOCK_PERIOD), 0, i % ESM_NUM_FAST_LOCK_PROFILES, 16000, 16000, 0xFFFFFFFFFFFFFFFF, 0xFF)
       self.dwell_tag += 1
       self._send_dwell_entry(dwell_entry)
 

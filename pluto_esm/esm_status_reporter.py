@@ -1,8 +1,5 @@
 import struct
-
-PACKED_UINT8  = "B"
-PACKED_UINT32 = "I"
-PACKED_UINT64 = "Q"
+from esm_pkg import *
 
 class esm_status_reporter:
   PACKED_STATUS_REPORT = struct.Struct("<" + PACKED_UINT32 + PACKED_UINT32 + "xx" + PACKED_UINT8 + PACKED_UINT8 +
@@ -32,6 +29,8 @@ class esm_status_reporter:
 
 
     if status_word != 0:
-      raise RuntimeError("Hardware error detected: {:x}".format(status_word))
+      #raise RuntimeError("Hardware error detected: {:x}".format(status_word))
+      print("Hardware error detected: {:x}".format(status_word))
+      exit()
 
     self.last_timestamp = timestamp
