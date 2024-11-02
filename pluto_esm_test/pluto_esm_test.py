@@ -48,6 +48,8 @@ def main():
 
   config.send_reset()
   #reader.read()
+  #config.send_enables(0, 0, 1) #TODO: config.send_enables(3, 3, 1)
+  #reader.read()
   config.send_enables(3, 3, 1) #TODO: config.send_enables(3, 3, 1)
 
   dwell_controller.send_default_dwell_entries()
@@ -66,5 +68,6 @@ if __name__ == "__main__":
   except KeyboardInterrupt:
     print("interrupted: {}".format(config))
     config.send_reset()
+    #config.send_enables(0, 0, 0)
     time.sleep(0)
     sys.exit(0)

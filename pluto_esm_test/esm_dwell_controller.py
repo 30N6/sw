@@ -27,9 +27,9 @@ class esm_message_dwell_entry:
                                                   PACKED_UINT32 +
                                                   PACKED_UINT32 +
                                                   PACKED_UINT64 +
-                                                  PACKED_UINT8)
+                                                  PACKED_UINT8 + "x" + PACKED_UINT16)
 
-  def __init__(self, entry_index, tag, freq, duration, gain, fast_lock_profile, thresh_n, thresh_w, chan_mask_n, chan_mask_w):
+  def __init__(self, entry_index, tag, freq, duration, gain, fast_lock_profile, thresh_n, thresh_w, chan_mask_n, chan_mask_w, min_pd):
     assert (entry_index < ESM_NUM_DWELL_ENTRIES)
     assert (tag <= 0xFFFF)
     assert (freq <= 0xFFFF)
@@ -40,6 +40,7 @@ class esm_message_dwell_entry:
     assert (thresh_w <= 0xFFFFFFFF)
     assert (chan_mask_n <= 0xFFFFFFFFFFFFFFFF)
     assert (chan_mask_w <= 0xFF)
+    assert (min_pd <= 0xFFFF)
 
     self.entry_index          = entry_index
     self.tag                  = tag
@@ -51,9 +52,10 @@ class esm_message_dwell_entry:
     self.threshold_wide       = thresh_w
     self.channel_mask_narrow  = chan_mask_n
     self.channel_mask_wide    = chan_mask_w
+    self.min_pulse_duration   = min_pd
 
   def pack(self):
-    return self.PACKED_ESM_MESSAGE_DWELL_ENTRY.pack(self.entry_index, self.tag, self.frequency, self.duration, self.gain, self.fast_lock_profile, self.threshold_narrow, self.threshold_wide, self.channel_mask_narrow, self.channel_mask_wide)
+    return self.PACKED_ESM_MESSAGE_DWELL_ENTRY.pack(self.entry_index, self.tag, self.frequency, self.duration, self.gain, self.fast_lock_profile, self.threshold_narrow, self.threshold_wide, self.channel_mask_narrow, self.channel_mask_wide, self.min_pulse_duration)
 
 class esm_dwell_instruction:
   PACKED_DWELL_INSTRUCTION = struct.Struct("<" + PACKED_UINT8 + PACKED_UINT8 + PACKED_UINT8 + PACKED_UINT8)
@@ -118,7 +120,9 @@ class esm_dwell_controller:
 
   def send_default_dwell_entries(self):
     for i in range(4): #range(ESM_NUM_DWELL_ENTRIES):
-      dwell_entry = esm_message_dwell_entry(i, self.dwell_tag, i * 1000, int(1.00 / FAST_CLOCK_PERIOD), 0, i % ESM_NUM_FAST_LOCK_PROFILES, 16000, 16000, 0xFFFFFFFFFFFFFFFF, 0xFF)
+      power_threshold = 30000
+      pd_threshold = 50
+      dwell_entry = esm_message_dwell_entry(i, self.dwell_tag, i * 1000, int(0.5 / FAST_CLOCK_PERIOD), 0, i % ESM_NUM_FAST_LOCK_PROFILES, power_threshold, power_threshold, 0xFFFFFFFFFFFFFFFF, 0xFF, pd_threshold)
       self.dwell_tag += 1
       self._send_dwell_entry(dwell_entry)
 
@@ -126,6 +130,7 @@ class esm_dwell_controller:
     dwell_instructions = []
     for i in range(ESM_NUM_DWELL_INSTRUCTIONS):
       dwell_instructions.append(esm_dwell_instruction(i < 5, 0, 0, 1, 1, 1, 0, i, (i + 1) % 4))
+      #dwell_instructions.append(esm_dwell_instruction(i < 5, 0, 0, 1, 1, 1, 0, i, (i + 1) % ESM_NUM_DWELL_INSTRUCTIONS ))
     dwell_program = esm_message_dwell_program(1, 0, 100, 200, dwell_instructions)
     self._send_dwell_program(dwell_program)
 
