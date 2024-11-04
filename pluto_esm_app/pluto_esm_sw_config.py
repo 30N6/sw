@@ -7,14 +7,31 @@ class pluto_esm_sw_config:
     self.config = json.load(fd)
     fd.close()
 
-    self.scan_dwells = self.compute_scan_dwells(self.config["scan_config"])
+    self.scan_dwells = self.compute_scan_dwells(self.config)
 
-  def compute_scan_dwells(self, scan_config):
+  def compute_scan_dwells(self, config):
     max_freq = 0
+    scan_config = config["scan_config"]
     for entry in scan_config["include_freqs"]:
       max_freq = max(max_freq, entry["freq_range"][0], entry["freq_range"][1])
 
-    dwell_time_bins = get_dwell_time_bins(scan_config, max_freq)
+    dwell_time_bins = self.get_dwell_time_bins(scan_config, max_freq)
+    dwell_by_freq = self.get_dwells_from_bins(dwell_time_bins, config["dwell_constraints"])
+    return dwell_by_freq
+
+  def get_dwells_from_bins(self, bins, dwell_constraints):
+    dwells = {}
+
+    for freq in range(len(bins)):
+      if bins[freq] == 0:
+        continue
+      nearest_dwell_freq = int(np.round((freq - dwell_constraints["freq_start"]) / dwell_constraints["freq_step"]) * dwell_constraints["freq_step"] + dwell_constraints["freq_start"])
+      if nearest_dwell_freq not in dwells:
+        dwells[nearest_dwell_freq] = bins[freq]
+      else:
+        dwells[nearest_dwell_freq] = max(dwells[nearest_dwell_freq], bins[freq])
+
+    return dwells
 
   def get_dwell_time_bins(self, scan_config, max_freq):
     dwell_time_bins = np.zeros(max_freq + 1)
@@ -32,5 +49,3 @@ class pluto_esm_sw_config:
       dwell_time_bins[i_start:i_end] = 0
 
     return dwell_time_bins
-
-    pass

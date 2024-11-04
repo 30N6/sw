@@ -17,7 +17,9 @@ def main():
 
   context = iio.Context("ip:192.168.3.100")
   info = iio_info.iio_info(context)
-  info.print_info(False)
+  info.print_info(True)
+
+  return
 
   dev_d2h     = context.find_device("axi-iio-dma-d2h")
   dev_h2d     = context.find_device("axi-iio-dma-h2d")

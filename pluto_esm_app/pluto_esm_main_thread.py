@@ -14,7 +14,7 @@ class pluto_esm_main_thread:
     self.clock = pygame.time.Clock()
 
     self.sw_config = pluto_esm_sw_config.pluto_esm_sw_config("./pluto_esm_sample_config.json")
-    #self.sequencer = pluto_esm_sequencer.pluto_esm_sequencer(pluto_esm_sw_configdwell_config)
+    self.sequencer = pluto_esm_sequencer.pluto_esm_sequencer(self.sw_config.scan_dwells, [])
 
     self.render_spectrum = render_spectrum.render_spectrum(self.surface)
 
