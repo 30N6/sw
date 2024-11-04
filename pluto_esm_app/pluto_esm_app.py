@@ -14,5 +14,4 @@ if __name__ == "__main__":
     main()
   except KeyboardInterrupt:
     print("interrupted")
-    time.sleep(0)
     sys.exit(0)
