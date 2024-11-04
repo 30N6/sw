@@ -13,6 +13,6 @@ if __name__ == "__main__":
   try:
     main()
   except KeyboardInterrupt:
-    print("interrupted: {}".format([]))
+    print("interrupted")
     time.sleep(0)
     sys.exit(0)

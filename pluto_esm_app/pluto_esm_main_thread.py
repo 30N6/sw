@@ -1,6 +1,7 @@
 import pygame
 import pluto_esm_sw_config
 import pluto_esm_sequencer
+import pluto_esm_hw_interface
 import render_spectrum
 
 class pluto_esm_main_thread:
@@ -15,6 +16,10 @@ class pluto_esm_main_thread:
 
     self.sw_config = pluto_esm_sw_config.pluto_esm_sw_config("./pluto_esm_sample_config.json")
     self.sequencer = pluto_esm_sequencer.pluto_esm_sequencer(self.sw_config.scan_dwells, [])
+
+    self.hw_interface = pluto_esm_hw_interface.pluto_esm_hw_interface([], "ip:192.168.3.100")
+
+    self.hw_interface.test()
 
     self.render_spectrum = render_spectrum.render_spectrum(self.surface)
 
@@ -36,4 +41,6 @@ class pluto_esm_main_thread:
       pygame.display.flip()
       self.clock.tick(self.FPS)
 
+    print("sending shutdown")
+    self.hw_interface.shutdown()
     pygame.quit()
