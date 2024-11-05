@@ -17,6 +17,8 @@ class render_spectrum:
 
     self.dwell_cal_height = 0.125
 
+    self.font = pygame.font.SysFont('Consolas', 14)
+
   @staticmethod
   def _color_interp(ca, cb, pct):
     pct = min(1.0, max(0.0, pct))
@@ -43,10 +45,19 @@ class render_spectrum:
 
       pygame.draw.rect(self.surface, dwell_color, dwell_rect, 0)
 
+  def _render_state(self):
+    state_str = "{:>20} {:>16}".format(self.sequencer.state, self.sequencer.dwell_state)
+    text_data = self.font.render(state_str, True, (0, 192, 192))
+    text_rect = text_data.get_rect()
+    text_rect.left = 16
+    text_rect.bottom = 792
+    self.surface.blit(text_data, text_rect)
+
   def render(self):
     rect_dwell_display = [16, 16,  600, 64]
 
     self._render_dwell_display(rect_dwell_display)
+    self._render_state()
 
     pygame.draw.rect(self.surface, (0, 0, 255), [0, 0, 640, 768], 1)
     pygame.draw.rect(self.surface, (0, 128, 128), rect_dwell_display, 1)
