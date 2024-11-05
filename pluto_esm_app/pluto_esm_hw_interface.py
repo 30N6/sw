@@ -76,7 +76,10 @@ class pluto_esm_hw_command_processor_thread:
   def run(self):
     running = True
     while running:
+      self.logger.log(self.logger.LL_DEBUG, "recv start")
       cmd = self.pipe.recv()
+      t_start = time.time()
+      self.logger.log(self.logger.LL_DEBUG, "command_start")
       if cmd["command_type"] == hw_command.CMD_WRITE_ATTR_PHY:
         self.chan_ad9361_phy.attrs[cmd["attr"]].value = cmd["data"]
         self.pipe.send({"unique_key": cmd["unique_key"], "data": None})
@@ -110,6 +113,8 @@ class pluto_esm_hw_command_processor_thread:
         raise RuntimeError("invalid command")
         running = False
 
+      self.logger.log(self.logger.LL_DEBUG, "command_end: diff={}".format(time.time() - t_start))
+
     self.logger.shutdown("graceful exit")
 
   def shutdown(self, reason):
@@ -127,6 +132,7 @@ class pluto_esm_hw_command_processor:
   def __init__(self, pluto_uri, logger):
     self.unique_key = 0
     self.received_data = {}
+    self.ack_not_expected = []
     self.pluto_uri = pluto_uri
     self.logger = logger
     self.master_pipe, slave_pipe = Pipe()
@@ -138,10 +144,16 @@ class pluto_esm_hw_command_processor:
     while self.master_pipe.poll():
       data = self.master_pipe.recv()
       assert (data["unique_key"] not in self.received_data)
-      self.received_data[data["unique_key"]] = data
+      if data["unique_key"] in self.ack_not_expected:
+        self.logger.log(self.logger.LL_DEBUG, "[hwcp] _update_receive_queue: dropping unique_key={} - ack not expected".format(data["unique_key"]))
+        self.ack_not_expected.remove(data["unique_key"])
+      else:
+        self.received_data[data["unique_key"]] = data
 
-  def send_command(self, cmd):
-    self.logger.log(self.logger.LL_DEBUG, "[hwcp] send_command: {}".format(cmd))
+  def send_command(self, cmd, expect_ack):
+    self.logger.log(self.logger.LL_DEBUG, "[hwcp] send_command: {} expect_ack={}".format(cmd, expect_ack))
+    if not expect_ack:
+      self.ack_not_expected.append(cmd["unique_key"])
     self.master_pipe.send(cmd)
 
   def try_get_result(self, unique_key):
@@ -157,10 +169,13 @@ class pluto_esm_hw_command_processor:
     self.unique_key += 1
     return k
 
+  def update(self):
+    self._update_receive_queue()
+
   def shutdown(self):
     self.logger.log(self.logger.LL_INFO, "[hwcp] shutdown")
     assert (self.hwc_process.is_alive())
-    self.send_command(hw_command.gen_stop())
+    self.send_command(hw_command.gen_stop(), False)
     self.hwc_process.join(1.0)
     assert (not self.hwc_process.is_alive())
 
@@ -202,7 +217,7 @@ class pluto_esm_hw_config:
     if num_words % 2 != 0:
       raise RuntimeError("Odd-length transfer attempted... this probably won't work.")
     cmd = hw_command.gen_write_dma(self.hwcp.get_next_unique_key(), data)
-    self.hwcp.send_command(cmd)
+    self.hwcp.send_command(cmd, False)
 
 
 class pluto_esm_hw_interface:
@@ -215,9 +230,7 @@ class pluto_esm_hw_interface:
     self.logger.log(self.logger.LL_INFO, "[hwi] init done, hwcp={}".format(self.hwcp))
     #TODO self.dma_reader =
 
-    self.fast_lock_cal_keys = []
-    self.fast_lock_cal_freq = 0
-    self.fast_lock_cal_pending = False
+    self.fast_lock_cal_pending = []
 
     self.hw_cfg.send_reset()
 
@@ -233,24 +246,22 @@ class pluto_esm_hw_interface:
     cmd.append(hw_command.gen_write_attr_rx_lo(self.hwcp.get_next_unique_key(), "fastlock_store", "0"))
     cmd.append(hw_command.gen_read_attr_rx_lo(self.hwcp.get_next_unique_key(), "fastlock_save"))
 
-    assert (not self.fast_lock_cal_pending)
-    self.fast_lock_cal_pending  = True
-    self.fast_lock_cal_keys     = [c["unique_key"] for c in cmd]
-    self.fast_lock_cal_freq     = frequency
+    self.fast_lock_cal_pending.append({"freq": frequency, "keys": [c["unique_key"] for c in cmd]})
 
     for entry in cmd:
-      self.hwcp.send_command(entry)
+      self.hwcp.send_command(entry, True)
 
   def check_fast_lock_cal_results(self):
-    assert (self.fast_lock_cal_pending)
-    cmd_result = self.hwcp.try_get_result(self.fast_lock_cal_keys[0])
+    assert (len(self.fast_lock_cal_pending) > 0)
+    cmd_result = self.hwcp.try_get_result(self.fast_lock_cal_pending[0]["keys"][0])
 
     if cmd_result is not None:
-      finished_key = self.fast_lock_cal_keys.pop(0)
+      finished_key = self.fast_lock_cal_pending[0]["keys"].pop(0)
       assert (cmd_result["unique_key"] == finished_key)
-      if len(self.fast_lock_cal_keys) == 0:
-        self.fast_lock_cal_pending = False
-        return {"freq": self.fast_lock_cal_freq, "data": cmd_result["data"]}
+      if len(self.fast_lock_cal_pending[0]["keys"]) == 0:
+        freq = self.fast_lock_cal_pending[0]["freq"]
+        self.fast_lock_cal_pending.pop(0)
+        return {"freq": freq, "data": cmd_result["data"]}
 
     return None
 
@@ -259,7 +270,7 @@ class pluto_esm_hw_interface:
       cmd = hw_command.gen_write_attr_rx_lo(self.hwcp.get_next_unique_key(), "frequency", str(int(freq * 1e6)))
       start_time = time.time()
       print("[{}] sending command: {}".format(start_time, cmd))
-      self.hwcp.send_command(cmd)
+      self.hwcp.send_command(cmd, True)
       r = None
       while r is None:
         r = self.hwcp.try_get_result(cmd["unique_key"])
@@ -271,7 +282,7 @@ class pluto_esm_hw_interface:
     #for freq in range(500, 5000, 100):
     #  cmd = hw_command.gen_write_attr_rx_lo(self.hwcp.get_next_unique_key(), "frequency", str(int(freq * 1e6)))
     #  print("[{}] sending command: {}".format(start_time, cmd))
-    #  self.hwcp.send_command(cmd)
+    #  self.hwcp.send_command(cmd, True)
     #  keys.append(cmd["unique_key"])
     #
     #for k in keys:
@@ -281,6 +292,8 @@ class pluto_esm_hw_interface:
     #  end_time = time.time()
     #  print("[{}] command complete: {} -- diff={}".format(end_time, r, end_time - start_time))
 
+  def update(self):
+    self.hwcp.update()
 
 
   def shutdown(self):

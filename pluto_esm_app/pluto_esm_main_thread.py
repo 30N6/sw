@@ -40,6 +40,7 @@ class pluto_esm_main_thread:
       self.logger.flush()
       #todo: read messages from queue
       #dwell_scheduler.update()
+      self.hw_interface.update()
       self.sequencer.update()
 
       self.surface.fill((0,0,0))
