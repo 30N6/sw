@@ -26,6 +26,9 @@ class pluto_esm_logger:
 
     self.fd.write("[{:04}-{:02}-{:02} {:02}:{:02}:{:09.6f}] {}\n".format(t_loc.tm_year, t_loc.tm_mon, t_loc.tm_mday, t_loc.tm_hour, t_loc.tm_min, t_sec, string))
 
+  def flush(self):
+    self.fd.flush()
+
   def shutdown(self, reason):
     self.log(self.LL_INFO, "shutdown - {}".format(reason))
     self.fd.close()

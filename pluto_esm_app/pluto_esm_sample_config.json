@@ -1,4 +1,5 @@
 {
+    "fast_lock_config": {"recalibration_interval": 60.0, "recalibration_pause": 2.0},
     "dwell_constraints": {"freq_start": 20, "freq_step": 40},
     "scan_config": {
       "include_freqs": [
