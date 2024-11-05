@@ -112,8 +112,8 @@ class pluto_esm_hw_command_processor_thread:
 
     self.logger.shutdown("graceful exit")
 
-    def shutdown(self, reason):
-      self.logger.shutdown(reason)
+  def shutdown(self, reason):
+    self.logger.shutdown(reason)
 
 def pluto_esm_hw_command_processor_thread_func(arg):
   thread = pluto_esm_hw_command_processor_thread(arg)

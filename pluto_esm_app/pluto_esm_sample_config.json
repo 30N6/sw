@@ -8,7 +8,7 @@
           {"freq_range": [2700, 3000], "dwell_time": 0.015, "comment": "WSR-88D"}
       ],
       "exclude_freqs": [
-          {"freq_range": [850, 900], "comment": "testing"}
+          {"freq_range": [800, 900], "comment": "testing"}
       ]
     },
     "emitter_config": {

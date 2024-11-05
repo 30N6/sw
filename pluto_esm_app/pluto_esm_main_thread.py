@@ -8,7 +8,7 @@ import render_spectrum
 
 class pluto_esm_main_thread:
   SCREEN_SIZE = (1280, 800)
-  FPS = 30
+  FPS = 60
   LOG_DIR = "./log"
 
   def __init__(self):
@@ -28,7 +28,7 @@ class pluto_esm_main_thread:
 
 
     #self.hw_interface.test()
-    self.render_spectrum = render_spectrum.render_spectrum(self.surface, self.sequencer)
+    self.render_spectrum = render_spectrum.render_spectrum(self.surface, self.sw_config, self.sequencer)
 
   def run(self):
     running = True
