@@ -5,6 +5,7 @@ class pluto_esm_logger:
   LL_DEBUG  = 0
   LL_INFO   = 1
   LL_WARN   = 2
+  LL_ERROR  = 3
 
   def __init__(self, path, prefix, min_level):
     self.path = path

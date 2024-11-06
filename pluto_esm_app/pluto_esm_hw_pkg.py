@@ -52,3 +52,18 @@ PACKED_ESM_MESSAGE_DWELL_ENTRY    = struct.Struct("<" + PACKED_UINT8 + "xxx" + "
 
 PACKED_DWELL_INSTRUCTION          = struct.Struct("<" + PACKED_UINT8 + PACKED_UINT8 + PACKED_UINT8 + PACKED_UINT8)
 PACKED_DWELL_PROGRAM              = struct.Struct("<" + PACKED_UINT8 + PACKED_UINT8 + "xx" + PACKED_UINT32 + PACKED_UINT64)
+
+PACKED_DWELL_STATS_HEADER = struct.Struct("<" + PACKED_UINT32 + PACKED_UINT32 + "xx" + PACKED_UINT8 + PACKED_UINT8 +
+                                                PACKED_UINT32 +
+                                                PACKED_UINT16 + PACKED_UINT16 +
+                                                PACKED_UINT32 +
+                                                PACKED_UINT8 + PACKED_UINT8 + PACKED_UINT8 + PACKED_UINT8 +
+                                                PACKED_UINT32 +
+                                                PACKED_UINT32 +
+                                                "xxxxxxxx" + "xxxx" +
+                                                PACKED_UINT32 +
+                                                PACKED_UINT32 +
+                                                PACKED_UINT32 + PACKED_UINT32 +
+                                                PACKED_UINT32 + PACKED_UINT32)
+PACKED_DWELL_STATS_CHANNEL_ENTRY = struct.Struct("<" + PACKED_UINT32 + PACKED_UINT32 + PACKED_UINT32 + PACKED_UINT32)
+NUM_DWELL_STATS_TRAILER_BYTES = TRANSFER_SIZE - PACKED_DWELL_STATS_HEADER.size

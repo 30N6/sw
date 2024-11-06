@@ -1,5 +1,6 @@
 import time
 import pluto_esm_hw_dwell
+import pluto_esm_hw_dwell_reporter
 import pluto_esm_hw_pkg
 
 class dwell_data:
@@ -26,6 +27,7 @@ class pluto_esm_sequencer:
     self.logger                         = logger
     self.hw_interface                   = hw_interface
     self.dwell_ctrl_interface           = pluto_esm_hw_dwell.esm_dwell_controller(hw_interface.hw_cfg)
+    self.dwell_reporter                 = pluto_esm_hw_dwell_reporter.pluto_esm_hw_dwell_reporter(logger)
 
     self.state                          = "IDLE"
 
@@ -45,6 +47,7 @@ class pluto_esm_sequencer:
     self.dwell_state                    = "IDLE"
     self.dwell_index                    = 0
     self.dwell_active                   = []  #TODO: rename
+    self.dwell_completed                = []
 
     self.scan_dwells = {}
     for freq in sw_config.scan_dwells:
@@ -193,6 +196,20 @@ class pluto_esm_sequencer:
 
     return pluto_esm_hw_dwell.esm_message_dwell_program(1, 0, 0, 0, dwell_instructions)
 
+  def process_dwell_reports(self):
+    while len(self.hw_interface.hwdr.output_data_dwell) > 0:
+      packed_report = self.hw_interface.hwdr.output_data_dwell.pop(0)
+      combined_report = self.dwell_reporter.process_message(packed_report)
+
+      if combined_report is not None:
+        assert (combined_report["frequency"] == self.dwell_active[0].frequency)
+        self.logger.log(self.logger.LL_INFO, "[sequencer] process_dwell_reports: combined report frequency={}".format(combined_report["frequency"]))
+        self.dwell_completed.append({"dwell_data": self.dwell_active.pop(0), "dwell_report": combined_report})
+      else:
+        self.logger.log(self.logger.LL_INFO, "[sequencer] process_dwell_reports: partial report")
+
+      #self.dwell_active.pop(0)
+
   def update_scan_dwells(self):
     if self.state != "ACTIVE":
       self.dwell_state = "IDLE"
@@ -234,6 +251,8 @@ class pluto_esm_sequencer:
         self.dwell_state = "HW_ACTIVE"
 
     if self.dwell_state == "HW_ACTIVE":
+      self.process_dwell_reports()
+      #
       #self.dwell_state = "
       pass
 

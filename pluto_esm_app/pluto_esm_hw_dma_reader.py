@@ -72,45 +72,17 @@ def pluto_esm_hw_dma_reader_thread_func(arg):
     thread.shutdown("interrupted")
 
 
-  def _process_buffer(self, data):
-    assert ((len(data) % self.TRANSFER_SIZE) == 0)
-    num_transfers = len(data) // self.TRANSFER_SIZE
-    #print("len(data)={}  num_transfers={}".format(len(data), num_transfers))
-
-    for i_xfer in range(num_transfers):
-      xfer_data = data[i_xfer*self.TRANSFER_SIZE : (i_xfer+1)*self.TRANSFER_SIZE]
-
-      unpacked_header = PACKED_ESM_REPORT_COMMON_HEADER.unpack(xfer_data[:PACKED_ESM_REPORT_COMMON_HEADER.size])
-      self._process_message(unpacked_header, xfer_data)
-
-  def _process_message(self, header, full_data):
-    magic_num = header[0]
-    seq_num   = header[1]
-    msg_type  = header[2]
-    mod_id    = header[3]
-
-    if magic_num != ESM_REPORT_MAGIC_NUM:
-      raise RuntimeError("Invalid magic number. header={} full_data={}".format(unpacked_header, full_data))
-
-    if msg_type == ESM_REPORT_MESSAGE_TYPE_STATUS:
-      self.status_reporter.process_message(full_data)
-    elif msg_type in (ESM_REPORT_MESSAGE_TYPE_PDW_PULSE, ESM_REPORT_MESSAGE_TYPE_PDW_SUMMARY):
-      self.pdw_encoder.process_message(full_data)
-    elif msg_type == ESM_REPORT_MESSAGE_TYPE_DWELL_STATS:
-      self.dwell_stats.process_message(full_data)
-    else:
-      raise RuntimeError("unknown message type: {}".format(msg_type))
-
-    #print(header)
-
 class pluto_esm_hw_dma_reader:
   def __init__(self, pluto_uri, logger):
     self.received_data = []
     self.pluto_uri = pluto_uri
     self.logger = logger
-
     self.request_queue = Queue()
     self.result_queue = Queue()
+
+    self.output_data_dwell = []
+    self.output_data_pdw = []
+    self.output_data_status = []
 
     self.hwdr_process = Process(target=pluto_esm_hw_dma_reader_thread_func,
                                args=({"pluto_uri": pluto_uri, "request_queue": self.request_queue, "result_queue": self.result_queue, "log_dir": logger.path, "log_level": logger.min_level}, ))
@@ -122,8 +94,45 @@ class pluto_esm_hw_dma_reader:
       self.received_data.append(data["data"])
       self.logger.log(self.logger.LL_DEBUG, "[hwdr] _update_receive_queue: received data: len={} uk={}".format(len(data), data["unique_key"]))
 
+  def _update_output_queues(self):
+    while len(self.received_data) > 0:
+      data = self.received_data.pop(0)
+
+      assert ((len(data) % TRANSFER_SIZE) == 0)
+      num_transfers = len(data) // TRANSFER_SIZE
+      for i_xfer in range(num_transfers):
+        xfer_data = data[i_xfer*TRANSFER_SIZE : (i_xfer+1)*TRANSFER_SIZE]
+        unpacked_header = PACKED_ESM_REPORT_COMMON_HEADER.unpack(xfer_data[:PACKED_ESM_REPORT_COMMON_HEADER.size])
+        self._process_message(unpacked_header, xfer_data)
+
+  def _process_message(self, header, full_data):
+    magic_num = header[0]
+    seq_num   = header[1]
+    msg_type  = header[2]
+    mod_id    = header[3]
+
+    if magic_num != ESM_REPORT_MAGIC_NUM:
+      #raise RuntimeError("Invalid magic number. header={} full_data={}".format(header, full_data))
+      print("Invalid magic number. header={} full_data={}".format(header, full_data))
+      self.logger.log(self.logger.LL_ERROR, "[hwdr] Invalid magic number. header={} full_data={}".format(header, full_data))
+      return
+
+    if msg_type == ESM_REPORT_MESSAGE_TYPE_STATUS:
+      self.logger.log(self.logger.LL_DEBUG, "[hwdr] _process_message: saving status message: seq_num={}".format(seq_num))
+      #self.output_data_status.append(full_data)
+      #TODO: log full thing here
+    elif msg_type in (ESM_REPORT_MESSAGE_TYPE_PDW_PULSE, ESM_REPORT_MESSAGE_TYPE_PDW_SUMMARY):
+      self.logger.log(self.logger.LL_DEBUG, "[hwdr] _process_message: saving PDW message: seq_num={}".format(seq_num))
+      self.output_data_pdw.append(full_data)
+    elif msg_type == ESM_REPORT_MESSAGE_TYPE_DWELL_STATS:
+      self.logger.log(self.logger.LL_DEBUG, "[hwdr] _process_message: saving dwell message: seq_num={}".format(seq_num))
+      self.output_data_dwell.append(full_data)
+    else:
+      raise RuntimeError("unknown message type: {}".format(msg_type))
+
   def update(self):
     self._update_receive_queue()
+    self._update_output_queues()
 
   def shutdown(self):
     self.logger.log(self.logger.LL_INFO, "[hwdr] shutdown")

@@ -281,4 +281,6 @@ class pluto_esm_hw_interface:
     self.hwdr.update()
 
   def shutdown(self):
+    self.hw_cfg.send_reset()
     self.hwcp.shutdown()
+    self.hwdr.shutdown()
