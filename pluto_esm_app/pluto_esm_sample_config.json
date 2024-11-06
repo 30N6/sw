@@ -3,9 +3,9 @@
     "dwell_constraints": {"freq_start": 20, "freq_step": 40},
     "scan_config": {
       "include_freqs": [
-          {"freq_range": [120,  5999], "dwell_time": 0.005, "comment": "full span"},
+          {"freq_range": [120,  5999], "dwell_time": 0.010, "comment": "full span"},
           {"freq_range": [1200, 1400], "dwell_time": 0.050, "comment": "ARSR-4"},
-          {"freq_range": [2700, 3000], "dwell_time": 0.015, "comment": "WSR-88D"}
+          {"freq_range": [2700, 3000], "dwell_time": 0.020, "comment": "WSR-88D"}
       ],
       "exclude_freqs": [
           {"freq_range": [800, 900], "comment": "testing"}

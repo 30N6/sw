@@ -48,6 +48,7 @@ class pluto_esm_sequencer:
     self.dwell_index                    = 0
     self.dwell_active                   = []  #TODO: rename
     self.dwell_completed                = []
+    self.dwell_history                  = {}
 
     self.scan_dwells = {}
     for freq in sw_config.scan_dwells:
@@ -205,6 +206,7 @@ class pluto_esm_sequencer:
         assert (combined_report["frequency"] == self.dwell_active[0].frequency)
         self.logger.log(self.logger.LL_INFO, "[sequencer] process_dwell_reports: combined report frequency={}".format(combined_report["frequency"]))
         self.dwell_completed.append({"dwell_data": self.dwell_active.pop(0), "dwell_report": combined_report})
+        self.dwell_history[combined_report["frequency"]] = time.time()
       else:
         self.logger.log(self.logger.LL_INFO, "[sequencer] process_dwell_reports: partial report")
 
@@ -252,9 +254,13 @@ class pluto_esm_sequencer:
 
     if self.dwell_state == "HW_ACTIVE":
       self.process_dwell_reports()
-      #
-      #self.dwell_state = "
-      pass
+      if (len(self.dwell_active) == 0):
+        self.logger.log(self.logger.LL_INFO, "[sequencer] update_scan_dwells [HW_ACTIVE]: dwells completed")
+        self.dwell_state = "HW_COMPLETE"
+
+    if self.dwell_state == "HW_COMPLETE":
+      #TODO: update waterfall?
+      self.dwell_state = "IDLE"
 
   def update(self):
     if self.state == "IDLE":
