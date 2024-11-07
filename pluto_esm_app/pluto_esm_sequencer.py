@@ -44,11 +44,14 @@ class pluto_esm_sequencer:
     self.hw_dwell_program_pending       = []
     self.fast_lock_load_pending         = []
 
+    self.current_fast_lock_profiles     = {}
+
     self.dwell_state                    = "IDLE"
     self.dwell_index                    = 0
     self.dwell_active                   = []  #TODO: rename
-    self.dwell_completed                = []
     self.dwell_history                  = {}
+
+    self.dwells_to_render               = []
 
     self.scan_dwells = {}
     for freq in sw_config.scan_dwells:
@@ -135,6 +138,11 @@ class pluto_esm_sequencer:
 
   def send_fast_lock_profile(self, profile_index, dwell_data):
     assert (dwell_data.fast_lock_profile_valid)
+    if ((profile_index in self.current_fast_lock_profiles) and (self.current_fast_lock_profiles[profile_index] == dwell_data.fast_lock_profile_data)):
+      self.logger.log(self.logger.LL_INFO, "[sequencer] skipping fast lock profile, already loaded: index={}".format(profile_index))
+      return
+
+    self.current_fast_lock_profiles[profile_index] = dwell_data.fast_lock_profile_data
     key = self.hw_interface.send_fast_lock_profile(profile_index, dwell_data.fast_lock_profile_data)
     self.fast_lock_load_pending.append(key)
     self.logger.log(self.logger.LL_INFO, "[sequencer] sending fast lock profile: index={} uk={}".format(profile_index, key))
@@ -205,12 +213,26 @@ class pluto_esm_sequencer:
       if combined_report is not None:
         assert (combined_report["frequency"] == self.dwell_active[0].frequency)
         self.logger.log(self.logger.LL_INFO, "[sequencer] process_dwell_reports: combined report frequency={}".format(combined_report["frequency"]))
-        self.dwell_completed.append({"dwell_data": self.dwell_active.pop(0), "dwell_report": combined_report})
         self.dwell_history[combined_report["frequency"]] = time.time()
+        self.dwells_to_render.append({"dwell_data": self.dwell_active.pop(0), "dwell_report": combined_report})
       else:
         self.logger.log(self.logger.LL_INFO, "[sequencer] process_dwell_reports: partial report")
 
       #self.dwell_active.pop(0)
+
+  def activate_next_dwells(self):
+    assert (len(self.dwell_active) == 0)
+    freq_list = list(self.scan_dwells.keys())
+    for i in range(min(self.MAX_ACTIVE_SCAN_DWELLS, len(freq_list))):
+      current_freq = freq_list[self.dwell_index]
+      current_dwell = self.scan_dwells[current_freq]
+      self.dwell_active.append(current_dwell)
+      self.dwell_index = (self.dwell_index + 1) % len(freq_list)
+
+      assert (current_dwell.hw_entry_valid)
+      fast_lock_profile = current_dwell.hw_dwell_entry.fast_lock_profile
+      self.send_fast_lock_profile(fast_lock_profile, current_dwell)
+      self.logger.log(self.logger.LL_INFO, "[sequencer] activate_next_dwells: preparing to start new dwell: freq {}, fast lock profile {}".format(current_freq, fast_lock_profile))
 
   def update_scan_dwells(self):
     if self.state != "ACTIVE":
@@ -221,26 +243,14 @@ class pluto_esm_sequencer:
     self.check_pending_hw_dwell_programs()
 
     if self.dwell_state == "IDLE":
-      assert (len(self.scan_dwells) > self.MAX_ACTIVE_SCAN_DWELLS) #TODO: add support
-      assert (len(self.dwell_active) == 0)
-      freq_list = list(self.scan_dwells.keys())
-      for i in range(self.MAX_ACTIVE_SCAN_DWELLS):
-        current_freq = freq_list[self.dwell_index]
-        current_dwell = self.scan_dwells[current_freq]
-        self.dwell_active.append(current_dwell)
-        self.dwell_index = (self.dwell_index + 1) % len(freq_list)
-
-        assert (current_dwell.hw_entry_valid)
-        fast_lock_profile = current_dwell.hw_dwell_entry.fast_lock_profile
-        self.send_fast_lock_profile(fast_lock_profile, current_dwell)
-        self.logger.log(self.logger.LL_INFO, "[sequencer] update_scan_dwells [IDLE]: preparing to start new dwell: freq {}, fast lock profile {}".format(current_freq, fast_lock_profile))
-
-      assert (len(self.dwell_active) > 0)
+      self.activate_next_dwells()
       self.dwell_state = "LOAD_PROFILES"
+
       #TODO: figure out if dwell entries need to be updated
       #TODO: send dwell program immediately, or wait for ack?
 
     if self.dwell_state == "LOAD_PROFILES":
+      assert (len(self.dwell_active) > 0)
       if len(self.fast_lock_load_pending) == 0:
         self.dwell_state = "SEND_PROGRAM"
         dwell_program = self.compute_next_dwell_program()
@@ -260,6 +270,8 @@ class pluto_esm_sequencer:
 
     if self.dwell_state == "HW_COMPLETE":
       #TODO: update waterfall?
+      #self.hw_interface.hw_cfg.send_reset()
+
       self.dwell_state = "IDLE"
 
   def update(self):

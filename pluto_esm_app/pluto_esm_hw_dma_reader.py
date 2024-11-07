@@ -119,8 +119,7 @@ class pluto_esm_hw_dma_reader:
 
     if msg_type == ESM_REPORT_MESSAGE_TYPE_STATUS:
       self.logger.log(self.logger.LL_DEBUG, "[hwdr] _process_message: saving status message: seq_num={}".format(seq_num))
-      #self.output_data_status.append(full_data)
-      #TODO: log full thing here
+      self.output_data_status.append(full_data)
     elif msg_type in (ESM_REPORT_MESSAGE_TYPE_PDW_PULSE, ESM_REPORT_MESSAGE_TYPE_PDW_SUMMARY):
       self.logger.log(self.logger.LL_DEBUG, "[hwdr] _process_message: saving PDW message: seq_num={}".format(seq_num))
       self.output_data_pdw.append(full_data)

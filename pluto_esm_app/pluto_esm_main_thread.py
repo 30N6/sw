@@ -42,6 +42,7 @@ class pluto_esm_main_thread:
       #dwell_scheduler.update()
       self.hw_interface.update()
       self.sequencer.update()
+      self.render_spectrum.update()
 
       self.surface.fill((0,0,0))
       self.render_spectrum.render()

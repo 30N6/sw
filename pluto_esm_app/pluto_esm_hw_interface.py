@@ -1,5 +1,6 @@
 import pluto_esm_logger
 import pluto_esm_hw_dma_reader
+import pluto_esm_status_reporter
 from pluto_esm_hw_pkg import *
 import iio
 import time
@@ -8,10 +9,11 @@ from multiprocessing import Process, Queue
 class hw_command:
   CMD_WRITE_ATTR_PHY    = 0
   CMD_WRITE_ATTR_RX_LO  = 1
-  CMD_READ_ATTR_PHY     = 2
-  CMD_READ_ATTR_RX_LO   = 3
-  CMD_WRITE_DMA_H2D     = 4
-  CMD_STOP              = 5
+  CMD_WRITE_ATTR_DBG    = 2
+  CMD_READ_ATTR_PHY     = 3
+  CMD_READ_ATTR_RX_LO   = 4
+  CMD_WRITE_DMA_H2D     = 5
+  CMD_STOP              = 6
 
   @staticmethod
   def gen_write_attr_phy(unique_key, attr, data):
@@ -21,6 +23,10 @@ class hw_command:
   @staticmethod
   def gen_write_attr_rx_lo(unique_key, attr, data):
     return {"unique_key": unique_key, "command_type": hw_command.CMD_WRITE_ATTR_RX_LO, "attr": attr, "data": data}
+
+  @staticmethod
+  def gen_write_attr_dbg(unique_key, attr, data):
+    return {"unique_key": unique_key, "command_type": hw_command.CMD_WRITE_ATTR_DBG, "attr": attr, "data": data}
 
   @staticmethod
   def gen_read_attr_phy(unique_key, attr):
@@ -89,6 +95,11 @@ class pluto_esm_hw_command_processor_thread:
         self.chan_ad9361_rx_lo.attrs[cmd["attr"]].value = cmd["data"]
         self.result_queue.put({"unique_key": cmd["unique_key"], "data": None}, block=False)
         self.logger.log(self.logger.LL_DEBUG, "write rx_lo[{}]={}: uk={}".format(cmd["attr"], cmd["data"], cmd["unique_key"]))
+
+      elif cmd["command_type"] == hw_command.CMD_WRITE_ATTR_DBG:
+        self.dev_ad9361.debug_attrs[cmd["attr"]].value = cmd["data"]
+        self.result_queue.put({"unique_key": cmd["unique_key"], "data": None}, block=False)
+        self.logger.log(self.logger.LL_DEBUG, "write dbg[{}]={}: uk={}".format(cmd["attr"], cmd["data"], cmd["unique_key"]))
 
       elif cmd["command_type"] == hw_command.CMD_READ_ATTR_PHY:
         data = self.chan_ad9361_phy.attrs[cmd["attr"]].value
@@ -228,19 +239,37 @@ class pluto_esm_hw_interface:
     self.logger = logger
 
     #todo: iio info
-    self.hwcp   = pluto_esm_hw_command_processor(pluto_uri, self.logger)
-    self.hwdr   = pluto_esm_hw_dma_reader.pluto_esm_hw_dma_reader(pluto_uri, self.logger)
-    self.hw_cfg = pluto_esm_hw_config(self.logger, self.hwcp)
+    self.hwcp             = pluto_esm_hw_command_processor(pluto_uri, self.logger)
+    self.hwdr             = pluto_esm_hw_dma_reader.pluto_esm_hw_dma_reader(pluto_uri, self.logger)
+    self.hw_cfg           = pluto_esm_hw_config(self.logger, self.hwcp)
+    self.status_reporter  = pluto_esm_status_reporter.pluto_esm_status_reporter(self.logger, self.hwdr.output_data_status)
+
     self.logger.log(self.logger.LL_INFO, "[hwi] init done, hwcp={} hwdr={}".format(self.hwcp, self.hwdr))
 
     self.fast_lock_cal_pending = []
 
+    self.initial_ad9361_setup()
     self.hw_cfg.send_reset()
     self.hw_cfg.send_enables(3, 3, 1)
 
   def initial_ad9361_setup(self):
-    #TODO
-    pass
+    attributes_phy = [("bb_dc_offset_tracking_en",  "1"),
+                      ("filter_fir_en",             "0"),
+                      ("gain_control_mode",         "manual"),
+                      ("hardwaregain",              "30"),
+                      ("quadrature_tracking_en",    "1"),
+                      ("rf_bandwidth",              "56000000"),
+                      ("rf_dc_offset_tracking_en",  "1"),
+                      ("sampling_frequency",        "61440000")]
+    attributes_dev_dbg = [("adi,rx-fastlock-pincontrol-enable", "1")]
+
+    for entry in attributes_phy:
+      cmd = hw_command.gen_write_attr_phy(self.hwcp.get_next_unique_key(), entry[0], entry[1])
+      self.hwcp.send_command(cmd, False)
+
+    for entry in attributes_dev_dbg:
+      cmd = hw_command.gen_write_attr_dbg(self.hwcp.get_next_unique_key(), entry[0], entry[1])
+      self.hwcp.send_command(cmd, False)
 
   #TODO: move this to the sequencer? at least move the cal pending stuff
   def send_fast_lock_cal_cmd(self, frequency):
@@ -279,8 +308,11 @@ class pluto_esm_hw_interface:
   def update(self):
     self.hwcp.update()
     self.hwdr.update()
+    self.status_reporter.update()
 
   def shutdown(self):
     self.hw_cfg.send_reset()
+    self.logger.log(self.logger.LL_INFO, "sleeping for 3 seconds before shutdown")
+    time.sleep(3.0)
     self.hwcp.shutdown()
     self.hwdr.shutdown()

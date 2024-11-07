@@ -4,7 +4,7 @@ from pluto_esm_hw_pkg import *
 import numpy as np
 import math
 
-class render_spectrum:
+class pluto_esm_spectrogram:
 
   def __init__(self, surface, sw_config, sequencer):
     self.surface              = surface

@@ -1,0 +1,36 @@
+{
+    "fast_lock_config": {"recalibration_interval": 60.0, "recalibration_pause": 2.0},
+    "dwell_constraints": {"freq_start": 20, "freq_step": 40},
+    "scan_config": {
+      "include_freqs": [
+          {"freq_range": [118, 155],    "dwell_time": 0.050, "comment": "VHF"},
+          {"freq_range": [450, 470],    "dwell_time": 0.050, "comment": "UHF"},
+          {"freq_range": [902, 926],    "dwell_time": 0.050, "comment": "915"}
+      ],
+      "exclude_freqs": [
+          {"freq_range": [800, 900], "comment": "testing"}
+      ]
+    },
+    "emitter_config": {
+        "pulsed_emitters": [
+            {"name": "ARSR-4",  "freq_range": [1200, 1400], "PW_range": [60, 90],     "PRI_range": [4600, 14000], "priority": 2},
+            {"name": "WSR-88D", "freq_range": [2700, 3000], "PW_range": [1.57, 4.57], "PRI_range": [760, 3150],   "priority": 2},
+            {"name": "SSR",     "freq_range": [1030, 1030], "PW_range": [0.5, 30.25], "PRI_range": [1.0, 20.2],   "priority": 2},
+            {"name": "SSR-rep", "freq_range": [1090, 1090], "PW_range": [0.45, 0.5],  "PRI_range": [1.0, 1.5],    "priority": 0},
+            {"name": "UAT",     "freq_range": [978, 978],   "PW_range": [144, 272],   "PRI_range": [],            "priority": 0}
+        ],
+        "cw_emitters": [
+            {"name": "FM-radio",  "freq_range": [88.00,  108.00],   "priority": 0 },
+            {"name": "RNAV-VHF",  "freq_range": [108.00, 117.98],   "priority": 0 },
+            {"name": "airband",   "freq_range": [118.00, 137.00],   "priority": 2 },
+            {"name": "ham-2m",    "freq_range": [144.00, 148.00],   "priority": 2 },
+            {"name": "MURS",      "freq_range": [151.82, 154.60],   "priority": 2 },
+            {"name": "TV-VHF",    "freq_range": [174.00, 216.00],   "priority": 0 },
+            {"name": "ILS-UHF",   "freq_range": [328.60, 335.40],   "priority": 0 },
+            {"name": "ham-70cm",  "freq_range": [450.00, 470.00],   "priority": 2 },
+            {"name": "GMRS",      "freq_range": [462.56, 467.73],   "priority": 2 },
+            {"name": "TV-UHF1",   "freq_range": [470.00, 608.00],   "priority": 0 },
+            {"name": "TV-UHF2",   "freq_range": [614.00, 698.00],   "priority": 0 }
+        ]
+    }
+}

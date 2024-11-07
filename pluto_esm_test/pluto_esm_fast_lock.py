@@ -2,7 +2,7 @@ import sys
 import time
 import iio
 import numpy as np
-#import iio_info
+import iio_info
 
 config = []
 
@@ -10,8 +10,8 @@ def main():
   global config
 
   context = iio.Context("ip:192.168.3.100")
-  #info = iio_info.iio_info(context)
-  #info.print_info(True)
+  info = iio_info.iio_info(context)
+  info.print_info(True)
 
   dev_d2h     = context.find_device("axi-iio-dma-d2h")
   dev_h2d     = context.find_device("axi-iio-dma-h2d")
@@ -21,6 +21,10 @@ def main():
   chan_dma_h2d      = dev_h2d.find_channel("voltage0", True)
   chan_ad9361_phy   = dev_ad9361.find_channel("voltage0", False)
   chan_ad9361_rx_lo = dev_ad9361.find_channel("altvoltage0", True)
+
+  print(dev_ad9361.debug_attrs)
+
+  return
 
   for attr in chan_ad9361_rx_lo.attrs:
     print(attr)
