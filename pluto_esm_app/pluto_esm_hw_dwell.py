@@ -17,7 +17,7 @@ class esm_message_dwell_entry:
 
     self.entry_index          = entry_index
     self.tag                  = tag
-    self.frequency            = freq
+    self.frequency            = int(round(freq))
     self.duration             = duration
     self.gain                 = gain
     self.fast_lock_profile    = fast_lock_profile

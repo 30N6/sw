@@ -11,9 +11,9 @@ class render_spectrum:
     self.sw_config            = sw_config
     self.sequencer            = sequencer
     self.max_freq             = sw_config.max_freq
-    self.dwell_bw             = sw_config.config["dwell_constraints"]["freq_step"]
+    self.dwell_bw             = sw_config.config["dwell_config"]["freq_step"]
     self.dwell_cal_interval   = sw_config.config["fast_lock_config"]["recalibration_interval"]
-    self.dwell_scan_fade_time = 0.2
+    self.dwell_scan_fade_time = 0.5
 
     self.colors = {}
     self.colors["cal_old"] = (192, 0, 0)
@@ -43,7 +43,7 @@ class render_spectrum:
   def _render_dwell_display(self, rect):
     now           = time.time()
     mhz_per_px    = self.max_freq / rect[2]
-    px_per_dwell  = self.dwell_bw / mhz_per_px
+    px_per_dwell  = math.ceil(self.dwell_bw / mhz_per_px)
 
     # calibration status
     for dwell_freq in self.sequencer.scan_dwells:
@@ -93,32 +93,7 @@ class render_spectrum:
 
 
   def process_dwell_updates(self):
-    while len(self.sequencer.dwells_to_render) > 0:
-      entry         = self.sequencer.dwells_to_render.pop(0)
-      dwell_data    = entry["dwell_data"]
-      dwell_report  = entry["dwell_report"]
-
-      assert (dwell_report["num_channels"] == self.num_channels)
-      assert (len(dwell_report["channel_data"]) == self.num_channels)
-      assert (dwell_report["frequency"] == dwell_data.frequency)
-
-      channel_data = np.zeros(self.num_channels - 1, self.dwell_data_dtype) #skip channel (wraps around)
-      for i in range(1, self.num_channels):
-        entry = dwell_report["channel_data"][i]
-        assert (entry["index"] == i)
-        channel_data[i - 1]["time"]       = dwell_report["ts_dwell_start"]
-        channel_data[i - 1]["freq"]       = dwell_report["frequency"] - self.channel_spacing * (self.num_channels / 2 - i)  #TODO: not sure if this is off by one -- need hw testing
-        channel_data[i - 1]["avg_power"]  = entry["accum"]  / dwell_report["num_samples"]
-        channel_data[i - 1]["peak_power"] = entry["max"]
-
-      self.dwell_data_buffer = np.concatenate((self.dwell_data_buffer, channel_data), casting="no")
-      #print(self.dwell_data_buffer)
-
-      print("dwell_duration = {} {}".format(dwell_report["ts_dwell_end"] - dwell_report["ts_dwell_start"], (dwell_report["ts_dwell_end"] - dwell_report["ts_dwell_start"]) * FAST_CLOCK_PERIOD))
-
-    newest_timestamp = self.dwell_data_buffer[-1]["time"]
-    max_age = (newest_timestamp - self.dwell_data_buffer[0]["time"]) * FAST_CLOCK_PERIOD
-    print("max_age={} len={}".format(max_age, self.dwell_data_buffer.size))
+    pass
 
   def update(self):
     self.process_dwell_updates()

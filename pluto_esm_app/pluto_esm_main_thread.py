@@ -26,7 +26,6 @@ class pluto_esm_main_thread:
     self.hw_interface = pluto_esm_hw_interface.pluto_esm_hw_interface(self.logger, "ip:192.168.3.100")
     self.sequencer    = pluto_esm_sequencer.pluto_esm_sequencer(self.logger, self.sw_config, self.hw_interface)
 
-
     #self.hw_interface.test()
     self.render_spectrum = render_spectrum.render_spectrum(self.surface, self.sw_config, self.sequencer)
 

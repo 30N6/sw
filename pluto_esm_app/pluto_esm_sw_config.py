@@ -7,48 +7,44 @@ class pluto_esm_sw_config:
     self.config = json.load(fd)
     fd.close()
 
-    self.scan_dwells = self.compute_scan_dwells(self.config)
-    self.max_freq = max(list(self.scan_dwells.keys())) + self.config["dwell_constraints"]["freq_step"] / 2
+    self.scan_dwells = self._compute_scan_dwells(self.config)
+    self.randomize_scan_order = self.config["scan_config"]["randomize_scan_order"]
+    self.max_freq = max(list(self.scan_dwells.keys())) + self.config["dwell_config"]["freq_step"] / 2
     self.fast_lock_recal_interval = self.config["fast_lock_config"]["recalibration_interval"]
     self.fast_lock_recal_pause = self.config["fast_lock_config"]["recalibration_pause"]
 
-  def compute_scan_dwells(self, config):
+  def _compute_scan_dwells(self, config):
     max_freq = 0
+    min_freq = 99999
     scan_config = config["scan_config"]
     for entry in scan_config["include_freqs"]:
-      max_freq = max(max_freq, entry["freq_range"][0], entry["freq_range"][1])
-
-    dwell_time_bins = self.get_dwell_time_bins(scan_config, max_freq)
-    dwell_by_freq = self.get_dwells_from_bins(dwell_time_bins, config["dwell_constraints"])
-    return dwell_by_freq
-
-  def get_dwells_from_bins(self, bins, dwell_constraints):
-    dwells = {}
-
-    for freq in range(len(bins)):
-      if bins[freq] == 0:
-        continue
-      nearest_dwell_freq = int(np.round((freq - dwell_constraints["freq_start"]) / dwell_constraints["freq_step"]) * dwell_constraints["freq_step"] + dwell_constraints["freq_start"])
-      if nearest_dwell_freq not in dwells:
-        dwells[nearest_dwell_freq] = bins[freq]
-      else:
-        dwells[nearest_dwell_freq] = max(dwells[nearest_dwell_freq], bins[freq])
-
-    return dwells
-
-  def get_dwell_time_bins(self, scan_config, max_freq):
-    dwell_time_bins = np.zeros(max_freq + 1)
-    for entry in scan_config["include_freqs"]:
       assert (entry["freq_range"][0] <= entry["freq_range"][1])
-      i_start = entry["freq_range"][0]
-      i_end   = entry["freq_range"][1] + 1
-      current_dwell_time = np.ones(i_end - i_start) * entry["dwell_time"]
-      dwell_time_bins[i_start:i_end] = np.maximum(dwell_time_bins[i_start:i_end], current_dwell_time)
+      max_freq = max(max_freq, entry["freq_range"][0], entry["freq_range"][1])
+      min_freq = min(min_freq, entry["freq_range"][0], entry["freq_range"][1])
 
     for entry in scan_config["exclude_freqs"]:
       assert (entry["freq_range"][0] <= entry["freq_range"][1])
-      i_start = entry["freq_range"][0]
-      i_end   = entry["freq_range"][1] + 1
-      dwell_time_bins[i_start:i_end] = 0
 
-    return dwell_time_bins
+    channel_step = config["dwell_config"]["channel_step"]
+    freq_step = config["dwell_config"]["freq_step"]
+    assert (freq_step % channel_step < 1e-12)
+    dwell_candidates = np.arange(config["dwell_config"]["freq_start"], max_freq + freq_step, freq_step)
+
+    dwell_by_freq = {}
+    for dwell_freq in dwell_candidates:
+      dwell_channels = np.arange(dwell_freq - freq_step/2, dwell_freq + freq_step/2 + channel_step, channel_step)
+      dwell_time = np.zeros(dwell_channels.size)
+      for i in range(dwell_channels.size):
+        chan_freq = dwell_channels[i]
+        for entry in scan_config["include_freqs"]:
+          if (chan_freq >= entry["freq_range"][0]) and (chan_freq < entry["freq_range"][1]):
+            dwell_time[i] = max(dwell_time[i], entry["dwell_time"])
+        for entry in scan_config["exclude_freqs"]:
+          if (chan_freq >= entry["freq_range"][0]) and (chan_freq < entry["freq_range"][1]):
+            dwell_time[i] = 0
+
+      max_dwell_time = np.max(dwell_time)
+      if max_dwell_time > 0:
+        dwell_by_freq[dwell_freq] = max_dwell_time
+
+    return dwell_by_freq

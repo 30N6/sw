@@ -1,7 +1,8 @@
 {
     "fast_lock_config": {"recalibration_interval": 60.0, "recalibration_pause": 2.0},
-    "dwell_constraints": {"freq_start": 20, "freq_step": 40},
+    "dwell_config": {"freq_start": 96.0, "freq_step": 48.0, "channel_step": 0.96},
     "scan_config": {
+      "randomize_scan_order": 1,
       "include_freqs": [
           {"freq_range": [118, 155],    "dwell_time": 0.050, "comment": "VHF"},
           {"freq_range": [450, 470],    "dwell_time": 0.050, "comment": "UHF"},

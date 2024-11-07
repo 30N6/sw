@@ -1,4 +1,5 @@
 import time
+import random
 import pluto_esm_hw_dwell
 import pluto_esm_hw_dwell_reporter
 import pluto_esm_hw_pkg
@@ -13,6 +14,9 @@ class dwell_data:
 
     self.hw_dwell_valid             = False
     self.hw_dwell_entry             = pluto_esm_hw_dwell.esm_message_dwell_entry.default_dwell()
+
+    self.first_dwell                = False
+    self.last_dwell                 = False
 
   def __str__(self):
     return "dwell_data: {} {} {} {}".format(self.frequency, self.dwell_time, self.fast_lock_profile_valid, self.fast_lock_profile_data)
@@ -47,11 +51,15 @@ class pluto_esm_sequencer:
     self.current_fast_lock_profiles     = {}
 
     self.dwell_state                    = "IDLE"
-    self.dwell_index                    = 0
     self.dwell_active                   = []  #TODO: rename
+    self.dwell_active_first             = []
+    self.dwell_active_last              = []
     self.dwell_history                  = {}
 
     self.dwells_to_render               = []
+
+    self.scan_sequence                  = []
+    self.randomize_scan_order           = sw_config.randomize_scan_order
 
     self.scan_dwells = {}
     for freq in sw_config.scan_dwells:
@@ -196,8 +204,9 @@ class pluto_esm_sequencer:
     dwell_instructions  = []
     next_instruction_index = 0
     #TODO: randomize dwell order
-    for dwell in self.dwell_active:
+    for entry in self.dwell_active:
       #TODO: don't skip PLL checks
+      dwell = entry["dwell"]
       next_instruction_index += 1
       dwell_instructions.append(pluto_esm_hw_dwell.esm_dwell_instruction(1, 0, 0, 1, 1, 1, 0, dwell.hw_dwell_entry.entry_index, next_instruction_index))
     for _ in range(pluto_esm_hw_pkg.ESM_NUM_DWELL_INSTRUCTIONS - len(dwell_instructions)):
@@ -210,29 +219,47 @@ class pluto_esm_sequencer:
       packed_report = self.hw_interface.hwdr.output_data_dwell.pop(0)
       combined_report = self.dwell_reporter.process_message(packed_report)
 
+      expected_entry = self.dwell_active[0]
+      expected_dwell = expected_entry["dwell"]
+
       if combined_report is not None:
-        assert (combined_report["frequency"] == self.dwell_active[0].frequency)
-        self.logger.log(self.logger.LL_INFO, "[sequencer] process_dwell_reports: combined report frequency={}".format(combined_report["frequency"]))
-        self.dwell_history[combined_report["frequency"]] = time.time()
-        self.dwells_to_render.append({"dwell_data": self.dwell_active.pop(0), "dwell_report": combined_report})
+        assert (combined_report["frequency"] == int(round(expected_dwell.frequency)))
+        self.logger.log(self.logger.LL_INFO, "[sequencer] process_dwell_reports: combined report received for frequency={}".format(expected_dwell.frequency))
+
+        #data for rendering the dwell indicator
+        if expected_entry["first"]:
+          self.dwell_history = {}
+        self.dwell_history[expected_dwell.frequency] = time.time()
+
+        #data for rendering the spectrogram
+        self.dwells_to_render.append({"dwell_data": expected_dwell, "dwell_report": combined_report, "first_in_sequence": expected_entry["first"], "last_in_sequence": expected_entry["last"]})
+        self.dwell_active.pop(0)
       else:
         self.logger.log(self.logger.LL_INFO, "[sequencer] process_dwell_reports: partial report")
 
-      #self.dwell_active.pop(0)
-
   def activate_next_dwells(self):
     assert (len(self.dwell_active) == 0)
-    freq_list = list(self.scan_dwells.keys())
-    for i in range(min(self.MAX_ACTIVE_SCAN_DWELLS, len(freq_list))):
-      current_freq = freq_list[self.dwell_index]
-      current_dwell = self.scan_dwells[current_freq]
-      self.dwell_active.append(current_dwell)
-      self.dwell_index = (self.dwell_index + 1) % len(freq_list)
+    while (len(self.scan_sequence) > 0) and (len(self.dwell_active) < self.MAX_ACTIVE_SCAN_DWELLS):
+      current_entry = self.scan_sequence.pop(0)
+      self.dwell_active.append(current_entry)
 
+      current_dwell = current_entry["dwell"]
       assert (current_dwell.hw_entry_valid)
       fast_lock_profile = current_dwell.hw_dwell_entry.fast_lock_profile
       self.send_fast_lock_profile(fast_lock_profile, current_dwell)
-      self.logger.log(self.logger.LL_INFO, "[sequencer] activate_next_dwells: preparing to start new dwell: freq {}, fast lock profile {}".format(current_freq, fast_lock_profile))
+      self.logger.log(self.logger.LL_INFO, "[sequencer] activate_next_dwells: preparing to start new dwell: freq {}, fast lock profile {} -- {} dwells remaining in sequence".format(current_dwell.frequency, fast_lock_profile, len(self.scan_sequence)))
+
+  def prepare_scan_sequence(self):
+    assert (len(self.scan_sequence) == 0)
+    assert (len(self.dwell_active) == 0)
+
+    dwell_sequence = list(self.scan_dwells.values())
+    if self.randomize_scan_order:
+      random.shuffle(dwell_sequence) #try to avoid aliasing with periodic signals
+
+    self.scan_sequence = []
+    for i in range(len(dwell_sequence)):
+      self.scan_sequence.append({"dwell": dwell_sequence[i], "first": (i == 0), "last": (i == (len(dwell_sequence) - 1))})
 
   def update_scan_dwells(self):
     if self.state != "ACTIVE":
@@ -243,6 +270,14 @@ class pluto_esm_sequencer:
     self.check_pending_hw_dwell_programs()
 
     if self.dwell_state == "IDLE":
+      #TODO: check enable
+      self.dwell_state = "LOAD_SEQUENCE"
+
+    if self.dwell_state == "LOAD_SEQUENCE":
+      self.prepare_scan_sequence()
+      self.dwell_state = "LOAD_DWELLS"
+
+    if self.dwell_state == "LOAD_DWELLS":
       self.activate_next_dwells()
       self.dwell_state = "LOAD_PROFILES"
 
@@ -266,13 +301,15 @@ class pluto_esm_sequencer:
       self.process_dwell_reports()
       if (len(self.dwell_active) == 0):
         self.logger.log(self.logger.LL_INFO, "[sequencer] update_scan_dwells [HW_ACTIVE]: dwells completed")
-        self.dwell_state = "HW_COMPLETE"
+        self.dwell_state = "DWELLS_COMPLETE"
 
-    if self.dwell_state == "HW_COMPLETE":
+    if self.dwell_state == "DWELLS_COMPLETE":
+      if len(self.scan_sequence) == 0:
+        self.dwell_state = "IDLE"
+      else:
+        self.dwell_state = "LOAD_DWELLS"
       #TODO: update waterfall?
       #self.hw_interface.hw_cfg.send_reset()
-
-      self.dwell_state = "IDLE"
 
   def update(self):
     if self.state == "IDLE":
