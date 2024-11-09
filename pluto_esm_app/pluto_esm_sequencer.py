@@ -10,6 +10,7 @@ class dwell_data:
     self.frequency                  = frequency
     self.dwell_time                 = dwell_time
     self.fast_lock_profile_valid    = False
+    self.fast_lock_profile_updated  = False
     self.fast_lock_profile_data     = []
     self.fast_lock_profile_time     = 0
 
@@ -113,10 +114,11 @@ class pluto_esm_sequencer:
       if cal_results is not None:
         assert (cal_results["freq"] == self.fast_lock_cal_pending[0])
         dwell = self.scan_dwells[cal_results["freq"]]
-        dwell.fast_lock_profile_valid = True
-        dwell.fast_lock_profile_time  = now
-        dwell.fast_lock_profile_data  = cal_results["data"]
-        self.fast_lock_last_cal_time  = now
+        dwell.fast_lock_profile_valid   = True
+        dwell.fast_lock_profile_updated = True
+        dwell.fast_lock_profile_time    = now
+        dwell.fast_lock_profile_data    = cal_results["data"]
+        self.fast_lock_last_cal_time    = now
         self.fast_lock_cal_pending.pop(0)
         self.logger.log(self.logger.LL_INFO, "[sequencer] received fast lock cal data for freq={}: {}".format(cal_results["freq"], dwell.fast_lock_profile_data))
 
@@ -145,16 +147,17 @@ class pluto_esm_sequencer:
     self.hw_dwell_program_pending.append(key)
     self.logger.log(self.logger.LL_INFO, "[sequencer] sending dwell program: uk={}".format(key))
 
-  def send_fast_lock_profile(self, profile_index, dwell_data):
+  def send_fast_lock_profile(self, profile_index, dwell_data, force):
     assert (dwell_data.fast_lock_profile_valid)
-    if ((profile_index in self.current_fast_lock_profiles) and (self.current_fast_lock_profiles[profile_index] == dwell_data.fast_lock_profile_data)):
+    if ((profile_index in self.current_fast_lock_profiles) and (self.current_fast_lock_profiles[profile_index] == dwell_data.fast_lock_profile_data) and (not force)):
       self.logger.log(self.logger.LL_INFO, "[sequencer] skipping fast lock profile, already loaded: index={}".format(profile_index))
-      return
+      return False
 
     self.current_fast_lock_profiles[profile_index] = dwell_data.fast_lock_profile_data
     key = self.hw_interface.send_fast_lock_profile(profile_index, dwell_data.fast_lock_profile_data)
     self.fast_lock_load_pending.append(key)
     self.logger.log(self.logger.LL_INFO, "[sequencer] sending fast lock profile: index={} uk={}".format(profile_index, key))
+    return True
 
   def set_fast_lock_recall(self):
     #TODO: remove
@@ -250,17 +253,24 @@ class pluto_esm_sequencer:
 
   def activate_next_dwells(self):
     assert (len(self.dwell_active) == 0)
+
+    force_fast_lock_update = False
     while (len(self.scan_sequence) > 0) and (len(self.dwell_active) < self.MAX_ACTIVE_SCAN_DWELLS):
       current_entry = self.scan_sequence.pop(0)
+      force_fast_lock_update |= current_entry["dwell"].fast_lock_profile_updated
+      current_entry["dwell"].fast_lock_profile_updated = False
       self.dwell_active.append(current_entry)
 
+    fast_lock_profile_sent = False
+    for current_entry in self.dwell_active:
       current_dwell = current_entry["dwell"]
       assert (current_dwell.hw_entry_valid)
       fast_lock_profile = current_dwell.hw_dwell_entry.fast_lock_profile
-      self.send_fast_lock_profile(fast_lock_profile, current_dwell)
+      fast_lock_profile_sent |= self.send_fast_lock_profile(fast_lock_profile, current_dwell, force_fast_lock_update)
       self.logger.log(self.logger.LL_INFO, "[sequencer] activate_next_dwells: preparing to start new dwell: freq {}, fast lock profile {} -- {} dwells remaining in sequence".format(current_dwell.frequency, fast_lock_profile, len(self.scan_sequence)))
 
-    self.set_fast_lock_recall()
+    if fast_lock_profile_sent:
+      self.set_fast_lock_recall()
 
   def prepare_scan_sequence(self):
     assert (len(self.scan_sequence) == 0)

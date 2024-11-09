@@ -256,10 +256,11 @@ class pluto_esm_hw_interface:
     attributes_phy      = [("bb_dc_offset_tracking_en",  "1"),
                            ("filter_fir_en",             "0"),
                            ("gain_control_mode",         "manual"),
-                           ("hardwaregain",              "20"),
+                           ("hardwaregain",              "30"),
                            ("quadrature_tracking_en",    "1"),
                            ("rf_bandwidth",              "56000000"),
                            ("rf_dc_offset_tracking_en",  "1"),
+                           ("bb_dc_offset_tracking_en",  "1"),
                            ("sampling_frequency",        "61440000")]
     attributes_dev_dbg  = [("adi,rx-fastlock-pincontrol-enable", "1")]
 

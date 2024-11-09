@@ -28,6 +28,8 @@ class render_spectrum:
 
     self.font = pygame.font.SysFont('Consolas', 14)
 
+    self.last_saved_index = 0
+
   @staticmethod
   def _color_interp(ca, cb, pct):
     pct = min(1.0, max(0.0, pct))
@@ -63,12 +65,15 @@ class render_spectrum:
       pygame.draw.rect(self.surface, dwell_color, dwell_rect, 0)
 
   def _render_waterfall_display(self, rect):
-    surf = pygame.surfarray.make_surface(self.spectrogram.spectrogram_avg[:, :].transpose())
+    surf = pygame.surfarray.make_surface(self.spectrogram.spectrogram_avg[:, 800:].transpose())
 
     if self.spectrogram.dwell_data_row_index % 32 == 31:
-      np.savetxt("./dwell_data_channel_peak.txt", self.spectrogram.dwell_data_channel_peak, "%u")
-      np.savetxt("./dwell_data_channel_accum.txt", self.spectrogram.dwell_data_channel_accum, "%u")
-      np.savetxt("./dwell_data_channel_duration.txt", self.spectrogram.dwell_data_channel_duration, "%u")
+      if self.last_saved_index != self.spectrogram.dwell_data_row_index:
+        np.savetxt("./dwell_data_channel_peak.txt", self.spectrogram.dwell_data_channel_peak, "%u")
+        np.savetxt("./dwell_data_channel_accum.txt", self.spectrogram.dwell_data_channel_accum, "%u")
+        np.savetxt("./dwell_data_channel_duration.txt", self.spectrogram.dwell_data_channel_duration, "%u")
+
+      self.last_saved_index = self.spectrogram.dwell_data_row_index
 
 
     self.surface.blit(surf, rect)
