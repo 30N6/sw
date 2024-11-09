@@ -13,8 +13,6 @@ def main():
   info = iio_info.iio_info(context)
   info.print_info(True)
 
-  return
-
   dev_d2h     = context.find_device("axi-iio-dma-d2h")
   dev_h2d     = context.find_device("axi-iio-dma-h2d")
   dev_ad9361  = context.find_device("ad9361-phy")
@@ -24,33 +22,14 @@ def main():
   chan_ad9361_phy   = dev_ad9361.find_channel("voltage0", False)
   chan_ad9361_rx_lo = dev_ad9361.find_channel("altvoltage0", True)
 
-  print(dev_ad9361.debug_attrs)
-
-  return
-
-  for attr in chan_ad9361_rx_lo.attrs:
-    print(attr)
-  print("\n\n")
-
-  freqs = range(100, 6000, 40)
-  cmd_time = np.zeros(len(freqs) + 1)
-  cmd_time[0] = time.time()
-  for i in range(len(freqs)):
-    freq = freqs[i]
-    chan_ad9361_rx_lo.attrs["frequency"].value = str(int(freq * 1e6))
-    chan_ad9361_rx_lo.attrs["fastlock_store"].value = str(0)
-    fast_lock_data = chan_ad9361_rx_lo.attrs["fastlock_save"].value
-    cmd_time[i + 1] = time.time()
-    print("{:4} : {} {}".format(freq, fast_lock_data, cmd_time[i + 1] - cmd_time[i]))
-
-  print("total time = {} max={} num_freqs={}".format(cmd_time[-1] - cmd_time[0], np.max(np.diff(cmd_time)), len(freqs)))
+  while True:
+    print(chan_ad9361_rx_lo.attrs["frequency"].value)
+    time.sleep(0.01)
 
 if __name__ == "__main__":
   try:
     main()
   except KeyboardInterrupt:
     print("interrupted: {}".format(config))
-    config.send_reset()
-    #config.send_enables(0, 0, 0)
     time.sleep(0)
     sys.exit(0)

@@ -4,13 +4,9 @@
     "scan_config": {
       "randomize_scan_order": 0,
       "include_freqs": [
-          {"freq_range": [120,  5999], "dwell_time": 0.010, "comment": "full span"},
-          {"freq_range": [1200, 1400], "dwell_time": 0.050, "comment": "ARSR-4"},
-          {"freq_range": [2700, 3000], "dwell_time": 0.020, "comment": "WSR-88D"}
+          {"freq_range": [889, 983],    "dwell_time": 0.0500, "comment": "1.3"}
       ],
-      "exclude_freqs": [
-          {"freq_range": [800, 900], "comment": "testing"}
-      ]
+      "exclude_freqs": []
     },
     "emitter_config": {
         "pulsed_emitters": [

@@ -2,6 +2,7 @@ import time
 import random
 import pluto_esm_hw_dwell
 import pluto_esm_hw_dwell_reporter
+import pluto_esm_hw_interface
 import pluto_esm_hw_pkg
 
 class dwell_data:
@@ -155,6 +156,16 @@ class pluto_esm_sequencer:
     self.fast_lock_load_pending.append(key)
     self.logger.log(self.logger.LL_INFO, "[sequencer] sending fast lock profile: index={} uk={}".format(profile_index, key))
 
+  def set_fast_lock_recall(self):
+    #TODO: remove
+    cmd = pluto_esm_hw_interface.hw_command.gen_write_attr_dbg(self.hw_interface.hwcp.get_next_unique_key(), "adi,rx-fastlock-pincontrol-enable", "1")
+    self.hw_interface.hwcp.send_command(cmd, False)
+
+    key = self.hw_interface.send_fastlock_recall("0")
+    self.fast_lock_load_pending.append(key)
+    self.logger.log(self.logger.LL_INFO, "[sequencer] fastlock_recall=0")
+    #self.logger.log(
+
   #TODO: use a generic function to reduce code duplication
   def check_pending_hw_dwells(self):
     keys_found = []
@@ -248,6 +259,8 @@ class pluto_esm_sequencer:
       fast_lock_profile = current_dwell.hw_dwell_entry.fast_lock_profile
       self.send_fast_lock_profile(fast_lock_profile, current_dwell)
       self.logger.log(self.logger.LL_INFO, "[sequencer] activate_next_dwells: preparing to start new dwell: freq {}, fast lock profile {} -- {} dwells remaining in sequence".format(current_dwell.frequency, fast_lock_profile, len(self.scan_sequence)))
+
+    self.set_fast_lock_recall()
 
   def prepare_scan_sequence(self):
     assert (len(self.scan_sequence) == 0)

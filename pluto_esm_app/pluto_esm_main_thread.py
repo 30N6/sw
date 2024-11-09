@@ -22,7 +22,7 @@ class pluto_esm_main_thread:
 
     self.logger = pluto_esm_logger.pluto_esm_logger(self.LOG_DIR, "pluto_esm_main_thread", pluto_esm_logger.pluto_esm_logger.LL_DEBUG)
 
-    self.sw_config    = pluto_esm_sw_config.pluto_esm_sw_config("./pluto_esm_sample_config.json")
+    self.sw_config    = pluto_esm_sw_config.pluto_esm_sw_config("./pluto_esm_sample_config_3.json")
     self.hw_interface = pluto_esm_hw_interface.pluto_esm_hw_interface(self.logger, "ip:192.168.3.100")
     self.sequencer    = pluto_esm_sequencer.pluto_esm_sequencer(self.logger, self.sw_config, self.hw_interface)
 

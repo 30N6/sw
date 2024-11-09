@@ -253,15 +253,15 @@ class pluto_esm_hw_interface:
     self.hw_cfg.send_enables(3, 3, 1)
 
   def initial_ad9361_setup(self):
-    attributes_phy = [("bb_dc_offset_tracking_en",  "1"),
-                      ("filter_fir_en",             "0"),
-                      ("gain_control_mode",         "manual"),
-                      ("hardwaregain",              "30"),
-                      ("quadrature_tracking_en",    "1"),
-                      ("rf_bandwidth",              "56000000"),
-                      ("rf_dc_offset_tracking_en",  "1"),
-                      ("sampling_frequency",        "61440000")]
-    attributes_dev_dbg = [("adi,rx-fastlock-pincontrol-enable", "1")]
+    attributes_phy      = [("bb_dc_offset_tracking_en",  "1"),
+                           ("filter_fir_en",             "0"),
+                           ("gain_control_mode",         "manual"),
+                           ("hardwaregain",              "20"),
+                           ("quadrature_tracking_en",    "1"),
+                           ("rf_bandwidth",              "56000000"),
+                           ("rf_dc_offset_tracking_en",  "1"),
+                           ("sampling_frequency",        "61440000")]
+    attributes_dev_dbg  = [("adi,rx-fastlock-pincontrol-enable", "1")]
 
     for entry in attributes_phy:
       cmd = hw_command.gen_write_attr_phy(self.hwcp.get_next_unique_key(), entry[0], entry[1])
@@ -303,7 +303,10 @@ class pluto_esm_hw_interface:
     modified_data = "{} {}".format(profile_index, profile_data.split(" ")[1])
     cmd = hw_command.gen_write_attr_rx_lo(self.hwcp.get_next_unique_key(), "fastlock_load", modified_data)
     return self.hwcp.send_command(cmd, True)
-    #self.logger.log(
+
+  def send_fastlock_recall(self, value):
+    cmd = hw_command.gen_write_attr_rx_lo(self.hwcp.get_next_unique_key(), "fastlock_recall", value)
+    return self.hwcp.send_command(cmd, True)
 
   def update(self):
     self.hwcp.update()
