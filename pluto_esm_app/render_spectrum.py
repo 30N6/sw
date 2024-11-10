@@ -5,6 +5,9 @@ import pluto_esm_spectrogram
 import numpy as np
 import math
 
+import cProfile, pstats, io
+from pstats import SortKey
+
 class render_spectrum:
 
   def __init__(self, surface, sw_config, sequencer):
@@ -29,6 +32,8 @@ class render_spectrum:
     self.font = pygame.font.SysFont('Consolas', 14)
 
     self.last_saved_index = 0
+
+    self.pr = cProfile.Profile()
 
   @staticmethod
   def _color_interp(ca, cb, pct):
@@ -65,15 +70,29 @@ class render_spectrum:
       pygame.draw.rect(self.surface, dwell_color, dwell_rect, 0)
 
   def _render_waterfall_display(self, rect):
-    surf = pygame.surfarray.make_surface(self.spectrogram.spectrogram_avg[:, 800:].transpose())
+    t0 = time.time()
+    
+    self.pr.enable()
+    data = self.spectrogram.get_spectrogram(True, rect[2], rect[3])
+    self.pr.disable()
+    s = io.StringIO()
+    sortby = SortKey.CUMULATIVE
+    ps = pstats.Stats(self.pr, stream=s).sort_stats(sortby)
+    ps.print_stats()
+    print(s.getvalue())
 
-    if self.spectrogram.dwell_data_row_index % 32 == 31:
-      if self.last_saved_index != self.spectrogram.dwell_data_row_index:
-        np.savetxt("./dwell_data_channel_peak.txt", self.spectrogram.dwell_data_channel_peak, "%u")
-        np.savetxt("./dwell_data_channel_accum.txt", self.spectrogram.dwell_data_channel_accum, "%u")
-        np.savetxt("./dwell_data_channel_duration.txt", self.spectrogram.dwell_data_channel_duration, "%u")
+    surf = pygame.surfarray.make_surface(data.transpose())
+    t1 = time.time()
 
-      self.last_saved_index = self.spectrogram.dwell_data_row_index
+    print("render_waterfall: t1-t0={}".format(t1-t0))
+
+    #if self.spectrogram.dwell_data_row_index % 32 == 31:
+    #  if self.last_saved_index != self.spectrogram.dwell_data_row_index:
+    #    np.savetxt("./dwell_data_channel_peak.txt", self.spectrogram.dwell_data_channel_peak, "%u")
+    #    np.savetxt("./dwell_data_channel_accum.txt", self.spectrogram.dwell_data_channel_accum, "%u")
+    #    np.savetxt("./dwell_data_channel_duration.txt", self.spectrogram.dwell_data_channel_duration, "%u")
+    #
+    #  self.last_saved_index = self.spectrogram.dwell_data_row_index
 
 
     self.surface.blit(surf, rect)

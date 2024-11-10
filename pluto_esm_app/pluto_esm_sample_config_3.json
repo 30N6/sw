@@ -4,7 +4,7 @@
     "scan_config": {
       "randomize_scan_order": 0,
       "include_freqs": [
-          {"freq_range": [889, 1200],    "dwell_time": 0.100, "comment": "1.3"}
+          {"freq_range": [120, 6000],    "dwell_time": 0.050, "comment": "1.3"}
       ],
       "exclude_freqs": []
     },

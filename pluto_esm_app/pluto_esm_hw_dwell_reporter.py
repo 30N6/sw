@@ -76,7 +76,7 @@ class pluto_esm_hw_dwell_reporter:
       self.partial_dwell_channels = []
 
       #print("dwell reporter: freq={} channels={}".format(report["frequency"], report["channel_data"]))
-      print("dwell reporter: freq={}".format(report["frequency"]))
+      #print("dwell reporter: freq={}".format(report["frequency"]))
 
       return report
     else:
