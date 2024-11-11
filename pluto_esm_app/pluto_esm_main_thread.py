@@ -5,6 +5,7 @@ import pluto_esm_sequencer
 import pluto_esm_hw_interface
 import pluto_esm_logger
 import render_spectrum
+import render_status
 
 class pluto_esm_main_thread:
   SCREEN_SIZE = (1280, 800)
@@ -27,7 +28,8 @@ class pluto_esm_main_thread:
     self.sequencer    = pluto_esm_sequencer.pluto_esm_sequencer(self.logger, self.sw_config, self.hw_interface)
 
     #self.hw_interface.test()
-    self.render_spectrum = render_spectrum.render_spectrum(self.surface, self.sw_config, self.sequencer)
+    self.render_status    = render_status.render_status(self.surface, self.sw_config, self.sequencer)
+    self.render_spectrum  = render_spectrum.render_spectrum(self.surface, self.sw_config, self.sequencer)
 
   def run(self):
     running = True
@@ -37,15 +39,15 @@ class pluto_esm_main_thread:
           running = False
 
       self.logger.flush()
-      #todo: read messages from queue
-      #dwell_scheduler.update()
       self.hw_interface.update()
       self.sequencer.update()
+      self.render_status.update()
       self.render_spectrum.update()
+      #TODO: replace with loop
 
       self.surface.fill((0,0,0))
+      self.render_status.render()
       self.render_spectrum.render()
-
 
       pygame.display.flip()
       self.clock.tick(self.FPS)

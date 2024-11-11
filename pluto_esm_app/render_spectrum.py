@@ -1,6 +1,7 @@
 import pygame
 import time
 from pluto_esm_hw_pkg import *
+import pluto_esm_dwell_stats_buffer
 import pluto_esm_spectrogram
 import numpy as np
 import math
@@ -11,10 +12,13 @@ from pstats import SortKey
 class render_spectrum:
 
   def __init__(self, surface, sw_config, sequencer):
+    self.rect_waterfall_display = [16, 128, 600, 360]
+
     self.surface              = surface
     self.sw_config            = sw_config
     self.sequencer            = sequencer
-    self.spectrogram          = pluto_esm_spectrogram.pluto_esm_spectrogram(self.sw_config, self.sequencer)
+    self.dwell_buffer         = pluto_esm_dwell_stats_buffer.pluto_esm_dwell_stats_buffer(self.sw_config)
+    self.spectrogram          = pluto_esm_spectrogram.pluto_esm_spectrogram(self.sw_config, self.rect_waterfall_display[2:4])
     self.max_freq             = sw_config.max_freq
     self.dwell_bw             = sw_config.config["dwell_config"]["freq_step"]
     self.dwell_cal_interval   = sw_config.config["fast_lock_config"]["recalibration_interval"]
@@ -70,21 +74,13 @@ class render_spectrum:
       pygame.draw.rect(self.surface, dwell_color, dwell_rect, 0)
 
   def _render_waterfall_display(self, rect):
-    t0 = time.time()
-    
-    self.pr.enable()
+    #t0 = time.time()
+
     data = self.spectrogram.get_spectrogram(True, rect[2], rect[3])
-    self.pr.disable()
-    s = io.StringIO()
-    sortby = SortKey.CUMULATIVE
-    ps = pstats.Stats(self.pr, stream=s).sort_stats(sortby)
-    ps.print_stats()
-    print(s.getvalue())
-
     surf = pygame.surfarray.make_surface(data.transpose())
-    t1 = time.time()
+    #t1 = time.time()
 
-    print("render_waterfall: t1-t0={}".format(t1-t0))
+    #print("render_waterfall: t1-t0={}".format(t1-t0))
 
     #if self.spectrogram.dwell_data_row_index % 32 == 31:
     #  if self.last_saved_index != self.spectrogram.dwell_data_row_index:
@@ -106,26 +102,28 @@ class render_spectrum:
 
     pass
 
-  def _render_state(self):
-    state_str = "{:>20} {:>16}".format(self.sequencer.state, self.sequencer.dwell_state)
-    text_data = self.font.render(state_str, True, (0, 192, 192))
-    text_rect = text_data.get_rect()
-    text_rect.left = 16
-    text_rect.bottom = 792
-    self.surface.blit(text_data, text_rect)
-
   def render(self):
     rect_dwell_display = [16, 16,  600, 64]
-    rect_waterfall_display = [16, 128, 600, 360]
 
     self._render_dwell_display(rect_dwell_display)
-    self._render_waterfall_display(rect_waterfall_display)
-    self._render_state()
+    self._render_waterfall_display(self.rect_waterfall_display)
 
     pygame.draw.rect(self.surface, (0, 0, 255), [0, 0, 640, 768], 1)
     pygame.draw.rect(self.surface, (0, 128, 128), rect_dwell_display, 1)
-    pygame.draw.rect(self.surface, (0, 128, 128), rect_waterfall_display, 1)
+    pygame.draw.rect(self.surface, (0, 128, 128), self.rect_waterfall_display, 1)
     pygame.draw.rect(self.surface, (0, 128, 128), [16, 512, 600, 232], 1)
 
   def update(self):
-    self.spectrogram.update()
+    #self.pr.enable()
+
+    while len(self.sequencer.dwells_to_render) > 0:
+      row_done = self.dwell_buffer.process_dwell_update(self.sequencer.dwells_to_render.pop(0))
+      if row_done:
+        #self.pr.enable()
+        self.spectrogram.process_new_row(self.dwell_buffer)
+        #self.pr.disable()
+        #s = io.StringIO()
+        #sortby = SortKey.CUMULATIVE
+        #ps = pstats.Stats(self.pr, stream=s).sort_stats(sortby)
+        #ps.print_stats()
+        #print(s.getvalue())

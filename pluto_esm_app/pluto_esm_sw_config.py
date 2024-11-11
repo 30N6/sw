@@ -9,6 +9,7 @@ class pluto_esm_sw_config:
 
     self.scan_dwells = self._compute_scan_dwells(self.config)
     self.randomize_scan_order = self.config["scan_config"]["randomize_scan_order"]
+    self.min_freq = min(list(self.scan_dwells.keys())) - self.config["dwell_config"]["freq_step"] / 2
     self.max_freq = max(list(self.scan_dwells.keys())) + self.config["dwell_config"]["freq_step"] / 2
     self.fast_lock_recal_interval = self.config["fast_lock_config"]["recalibration_interval"]
     self.fast_lock_recal_pause = self.config["fast_lock_config"]["recalibration_pause"]
