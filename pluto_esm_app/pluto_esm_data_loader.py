@@ -3,7 +3,7 @@ import time
 import json
 
 class pluto_esm_data_loader:
-  def __init__(self, logger, filename, speed=5.0):
+  def __init__(self, logger, filename, speed=10.0):
     self.logger = logger
 
     self.fd = open(filename, "r")

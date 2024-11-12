@@ -76,8 +76,8 @@ class render_spectrum:
   def _render_waterfall_display(self, rect):
     #t0 = time.time()
 
-    data = self.spectrogram.get_spectrogram(True, rect[2], rect[3])
-    surf = pygame.surfarray.make_surface(data.transpose())
+    data = self.spectrogram.get_spectrogram(False, rect[2], rect[3])
+    surf = pygame.surfarray.make_surface(data)
     #t1 = time.time()
 
     #print("render_waterfall: t1-t0={}".format(t1-t0))

@@ -1,6 +1,7 @@
 import time
 from pluto_esm_hw_pkg import *
 import numpy as np
+import turbo_colormap
 
 class pluto_esm_spectrogram:
 
@@ -8,16 +9,34 @@ class pluto_esm_spectrogram:
     self.sw_config              = sw_config
     self.spec_buffer_main_avg   = np.zeros((main_spec_dimensions[1], main_spec_dimensions[0]))
     self.spec_buffer_main_peak  = np.zeros((main_spec_dimensions[1], main_spec_dimensions[0]))
-
-  def _map_spectrogram_peak(self, input_value, full_scale_value):
-    output_value = int(round(255.0 * min(input_value, full_scale_value) / full_scale_value))
-    return output_value #(output_value << 16) | (output_value << 8) | output_value
+    self.spec_main_avg          = np.zeros((main_spec_dimensions[1], main_spec_dimensions[0], 3))
+    self.spec_main_peak         = np.zeros((main_spec_dimensions[1], main_spec_dimensions[0], 3))
 
   def get_spectrogram(self, peak_not_avg, output_width, output_height):
     if peak_not_avg:
-      return self.spec_buffer_main_peak
+      return self.spec_main_peak.transpose((1,0,2))
     else:
-      return self.spec_buffer_main_avg
+      return self.spec_main_avg.transpose((1,0,2))
+
+  @staticmethod
+  def _normalize_row_sqrt(data):
+    assert (data.shape[0] == data.size)
+    data[np.isnan(data)] = 0
+    row_max = np.max(data)
+    row_scaled = np.divide(data, row_max)
+    return np.sqrt(row_scaled)
+
+  @staticmethod
+  def _shift_and_insert(buf, new_row):
+    #buf[1:] = buf[:-1]
+    #buf[0] = new_row
+    #return buf
+
+    #buf = np.roll(buf, 1, 0)
+    #buf[0] = new_row
+    #return buf
+
+    return np.vstack((new_row, buf[:-1]))
 
   def process_new_row(self, dwell_buffer):
     scaled_duration = dwell_buffer.dwell_data_channel_duration[dwell_buffer.dwell_data_last_row_index] * FAST_CLOCK_PERIOD * CHANNELIZER_OVERSAMPLING
@@ -38,10 +57,7 @@ class pluto_esm_spectrogram:
       buf_avg[output_col]  = np.sum(input_row_avg[input_cols])
       buf_peak[output_col] = np.sum(input_row_peak[input_cols])
 
-    self.spec_buffer_main_avg         = np.roll(self.spec_buffer_main_avg, 1, 0)
-    self.spec_buffer_main_peak        = np.roll(self.spec_buffer_main_peak, 1, 0)
-    self.spec_buffer_main_avg[0, :]   = buf_avg
-    self.spec_buffer_main_peak[0, :]  = buf_peak
-
-    #print("avg = {}".format(self.spec_buffer_main_avg[0, :]))
-    #print("peak = {}".format(self.spec_buffer_main_peak[0, :]))
+    #self.spec_buffer_main_avg   = self._shift_and_insert(self.spec_buffer_main_avg,   buf_avg)
+    #self.spec_buffer_main_peak  = self._shift_and_insert(self.spec_buffer_main_peak,  buf_peak)
+    self.spec_main_avg          = self._shift_and_insert(self.spec_main_avg,          np.expand_dims(turbo_colormap.interpolate_color(self._normalize_row_sqrt(buf_avg)), 0))
+    self.spec_main_peak         = self._shift_and_insert(self.spec_main_peak,         np.expand_dims(turbo_colormap.interpolate_color(self._normalize_row_sqrt(buf_peak)), 0))

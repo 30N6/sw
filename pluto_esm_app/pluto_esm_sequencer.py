@@ -104,7 +104,7 @@ class pluto_esm_sequencer:
         self.logger.log(self.logger.LL_INFO, "[sequencer] _process_data_from_sim: simulated report received for frequency={}".format(report["dwell_data"].frequency))
         self._process_combined_dwell_report(report)
 
-  def _process_dwell_reports(self):
+  def _process_dwell_reports_from_hw(self):
     while len(self.hw_interface.hwdr.output_data_dwell) > 0:
       packed_report = self.hw_interface.hwdr.output_data_dwell.pop(0)
       r = self.dwell_reporter.process_message(packed_report)
@@ -112,13 +112,13 @@ class pluto_esm_sequencer:
         expected_dwell_entry  = self.dwell_active[0]
         expected_dwell_data   = expected_dwell_entry["dwell"]
         assert (r["frequency"] == int(round(expected_dwell_data.frequency)))
-        self.logger.log(self.logger.LL_INFO, "[sequencer] _process_dwell_reports: combined report received for frequency={}".format(expected_dwell_data.frequency))
+        self.logger.log(self.logger.LL_INFO, "[sequencer] _process_dwell_reports_from_hw: combined report received for frequency={}".format(expected_dwell_data.frequency))
         report = {"dwell_data": expected_dwell_data, "dwell_report": r, "first_in_sequence": expected_dwell_entry["first"], "last_in_sequence": expected_dwell_entry["last"]}
         self.recorder.log({"dwell_report": report})
         self.dwell_active.pop(0)
         self._process_combined_dwell_report(report)
       else:
-        self.logger.log(self.logger.LL_DEBUG, "[sequencer] _process_dwell_reports: partial report from hw")
+        self.logger.log(self.logger.LL_DEBUG, "[sequencer] _process_dwell_reports_from_hw: partial report from hw")
 
   def _process_combined_dwell_report(self, report):
     #data for rendering the dwell indicator
@@ -135,7 +135,7 @@ class pluto_esm_sequencer:
     if self.sim_enabled:
       self._process_data_from_sim()
     else:
-      self._process_dwell_reports()
+      self._process_dwell_reports_from_hw()
 
     #self.output_data_pdw.append(full_data)
     #self.output_data_dwell.append(full_data)
