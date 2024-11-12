@@ -236,9 +236,8 @@ class pluto_esm_hw_config:
 
 class pluto_esm_hw_interface:
   def __init__(self, logger, pluto_uri):
-    self.logger = logger
-
     #todo: iio info
+    self.logger           = logger
     self.hwcp             = pluto_esm_hw_command_processor(pluto_uri, self.logger)
     self.hwdr             = pluto_esm_hw_dma_reader.pluto_esm_hw_dma_reader(pluto_uri, self.logger)
     self.hw_cfg           = pluto_esm_hw_config(self.logger, self.hwcp)

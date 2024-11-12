@@ -4,6 +4,8 @@ import pluto_esm_sw_config
 import pluto_esm_sequencer
 import pluto_esm_hw_interface
 import pluto_esm_logger
+import pluto_esm_data_recorder
+import pluto_esm_data_loader
 import render_spectrum
 import render_status
 
@@ -21,11 +23,17 @@ class pluto_esm_main_thread:
     pygame.display.set_caption("pluto_esm")
     self.clock = pygame.time.Clock()
 
-    self.logger = pluto_esm_logger.pluto_esm_logger(self.LOG_DIR, "pluto_esm_main_thread", pluto_esm_logger.pluto_esm_logger.LL_DEBUG)
-
     self.sw_config    = pluto_esm_sw_config.pluto_esm_sw_config("./pluto_esm_sample_config_3.json")
+    self.logger       = pluto_esm_logger.pluto_esm_logger(self.LOG_DIR, "pluto_esm_main_thread", pluto_esm_logger.pluto_esm_logger.LL_DEBUG)
+
+    self.recorder     = pluto_esm_data_recorder.pluto_esm_data_recorder(self.LOG_DIR, "recorded_data", self.sw_config.enable_recording)
+    if self.sw_config.sim_enabled:
+      self.sim_loader = pluto_esm_data_loader.pluto_esm_data_loader(self.logger, self.sw_config.sim_filename)
+    else:
+      self.sim_loader = None
+
     self.hw_interface = pluto_esm_hw_interface.pluto_esm_hw_interface(self.logger, "ip:192.168.3.100")
-    self.sequencer    = pluto_esm_sequencer.pluto_esm_sequencer(self.logger, self.sw_config, self.hw_interface)
+    self.sequencer    = pluto_esm_sequencer.pluto_esm_sequencer(self.logger, self.recorder, self.sw_config, self.hw_interface, self.sim_loader)
 
     #self.hw_interface.test()
     self.render_status    = render_status.render_status(self.surface, self.sw_config, self.sequencer)
@@ -39,6 +47,8 @@ class pluto_esm_main_thread:
           running = False
 
       self.logger.flush()
+      self.recorder.flush()
+
       self.hw_interface.update()
       self.sequencer.update()
       self.render_status.update()
@@ -54,4 +64,6 @@ class pluto_esm_main_thread:
 
     print("sending shutdown")
     self.hw_interface.shutdown()
+    self.logger.shutdown("quit")
+    self.recorder.shutdown("quit")
     pygame.quit()

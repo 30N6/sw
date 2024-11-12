@@ -14,6 +14,12 @@ class pluto_esm_sw_config:
     self.fast_lock_recal_interval = self.config["fast_lock_config"]["recalibration_interval"]
     self.fast_lock_recal_pause = self.config["fast_lock_config"]["recalibration_pause"]
 
+    self.sim_enabled = self.config["sim_mode"]["enable"]
+    if self.sim_enabled:
+      self.sim_filename = self.config["sim_mode"]["filename"]
+
+    self.enable_recording = self.config["enable_recording"]
+
   def _compute_scan_dwells(self, config):
     max_freq = 0
     min_freq = 99999

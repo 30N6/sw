@@ -30,9 +30,15 @@ def main():
 
   #output_peak = normalize_db(buf_peak)
   #output_peak = normalize_sqrt(buf_peak)
+
+  #output_data = normalize_db(buf_peak).transpose()
   output_data = normalize_sqrt(buf_avg).transpose()
+  #output_data = normalize_sqrt(buf_peak).transpose()
 
   output_data = turbo_colormap.interpolate_color(output_data)
+
+  output_data = output_data.repeat(2, axis=1)
+
 
 
   #output_peak = np.empty((norm_peak.shape[0], norm_peak.shape[1], 3), np.uint8)
