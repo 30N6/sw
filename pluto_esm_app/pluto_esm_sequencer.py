@@ -97,14 +97,10 @@ class pluto_esm_sequencer:
     for entry in entries:
       if "dwell_report" in entry["data"]:
         data = entry["data"]["dwell_report"]
-
-        print(data)
-
         report = {"dwell_data"        : dwell_data.from_dict(data["dwell_data"]),
                   "dwell_report"      : data["dwell_report"],
                   "first_in_sequence" : data["first_in_sequence"],
                   "last_in_sequence"  : data["last_in_sequence"]}
-        print(report)
         self.logger.log(self.logger.LL_INFO, "[sequencer] _process_data_from_sim: simulated report received for frequency={}".format(report["dwell_data"].frequency))
         self._process_combined_dwell_report(report)
 

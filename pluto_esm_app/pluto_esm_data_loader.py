@@ -3,7 +3,7 @@ import time
 import json
 
 class pluto_esm_data_loader:
-  def __init__(self, logger, filename):
+  def __init__(self, logger, filename, speed=5.0):
     self.logger = logger
 
     self.fd = open(filename, "r")
@@ -11,7 +11,10 @@ class pluto_esm_data_loader:
     first_line = json.loads(self.fd.readline())
     first_time = self._get_entry_time(first_line)
 
+    self.speed = speed
+
     now = time.time()
+    self.initial_time = now
     self.time_offset = now - first_time
 
     self.logger.log(self.logger.LL_INFO, "[pluto_esm_data_loader] opened {} -- first_time={} offset={}".format(filename, first_time, self.time_offset))
@@ -38,6 +41,8 @@ class pluto_esm_data_loader:
     if self.input_done:
       return []
 
+    adjusted_time = (t - self.initial_time) * self.speed + self.initial_time
+
     while not self.input_done:
       line = self.fd.readline()
       if len(line) == 0:
@@ -48,12 +53,12 @@ class pluto_esm_data_loader:
       self.lines_processed += 1
       decoded_line = self._decode_line(line)
       self.pending_lines.append(decoded_line)
-      if decoded_line["virtual_time"] > t:
+      if decoded_line["virtual_time"] > adjusted_time:
         break
 
     r = []
     while len(self.pending_lines) > 0:
-      if self.pending_lines[0]["virtual_time"] > t:
+      if self.pending_lines[0]["virtual_time"] > adjusted_time:
         break
       r.append(self.pending_lines.pop(0))
 
