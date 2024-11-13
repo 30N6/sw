@@ -5,15 +5,16 @@ import json
 class pluto_esm_data_recorder:
   def __init__(self, path, prefix, enable):
     self.enable = enable
-    self.path = path
-    start_time = time.localtime()
-    filename = "{}-{:04}{:02}{:02}-{:02}{:02}{:02}.log".format(prefix,
-      start_time.tm_year, start_time.tm_mon, start_time.tm_mday,
-      start_time.tm_hour, start_time.tm_min, start_time.tm_sec)
-    filename = os.path.join(path, filename)
-    self.fd = open(filename, "w")
+    if enable:
+      self.path = path
+      start_time = time.localtime()
+      filename = "{}-{:04}{:02}{:02}-{:02}{:02}{:02}.log".format(prefix,
+        start_time.tm_year, start_time.tm_mon, start_time.tm_mday,
+        start_time.tm_hour, start_time.tm_min, start_time.tm_sec)
+      filename = os.path.join(path, filename)
+      self.fd = open(filename, "w")
 
-    self.log({"comment": "Logging started"})
+      self.log({"comment": "Logging started"})
 
   def log(self, data):
     if not self.enable:

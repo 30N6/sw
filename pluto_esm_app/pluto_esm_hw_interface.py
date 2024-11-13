@@ -255,7 +255,7 @@ class pluto_esm_hw_interface:
     attributes_phy      = [("bb_dc_offset_tracking_en",  "1"),
                            ("filter_fir_en",             "0"),
                            ("gain_control_mode",         "manual"),
-                           ("hardwaregain",              "30"),
+                           ("hardwaregain",              "50"),
                            ("quadrature_tracking_en",    "1"),
                            ("rf_bandwidth",              "56000000"),
                            ("rf_dc_offset_tracking_en",  "1"),
