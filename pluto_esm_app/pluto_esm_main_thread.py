@@ -40,11 +40,16 @@ class pluto_esm_main_thread:
     self.render_spectrum  = render_spectrum.render_spectrum(self.surface, self.sw_config, self.sequencer)
 
   def run(self):
+    key_handlers = [self.render_spectrum]
+
     running = True
     while (running):
       for i in pygame.event.get():
         if i.type == pygame.QUIT:
           running = False
+        elif i.type == pygame.KEYDOWN:
+          for handler in key_handlers:
+            handler.process_keydown(i.key)
 
       self.logger.flush()
       self.recorder.flush()

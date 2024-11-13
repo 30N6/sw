@@ -13,7 +13,7 @@ class render_spectrum:
 
   def __init__(self, surface, sw_config, sequencer):
     self.rect_dwell_display               = [16, 4,  600, 16]
-    self.rect_waterfall_display_primary   = [16, 48,  600, 320]
+    self.rect_waterfall_display_primary   = [16, 56,  600, 320]
     self.rect_waterfall_display_secondary = [16, 416, 600, 320]
 
     self.surface              = surface
@@ -23,6 +23,7 @@ class render_spectrum:
     self.spectrogram          = pluto_esm_spectrogram.pluto_esm_spectrogram(self.sw_config, self.rect_waterfall_display_primary[2:4])
     self.max_freq             = sw_config.max_freq
     self.dwell_bw             = sw_config.config["dwell_config"]["freq_step"]
+    self.channel_step         = sw_config.config["dwell_config"]["channel_step"]
     self.dwell_cal_interval   = sw_config.config["fast_lock_config"]["recalibration_interval"]
     self.dwell_scan_fade_time = 0.5
 
@@ -79,18 +80,38 @@ class render_spectrum:
       dwell_color = self._color_interp(self.colors["dwell_new"], self.colors["dwell_old"], (now - dwell_completion_time) / self.dwell_scan_fade_time)
       pygame.draw.rect(self.surface, dwell_color, dwell_rect, 0)
 
+    if self.freq_zoom_active:
+      zoom_marker_width = 8
+
+      for i in range(len(self.freq_zoom_range)):
+        x = self.rect_dwell_display[0] + self.freq_zoom_range[i] / mhz_per_px
+        points = [(x - zoom_marker_width/2, self.rect_dwell_display[1] + self.rect_dwell_display[3] + zoom_marker_width),
+                  (x,                       self.rect_dwell_display[1] + self.rect_dwell_display[3]),
+                  (x + zoom_marker_width/2, self.rect_dwell_display[1] + self.rect_dwell_display[3] + zoom_marker_width)]
+        pygame.draw.polygon(self.surface, self.colors["zoom_marker"], points)
+
     pygame.draw.rect(self.surface, self.colors["frame_elements"], self.rect_dwell_display, 1)
 
   def _render_waterfall_display(self):
     #t0 = time.time()
 
-    data = self.spectrogram.get_spectrogram(False, True, self.rect_waterfall_display_primary[2], self.rect_waterfall_display_primary[3])
-    surf = pygame.surfarray.make_surface(data)
-    self.surface.blit(surf, self.rect_waterfall_display_primary)
+    data_p = self.spectrogram.get_spectrogram(False, True)
+    data_s = self.spectrogram.get_spectrogram(True, True)
 
-    data = self.spectrogram.get_spectrogram(True, True, self.rect_waterfall_display_secondary[2], self.rect_waterfall_display_secondary[3])
-    surf = pygame.surfarray.make_surface(data)
-    self.surface.blit(surf, self.rect_waterfall_display_secondary)
+    if self.freq_zoom_active or True:
+      mhz_per_px = self.max_freq / self.spectrogram.output_width
+      i_start = round(self.freq_zoom_range[0] / mhz_per_px)
+      i_stop  = round(self.freq_zoom_range[1] / mhz_per_px)
+      surf_p = pygame.surfarray.make_surface(data_p[i_start:i_stop])
+      surf_s = pygame.surfarray.make_surface(data_s[i_start:i_stop])
+      surf_p = pygame.transform.smoothscale(surf_p, self.rect_waterfall_display_primary[2:4])
+      surf_s = pygame.transform.smoothscale(surf_p, self.rect_waterfall_display_secondary[2:4])
+    else:
+      surf_p = pygame.surfarray.make_surface(data_p)
+      surf_s = pygame.surfarray.make_surface(data_s)
+
+    self.surface.blit(surf_p, self.rect_waterfall_display_primary)
+    self.surface.blit(surf_s, self.rect_waterfall_display_secondary)
 
     pygame.draw.rect(self.surface, self.colors["frame_elements"], self.rect_waterfall_display_primary, 1)
     pygame.draw.rect(self.surface, self.colors["frame_elements"], self.rect_waterfall_display_secondary, 1)
@@ -102,7 +123,7 @@ class render_spectrum:
 
     for i in range(freq_tick_count):
       tick_frac = (i / (freq_tick_count - 1))
-      freq_str = "{}".format(round(tick_frac * self.max_freq))
+      freq_str = "{}".format(round(self.freq_zoom_range[0] + tick_frac * (self.freq_zoom_range[1] - self.freq_zoom_range[0])))
       text_data = self.font.render(freq_str, True, self.colors["frame_elements"])
 
       for j in range(len(waterfall_rects)):
@@ -117,25 +138,39 @@ class render_spectrum:
         text_rect.bottom = waterfall_rects[j][1] - freq_tick_height - 1
         self.surface.blit(text_data, text_rect)
 
-    if self.freq_zoom_active:
-      zoom_marker_width = 8
-      mhz_per_px = (self.max_freq / self.rect_waterfall_display_primary[2])
-
-      for i in range(2):
-        for j in range(len(waterfall_rects)):
-          x = waterfall_rects[j][0] + self.freq_zoom_range[i] / mhz_per_px
-          points = [(x - zoom_marker_width/2, waterfall_rects[j][1] + waterfall_rects[j][3] + zoom_marker_width),
-                    (x,                       waterfall_rects[j][1] + waterfall_rects[j][3]),
-                    (x + zoom_marker_width/2, waterfall_rects[j][1] + waterfall_rects[j][3] + zoom_marker_width)]
-          pygame.draw.polygon(self.surface, self.colors["zoom_marker"], points)
-
     for i in range(len(waterfall_rects)):
       status_str = "testing 12345  testing 12345  testing 12345  testing 12345  testing 12345  testing 12345"
       text_data = self.font.render(status_str, True, self.colors["frame_elements"])
       text_rect = text_data.get_rect()
       text_rect.left = waterfall_rects[i][0]
-      text_rect.bottom = waterfall_rects[i][1] + waterfall_rects[i][3] + 24
+      text_rect.bottom = waterfall_rects[i][1] + waterfall_rects[i][3] + 16
       self.surface.blit(text_data, text_rect)
+
+  def _update_zoom(self, key):
+    zoom_width  = (self.freq_zoom_range[1] - self.freq_zoom_range[0])
+    zoom_center = zoom_width / 2 + self.freq_zoom_range[0]
+
+    if key == pygame.K_c:
+      zoom_width = self.max_freq
+      zoom_center = self.max_freq / 2
+    elif key == pygame.K_z:
+      zoom_width = 0.75*zoom_width
+    elif key == pygame.K_x:
+      zoom_width = 1.5*zoom_width
+    elif key == pygame.K_a:
+      zoom_center = max(0 + zoom_width * 0.5, zoom_center - zoom_width * 0.3)
+    elif key == pygame.K_s:
+      zoom_center = min(self.max_freq - zoom_width * 0.5, zoom_center + zoom_width * 0.3)
+    else:
+      return
+
+    self.freq_zoom_range[0] = max(0, zoom_center - zoom_width/2)
+    self.freq_zoom_range[1] = min(self.max_freq, zoom_center + zoom_width/2)
+
+    if (self.freq_zoom_range[0] == 0) and (self.freq_zoom_range[1] == self.max_freq):
+      self.freq_zoom_active = False
+    else:
+      self.freq_zoom_active = True
 
   def render(self):
 
@@ -159,3 +194,7 @@ class render_spectrum:
         #ps = pstats.Stats(self.pr, stream=s).sort_stats(sortby)
         #ps.print_stats()
         #print(s.getvalue())
+
+  def process_keydown(self, key):
+    if key in (pygame.K_z, pygame.K_x, pygame.K_a, pygame.K_s, pygame.K_c):
+      self._update_zoom(key)

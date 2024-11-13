@@ -6,13 +6,12 @@ class pluto_esm_dwell_stats_buffer:
   def __init__(self, sw_config):
     self.max_freq             = sw_config.max_freq
     self.dwell_bw             = sw_config.config["dwell_config"]["freq_step"]
-    self.adjusted_max_freq    = self.max_freq + self.dwell_bw / 2 #TODO: doesn't max_freq already include an adjustment?
 
     self.num_channels     = ESM_NUM_CHANNELS_NARROW
     self.channel_spacing  = (ADC_CLOCK_FREQUENCY / self.num_channels) / 1e6
     assert (self.channel_spacing == sw_config.config["dwell_config"]["channel_step"])
 
-    self.buffer_width        = int(round(self.adjusted_max_freq / self.channel_spacing))
+    self.buffer_width        = int(round(self.max_freq / self.channel_spacing)) + 1
     self.buffer_depth        = 1024 #config?
 
     self.dwell_data_channel_accum     = np.zeros((self.buffer_depth, self.buffer_width), dtype=np.uint64)

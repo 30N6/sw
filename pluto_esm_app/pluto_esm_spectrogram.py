@@ -23,8 +23,7 @@ class pluto_esm_spectrogram:
     self.spec_filt_avg          = np.zeros((self.output_depth, self.output_width, 3))
     self.spec_filt_peak         = np.zeros((self.output_depth, self.output_width, 3))
 
-
-  def get_spectrogram(self, peak_not_avg, main_not_filt, output_width, output_height):
+  def get_spectrogram(self, peak_not_avg, main_not_filt):
     if main_not_filt:
       if peak_not_avg:
         return self.spec_main_peak.transpose((1,0,2)).repeat(self.output_row_height, 1)
@@ -88,8 +87,8 @@ class pluto_esm_spectrogram:
     buf_avg = np.zeros(self.output_width)
     buf_peak = np.zeros(self.output_width)
 
-    width_ratio = dwell_buffer.buffer_width / buf_avg.size
-    for output_col in range(buf_avg.size):
+    width_ratio = dwell_buffer.buffer_width / self.output_width
+    for output_col in range(self.output_width):
       input_cols = range(int(output_col * width_ratio), int((output_col + 1) * width_ratio))
       buf_avg[output_col]  = np.sum(input_row_avg[input_cols])
       buf_peak[output_col] = np.sum(input_row_peak[input_cols])
