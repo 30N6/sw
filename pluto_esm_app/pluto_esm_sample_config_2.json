@@ -1,4 +1,6 @@
 {
+    "sim_mode": {"enable": 1, "filename": "./log/recorded_data-20241112-164730.log"},
+    "enable_recording": 0,
     "fast_lock_config": {"recalibration_interval": 60.0, "recalibration_pause": 2.0},
     "dwell_config": {"freq_start": 96.0, "freq_step": 48.0, "channel_step": 0.96},
     "scan_config": {
@@ -7,7 +9,9 @@
           {"freq_range": [118, 155],    "dwell_time": 0.050, "comment": "VHF"},
           {"freq_range": [450, 470],    "dwell_time": 0.050, "comment": "UHF"},
           {"freq_range": [902, 926],    "dwell_time": 0.050, "comment": "915"},
-          {"freq_range": [118, 926],    "dwell_time": 0.050, "comment": "full"}
+          {"freq_range": [1200, 1400],  "dwell_time": 0.050, "comment": "1.3"},
+          {"freq_range": [2350, 2550],  "dwell_time": 0.050, "comment": "2.4"},
+          {"freq_range": [5200, 6000],  "dwell_time": 0.050, "comment": "5"}
       ],
       "exclude_freqs": []
     },
