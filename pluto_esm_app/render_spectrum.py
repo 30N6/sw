@@ -1,7 +1,6 @@
 import pygame
 import time
 from pluto_esm_hw_pkg import *
-import pluto_esm_dwell_stats_buffer
 import pluto_esm_spectrogram
 import numpy as np
 import math
@@ -19,7 +18,6 @@ class render_spectrum:
     self.surface              = surface
     self.sw_config            = sw_config
     self.sequencer            = sequencer
-    self.dwell_buffer         = pluto_esm_dwell_stats_buffer.pluto_esm_dwell_stats_buffer(self.sw_config)
     self.spectrogram          = pluto_esm_spectrogram.pluto_esm_spectrogram(self.sw_config, self.rect_waterfall_display_primary[2:4])
     self.max_freq             = sw_config.max_freq
     self.dwell_bw             = sw_config.config["dwell_config"]["freq_step"]
@@ -165,8 +163,6 @@ class render_spectrum:
     #print(peaks)
 
     for i in range(len(waterfall_rects)):
-      print(peaks[i])
-
       peak_values = "[" + " ".join(["{:.1f}".format(v) for v in peaks[i][1]]) + "]"
       peak_freqs = "[" + " ".join(["{:.1f}".format(v) for v in peaks[i][0]]) + "]"
 
@@ -214,17 +210,16 @@ class render_spectrum:
   def update(self):
     #self.pr.enable()
 
-    while len(self.sequencer.dwells_to_render) > 0:
-      row_done = self.dwell_buffer.process_dwell_update(self.sequencer.dwells_to_render.pop(0))
-      if row_done:
-        #self.pr.enable()
-        self.spectrogram.process_new_row(self.dwell_buffer)
-        #self.pr.disable()
-        #s = io.StringIO()
-        #sortby = SortKey.CUMULATIVE
-        #ps = pstats.Stats(self.pr, stream=s).sort_stats(sortby)
-        #ps.print_stats()
-        #print(s.getvalue())
+    while len(self.sequencer.dwell_rows_to_render) > 0:
+      self.sequencer.dwell_rows_to_render.pop(0)
+      #self.pr.enable()
+      self.spectrogram.process_new_row(self.sequencer.dwell_buffer)
+      #self.pr.disable()
+      #s = io.StringIO()
+      #sortby = SortKey.CUMULATIVE
+      #ps = pstats.Stats(self.pr, stream=s).sort_stats(sortby)
+      #ps.print_stats()
+      #print(s.getvalue())
 
   def process_keydown(self, key):
     if key in (pygame.K_z, pygame.K_x, pygame.K_a, pygame.K_s, pygame.K_c):

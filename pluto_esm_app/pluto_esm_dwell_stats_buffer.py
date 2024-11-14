@@ -22,6 +22,8 @@ class pluto_esm_dwell_stats_buffer:
     self.dwell_data_row_index         = 0
     self.dwell_data_last_row_index    = 0
 
+    self.dwell_channel_info           = {}
+
     center_channel = self.num_channels // 2
     self.channel_range = [center_channel - int(round(0.5 * self.dwell_bw / self.channel_spacing)),
                           center_channel + int(round(0.5 * self.dwell_bw / self.channel_spacing))]
@@ -46,16 +48,21 @@ class pluto_esm_dwell_stats_buffer:
     center_channel_index = int(round(dwell_data.frequency / self.channel_spacing))
     center_offset = self.num_channels // 2
 
-    channels = []
+    #channels = []
 
     self.dwell_data_channel_center[self.dwell_data_row_index, center_channel_index - 1] = True
+
+    if dwell_data.frequency not in self.dwell_channel_info:
+      self.dwell_channel_info[dwell_data.frequency] = {"center": center_channel_index,
+                                                       "start":  center_channel_index + self.channel_range[0] - center_offset,
+                                                       "stop":   center_channel_index + self.channel_range[1] - center_offset}
 
     for i in range(self.channel_range[0], self.channel_range[1] + 1):
       entry = dwell_report["channel_data"][i]
       assert (entry["index"] == i)
 
       global_channel_index = center_channel_index + (i - center_offset)
-      channels.append(global_channel_index)
+      #channels.append(global_channel_index)
 
       self.dwell_data_channel_accum[self.dwell_data_row_index, global_channel_index]     += entry["accum"]
       self.dwell_data_channel_peak[self.dwell_data_row_index, global_channel_index]      = max(self.dwell_data_channel_peak[self.dwell_data_row_index, global_channel_index], entry["max"])
@@ -63,6 +70,7 @@ class pluto_esm_dwell_stats_buffer:
 
     #print("dwell: freq={} first={} last={} chan_index={}".format(dwell_data.frequency, is_first, is_last, center_channel_index))
     #print("channels = {}".format(channels))
+    #print(self.channel_range)
     #print(self.dwell_data_channel_accum[self.dwell_data_row_index, :])
 
     if is_last:

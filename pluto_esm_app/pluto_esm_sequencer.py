@@ -4,6 +4,8 @@ import json
 import pluto_esm_hw_dwell
 import pluto_esm_hw_dwell_reporter
 import pluto_esm_hw_interface
+import pluto_esm_dwell_stats_buffer
+import pluto_esm_dwell_threshold
 import pluto_esm_hw_pkg
 
 class dwell_data:
@@ -51,6 +53,7 @@ class pluto_esm_sequencer:
     self.hw_interface                   = hw_interface
     self.dwell_ctrl_interface           = pluto_esm_hw_dwell.esm_dwell_controller(hw_interface.hw_cfg)
     self.dwell_reporter                 = pluto_esm_hw_dwell_reporter.pluto_esm_hw_dwell_reporter(logger)
+    self.dwell_buffer                   = pluto_esm_dwell_stats_buffer.pluto_esm_dwell_stats_buffer(sw_config)
 
     self.state                          = "IDLE"
 
@@ -74,8 +77,7 @@ class pluto_esm_sequencer:
     self.dwell_active_first             = []
     self.dwell_active_last              = []
     self.dwell_history                  = {}
-
-    self.dwells_to_render               = []
+    self.dwell_rows_to_render           = []
 
     self.scan_sequence                  = []
     self.randomize_scan_order           = sw_config.randomize_scan_order
@@ -83,6 +85,8 @@ class pluto_esm_sequencer:
     self.scan_dwells = {}
     for freq in sw_config.scan_dwells:
       self.scan_dwells[freq] = dwell_data(freq, sw_config.scan_dwells[freq])
+
+    self.dwell_threshold                = pluto_esm_dwell_threshold.pluto_esm_dwell_threshold(logger, sw_config, list(self.scan_dwells.keys()))
 
     for freq in self.scan_dwells:
       self.logger.log(self.logger.LL_DEBUG, "[sequencer] scan_dwells[{}]=[{}]".format(freq, self.scan_dwells[freq]))
@@ -125,8 +129,12 @@ class pluto_esm_sequencer:
     if report["first_in_sequence"]:
       self.dwell_history = {}
     self.dwell_history[report["dwell_data"].frequency] = time.time()
-    #data for rendering the spectrogram
-    self.dwells_to_render.append(report)
+
+    row_done = self.dwell_buffer.process_dwell_update(report)
+    if row_done:
+      #data for rendering the spectrogram
+      self.dwell_rows_to_render.append(report)
+      self.dwell_threshold.process_new_dwell_row(self.dwell_buffer)
 
   def _update_data_from_hw(self):
     if self.state == "IDLE":
