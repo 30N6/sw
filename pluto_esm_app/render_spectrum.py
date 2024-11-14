@@ -53,6 +53,21 @@ class render_spectrum:
             ca[1] + pct*(cb[1]-ca[1]),
             ca[2] + pct*(cb[2]-ca[2]))
 
+  def _get_spectrum_peaks(self, data, N, zoom_range, mhz_per_px, compute_dB):
+    zoomed_data = data[zoom_range[0]:zoom_range[1]]
+
+    if len(zoomed_data) < N:
+      return [0], [0]
+
+    idx = np.sort(np.argpartition(zoomed_data, -N)[-N:])
+    freq = (zoom_range[0] + idx) * mhz_per_px
+    val = zoomed_data[idx]
+
+    if compute_dB:
+      return freq, 10*np.log10(val)
+    else:
+      return freq, val
+
   def _render_dwell_display(self):
     now           = time.time()
     mhz_per_px    = self.max_freq / self.rect_dwell_display[2]
@@ -98,14 +113,17 @@ class render_spectrum:
     data_p = self.spectrogram.get_spectrogram(False, True)
     data_s = self.spectrogram.get_spectrogram(True, True)
 
+    mhz_per_px = self.max_freq / self.spectrogram.output_width
+    zoom_i_start = round(self.freq_zoom_range[0] / mhz_per_px)
+    zoom_i_stop  = round(self.freq_zoom_range[1] / mhz_per_px)
+
     if self.freq_zoom_active or True:
-      mhz_per_px = self.max_freq / self.spectrogram.output_width
-      i_start = round(self.freq_zoom_range[0] / mhz_per_px)
-      i_stop  = round(self.freq_zoom_range[1] / mhz_per_px)
-      surf_p = pygame.surfarray.make_surface(data_p[i_start:i_stop])
-      surf_s = pygame.surfarray.make_surface(data_s[i_start:i_stop])
-      surf_p = pygame.transform.smoothscale(surf_p, self.rect_waterfall_display_primary[2:4])
-      surf_s = pygame.transform.smoothscale(surf_p, self.rect_waterfall_display_secondary[2:4])
+      data_p = data_p[zoom_i_start:zoom_i_stop]
+      data_s = data_s[zoom_i_start:zoom_i_stop]
+      surf_p = pygame.surfarray.make_surface(data_p)
+      surf_s = pygame.surfarray.make_surface(data_s)
+      surf_p = pygame.transform.scale(surf_p, self.rect_waterfall_display_primary[2:4])
+      surf_s = pygame.transform.scale(surf_p, self.rect_waterfall_display_secondary[2:4])
     else:
       surf_p = pygame.surfarray.make_surface(data_p)
       surf_s = pygame.surfarray.make_surface(data_s)
@@ -138,9 +156,22 @@ class render_spectrum:
         text_rect.bottom = waterfall_rects[j][1] - freq_tick_height - 1
         self.surface.blit(text_data, text_rect)
 
+     #pygame.mouse.get_pos()
+
+    peaks       = [self._get_spectrum_peaks(self.spectrogram.filter_buffer_avg[0],  3, [zoom_i_start, zoom_i_stop], mhz_per_px, True),
+                   self._get_spectrum_peaks(self.spectrogram.filter_buffer_peak[0], 3, [zoom_i_start, zoom_i_stop], mhz_per_px, False)]
+    status_str  = ["[AVERAGE] peak_val_dB={} peak_freq={}", "[PEAK] peak_val={} peak_freq={}"]
+
+    #print(peaks)
+
     for i in range(len(waterfall_rects)):
-      status_str = "testing 12345  testing 12345  testing 12345  testing 12345  testing 12345  testing 12345"
-      text_data = self.font.render(status_str, True, self.colors["frame_elements"])
+      print(peaks[i])
+
+      peak_values = "[" + " ".join(["{:.1f}".format(v) for v in peaks[i][1]]) + "]"
+      peak_freqs = "[" + " ".join(["{:.1f}".format(v) for v in peaks[i][0]]) + "]"
+
+      s = status_str[i].format(peak_values, peak_freqs)
+      text_data = self.font.render(s, True, self.colors["frame_elements"])
       text_rect = text_data.get_rect()
       text_rect.left = waterfall_rects[i][0]
       text_rect.bottom = waterfall_rects[i][1] + waterfall_rects[i][3] + 16

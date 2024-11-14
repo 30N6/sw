@@ -97,7 +97,7 @@ class pluto_esm_spectrogram:
     self.spec_main_peak     = self._shift_and_insert(self.spec_main_peak,     np.expand_dims(turbo_colormap.interpolate_color(self._normalize_row_sqrt(buf_peak)), 0))
 
     self.spec_filt_avg      = self._shift_and_insert(self.spec_filt_avg,      np.expand_dims(turbo_colormap.interpolate_color(self._compute_new_filtered_row(buf_avg, self.filter_buffer_avg)), 0))
-    self.spec_filt_peak     = self._shift_and_insert(self.spec_filt_peak,    np.expand_dims(turbo_colormap.interpolate_color(self._compute_new_filtered_row(buf_peak, self.filter_buffer_peak)), 0))
+    self.spec_filt_peak     = self._shift_and_insert(self.spec_filt_peak,     np.expand_dims(turbo_colormap.interpolate_color(self._compute_new_filtered_row(buf_peak, self.filter_buffer_peak)), 0))
 
     self.filter_buffer_avg  = self._shift_and_insert(self.filter_buffer_avg,  buf_avg)
     self.filter_buffer_peak = self._shift_and_insert(self.filter_buffer_peak, buf_peak)
