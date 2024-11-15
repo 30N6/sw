@@ -3,6 +3,7 @@ import random
 import json
 import pluto_esm_hw_dwell
 import pluto_esm_hw_dwell_reporter
+import pluto_esm_hw_pdw_reporter
 import pluto_esm_hw_interface
 import pluto_esm_dwell_stats_buffer
 import pluto_esm_dwell_threshold
@@ -46,14 +47,16 @@ class pluto_esm_sequencer:
   MAX_ACTIVE_SCAN_DWELLS    = 6
   MAX_ACTIVE_REVISIT_DWELLS = 2
 
-  def __init__(self, logger, recorder, sw_config, hw_interface, sim_loader):
+  def __init__(self, logger, recorder, sw_config, hw_interface, analysis_thread, sim_loader):
     self.logger                         = logger
     self.recorder                       = recorder
     self.sim_loader                     = sim_loader
     self.hw_interface                   = hw_interface
+    self.analysis_thread                = analysis_thread
     self.dwell_ctrl_interface           = pluto_esm_hw_dwell.esm_dwell_controller(hw_interface.hw_cfg)
     self.dwell_reporter                 = pluto_esm_hw_dwell_reporter.pluto_esm_hw_dwell_reporter(logger)
     self.dwell_buffer                   = pluto_esm_dwell_stats_buffer.pluto_esm_dwell_stats_buffer(sw_config)
+    self.pdw_reporter                   = pluto_esm_hw_pdw_reporter.pluto_esm_hw_pdw_reporter(logger)
 
     self.state                          = "IDLE"
 
@@ -116,7 +119,7 @@ class pluto_esm_sequencer:
         expected_dwell_entry  = self.dwell_active[0]
         expected_dwell_data   = expected_dwell_entry["dwell"]
         assert (r["frequency"] == int(round(expected_dwell_data.frequency)))
-        self.logger.log(self.logger.LL_INFO, "[sequencer] _process_dwell_reports_from_hw: combined report received for frequency={}".format(expected_dwell_data.frequency))
+        self.logger.log(self.logger.LL_INFO, "[sequencer] _process_dwell_reports_from_hw: combined report received for frequency={} dwell_seq={}".format(expected_dwell_data.frequency, r["dwell_seq_num"]))
         report = {"dwell_data": expected_dwell_data, "dwell_report": r, "first_in_sequence": expected_dwell_entry["first"], "last_in_sequence": expected_dwell_entry["last"]}
         self.recorder.log({"dwell_report": report})
         self.dwell_active.pop(0)
@@ -124,11 +127,38 @@ class pluto_esm_sequencer:
       else:
         self.logger.log(self.logger.LL_DEBUG, "[sequencer] _process_dwell_reports_from_hw: partial report from hw")
 
+  def _process_pdw_reports_from_hw(self):
+    while len(self.hw_interface.hwdr.output_data_pdw) > 0:
+      packed_report = self.hw_interface.hwdr.output_data_pdw.pop(0)
+      r = self.pdw_reporter.process_message(packed_report)
+
+      if r["msg_type"] == pluto_esm_hw_pkg.ESM_REPORT_MESSAGE_TYPE_PDW_PULSE:
+        self.logger.log(self.logger.LL_DEBUG, "[sequencer] _process_pdw_reports_from_hw: pdw pulse report: msg_seq={} dwell_seq={} pulse_seq={} chan={} pd={}".format(
+          r["msg_seq_num"], r["dwell_seq_num"], r["pulse_seq_num"], r["pulse_channel"], r["pulse_duration"]))
+
+        report = {"pdw_pulse_report": r}
+        self.recorder.log(report)
+        self.analysis_thread.submit_report(report)
+
+      elif r["msg_type"] == pluto_esm_hw_pkg.ESM_REPORT_MESSAGE_TYPE_PDW_SUMMARY:
+        self.logger.log(self.logger.LL_INFO, "[sequencer] _process_pdw_reports_from_hw: pdw summary: msg_seq={} dwell_seq={} pulse_total_count={} pulse_drop_count={} ack_delay={}/{}".format(
+          r["msg_seq_num"], r["dwell_seq_num"], r["dwell_pulse_total_count"], r["dwell_pulse_drop_count"], r["ack_delay_report"], r["ack_delay_sample_processor"]))
+
+        report = {"pdw_summary_report": r}
+        self.recorder.log(report)
+        self.analysis_thread.submit_report(report)
+
+      else:
+        raise RuntimeError("invalid message type")
+
+
   def _process_combined_dwell_report(self, report):
     #data for rendering the dwell indicator
     if report["first_in_sequence"]:
       self.dwell_history = {}
     self.dwell_history[report["dwell_data"].frequency] = time.time()
+
+    self.analysis_thread.submit_report(report)
 
     row_done = self.dwell_buffer.process_dwell_update(report)
     if row_done:
@@ -144,6 +174,7 @@ class pluto_esm_sequencer:
       self._process_data_from_sim()
     else:
       self._process_dwell_reports_from_hw()
+      self._process_pdw_reports_from_hw()
 
     #self.output_data_pdw.append(full_data)
     #self.output_data_dwell.append(full_data)

@@ -1,4 +1,6 @@
 {
+    "sim_mode": {"enable": 0, "filename": "./log/recorded_data-20241114-151236.log"},
+    "enable_recording": 1,
     "fast_lock_config": {"recalibration_interval": 60.0, "recalibration_pause": 2.0},
     "dwell_config": {"freq_start": 96.0, "freq_step": 48.0, "channel_step": 0.96},
     "scan_config": {
@@ -6,7 +8,7 @@
       "include_freqs": [
           {"freq_range": [120,  5999], "dwell_time": 0.010, "comment": "full span"},
           {"freq_range": [1200, 1400], "dwell_time": 0.050, "comment": "ARSR-4"},
-          {"freq_range": [2700, 3000], "dwell_time": 0.020, "comment": "WSR-88D"},
+          {"freq_range": [2700, 3000], "dwell_time": 0.050, "comment": "WSR-88D"},
           {"freq_range": [118, 154],   "dwell_time": 0.100, "comment": "comms-VHF"},
           {"freq_range": [450, 470],   "dwell_time": 0.100, "comment": "comms-UHF"},
           {"freq_range": [433, 435],   "dwell_time": 0.100, "comment": "ISM-434"},

@@ -73,3 +73,28 @@ NUM_DWELL_STATS_TRAILER_BYTES = TRANSFER_SIZE - PACKED_DWELL_STATS_HEADER.size
 
 PACKED_STATUS_REPORT = struct.Struct("<" + PACKED_UINT32 + PACKED_UINT32 + "xx" + PACKED_UINT8 + PACKED_UINT8 +
                                            PACKED_UINT32 + PACKED_UINT32 + PACKED_UINT32 + PACKED_UINT32 + PACKED_UINT32 + PACKED_UINT32)
+
+
+PACKED_PDW_PULSE_REPORT_HEADER = struct.Struct("<" + PACKED_UINT32 + PACKED_UINT32 + "xx" + PACKED_UINT8 + PACKED_UINT8 +
+                                                     PACKED_UINT32 +
+                                                     PACKED_UINT32 +
+                                                     PACKED_UINT32 +
+                                                     PACKED_UINT32 +
+                                                     PACKED_UINT32 + PACKED_UINT32 +
+                                                     PACKED_UINT32 +
+                                                     PACKED_UINT32 +
+                                                     PACKED_UINT32 + PACKED_UINT32 +
+                                                     "xx" + PACKED_UINT8 + PACKED_UINT8)
+
+PACKED_PDW_PULSE_IQ_WORD = struct.Struct("<" + PACKED_INT16 + PACKED_INT16)
+NUM_PDW_PULSE_TRAILER_WORDS = (TRANSFER_SIZE - PACKED_PDW_PULSE_REPORT_HEADER.size) // PACKED_PDW_PULSE_IQ_WORD.size
+
+
+PACKED_PDW_SUMMARY_REPORT_HEADER = struct.Struct("<" + PACKED_UINT32 + PACKED_UINT32 + "xx" + PACKED_UINT8 + PACKED_UINT8 +
+                                                       PACKED_UINT32 +
+                                                       PACKED_UINT32 + PACKED_UINT32 +
+                                                       PACKED_UINT32 +
+                                                       PACKED_UINT32 +
+                                                       PACKED_UINT32 +
+                                                       PACKED_UINT32 +
+                                                       PACKED_UINT32)

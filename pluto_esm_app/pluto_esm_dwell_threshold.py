@@ -51,7 +51,9 @@ class pluto_esm_dwell_threshold:
       #print("da_1[{}] = {}".format(freq, da_1))
       #print("dwell_avg[{}] = {}".format(freq, dwell_avg))
       #print("dwell_peak[{}] = {}".format(freq, dwell_peak))
-      print("mean_peak[{}] = {:.1f} std={:.1f}".format(freq, np.mean(dwell_peak), np.std(dwell_peak)))
+      print("freq[{}] peak: mean={:.1f} std={:.1f} max={:.1f}  avg: mean={:.1f} std={:.1f} max={:.1f}".format(freq,
+        np.mean(dwell_peak), np.std(dwell_peak), np.max(dwell_peak),
+        np.mean(dwell_avg), np.std(dwell_avg), np.max(dwell_avg)))
 
       #center_channel_index = int(round(freq / self.channel_spacing))
 

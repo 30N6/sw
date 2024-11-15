@@ -38,7 +38,7 @@ class esm_message_dwell_entry:
   def default_scan_dwell(entry_index, tag, freq, duration, fast_lock_profile):
     #TODO: chan mask
     duration_in_cycles = int(duration / FAST_CLOCK_PERIOD)
-    return esm_message_dwell_entry(entry_index, tag, freq, duration_in_cycles, 0, fast_lock_profile, 0, 0, 0xFFFFFFFFFFFFFFFF, 0xFF, 0)
+    return esm_message_dwell_entry(entry_index, tag, freq, duration_in_cycles, 0, fast_lock_profile, 5000, 5000, 0xFFFFFFFFFFFFFFFF, 0xFF, 0)
 
   @staticmethod
   def from_dict(d):

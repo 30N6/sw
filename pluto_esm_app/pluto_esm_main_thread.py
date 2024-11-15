@@ -3,6 +3,7 @@ import pygame
 import pluto_esm_sw_config
 import pluto_esm_sequencer
 import pluto_esm_hw_interface
+import pluto_esm_analysis_thread
 import pluto_esm_logger
 import pluto_esm_data_recorder
 import pluto_esm_data_loader
@@ -23,7 +24,7 @@ class pluto_esm_main_thread:
     pygame.display.set_caption("pluto_esm")
     self.clock = pygame.time.Clock()
 
-    self.sw_config    = pluto_esm_sw_config.pluto_esm_sw_config("./pluto_esm_sample_config_2.json")
+    self.sw_config    = pluto_esm_sw_config.pluto_esm_sw_config("./pluto_esm_sample_config.json")
     self.logger       = pluto_esm_logger.pluto_esm_logger(self.LOG_DIR, "pluto_esm_main_thread", pluto_esm_logger.pluto_esm_logger.LL_DEBUG)
 
     self.recorder     = pluto_esm_data_recorder.pluto_esm_data_recorder(self.LOG_DIR, "recorded_data", self.sw_config.enable_recording)
@@ -32,8 +33,10 @@ class pluto_esm_main_thread:
     else:
       self.sim_loader = None
 
-    self.hw_interface = pluto_esm_hw_interface.pluto_esm_hw_interface(self.logger, "ip:192.168.3.100")
-    self.sequencer    = pluto_esm_sequencer.pluto_esm_sequencer(self.logger, self.recorder, self.sw_config, self.hw_interface, self.sim_loader)
+    self.hw_interface     = pluto_esm_hw_interface.pluto_esm_hw_interface(self.logger, "ip:192.168.3.100")
+    self.analysis_thread  = pluto_esm_analysis_thread.pluto_esm_analysis_runner(self.logger)
+    self.sequencer        = pluto_esm_sequencer.pluto_esm_sequencer(self.logger, self.recorder, self.sw_config,
+                                                                    self.hw_interface, self.analysis_thread, self.sim_loader)
 
     #self.hw_interface.test()
     self.render_status    = render_status.render_status(self.surface, self.sw_config, self.sequencer)
@@ -55,6 +58,7 @@ class pluto_esm_main_thread:
       self.recorder.flush()
 
       self.hw_interface.update()
+      self.analysis_thread.update()
       self.sequencer.update()
       self.render_status.update()
       self.render_spectrum.update()
@@ -69,6 +73,7 @@ class pluto_esm_main_thread:
 
     print("sending shutdown")
     self.hw_interface.shutdown()
+    self.analysis_thread.shutdown()
     self.logger.shutdown("quit")
     self.recorder.shutdown("quit")
     pygame.quit()
