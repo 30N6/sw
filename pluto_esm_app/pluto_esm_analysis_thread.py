@@ -29,7 +29,7 @@ class pluto_esm_analysis_thread:
             raise RuntimeError("invalid command")
             running = False
 
-    self.logger.shutdown("graceful exit")
+    self.shutdown("graceful exit")
 
   def shutdown(self, reason):
     self.logger.shutdown(reason)

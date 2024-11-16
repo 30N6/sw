@@ -126,7 +126,7 @@ class pluto_esm_hw_command_processor_thread:
 
       self.logger.log(self.logger.LL_DEBUG, "command_end: diff={}".format(time.time() - t_start))
 
-    self.logger.shutdown("graceful exit")
+    self.shutdown("graceful exit")
 
   def shutdown(self, reason):
     self.logger.shutdown(reason)
@@ -140,7 +140,7 @@ def pluto_esm_hw_command_processor_thread_func(arg):
 
 
 class pluto_esm_hw_command_processor:
-  def __init__(self, pluto_uri, logger):
+  def __init__(self, logger, pluto_uri):
     self.unique_key = 0
     self.received_data = {}
     self.ack_not_expected = []
@@ -235,11 +235,11 @@ class pluto_esm_hw_config:
 
 
 class pluto_esm_hw_interface:
-  def __init__(self, logger, pluto_uri):
+  def __init__(self, logger, pluto_uri, local_ip):
     #todo: iio info
     self.logger           = logger
-    self.hwcp             = pluto_esm_hw_command_processor(pluto_uri, self.logger)
-    self.hwdr             = pluto_esm_hw_dma_reader.pluto_esm_hw_dma_reader(pluto_uri, self.logger)
+    self.hwcp             = pluto_esm_hw_command_processor(self.logger, pluto_uri)
+    self.hwdr             = pluto_esm_hw_dma_reader.pluto_esm_hw_dma_reader(self.logger, pluto_uri, local_ip)
     self.hw_cfg           = pluto_esm_hw_config(self.logger, self.hwcp)
     self.status_reporter  = pluto_esm_status_reporter.pluto_esm_status_reporter(self.logger, self.hwdr.output_data_status)
 

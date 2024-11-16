@@ -59,8 +59,6 @@ class pluto_esm_hw_pdw_reporter:
     report["buffered_frame_valid"]    = unpacked_header[14]
     report["buffered_frame_index"]    = unpacked_header[15]
 
-    print(report)
-
     if report["buffered_frame_valid"]:
       pulse_iq_data = [[0, 0] for i in range(NUM_PDW_PULSE_TRAILER_WORDS)]
 
@@ -69,7 +67,6 @@ class pluto_esm_hw_pdw_reporter:
                                                              (PACKED_PDW_PULSE_REPORT_HEADER.size + PACKED_PDW_PULSE_IQ_WORD.size * (i + 1))])
 
         #TODO: verify IQ order
-        print(unpacked_word)
         pulse_iq_data[i][1] = unpacked_word[0]
         pulse_iq_data[i][0] = unpacked_word[1]
 

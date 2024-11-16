@@ -25,7 +25,7 @@ class pluto_esm_main_thread:
     self.clock = pygame.time.Clock()
 
     self.sw_config    = pluto_esm_sw_config.pluto_esm_sw_config("./pluto_esm_sample_config.json")
-    self.logger       = pluto_esm_logger.pluto_esm_logger(self.LOG_DIR, "pluto_esm_main_thread", pluto_esm_logger.pluto_esm_logger.LL_DEBUG)
+    self.logger       = pluto_esm_logger.pluto_esm_logger(self.LOG_DIR, "pluto_esm_main_thread", pluto_esm_logger.pluto_esm_logger.LL_INFO)
 
     self.recorder     = pluto_esm_data_recorder.pluto_esm_data_recorder(self.LOG_DIR, "recorded_data", self.sw_config.enable_recording)
     if self.sw_config.sim_enabled:
@@ -33,7 +33,7 @@ class pluto_esm_main_thread:
     else:
       self.sim_loader = None
 
-    self.hw_interface     = pluto_esm_hw_interface.pluto_esm_hw_interface(self.logger, "ip:192.168.3.100")
+    self.hw_interface     = pluto_esm_hw_interface.pluto_esm_hw_interface(self.logger, "ip:192.168.3.100", "192.168.3.10")
     self.analysis_thread  = pluto_esm_analysis_thread.pluto_esm_analysis_runner(self.logger)
     self.sequencer        = pluto_esm_sequencer.pluto_esm_sequencer(self.logger, self.recorder, self.sw_config,
                                                                     self.hw_interface, self.analysis_thread, self.sim_loader)
@@ -71,6 +71,7 @@ class pluto_esm_main_thread:
       pygame.display.flip()
       self.clock.tick(self.FPS)
 
+    #TODO: improve reliability
     print("sending shutdown")
     self.hw_interface.shutdown()
     self.analysis_thread.shutdown()

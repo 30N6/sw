@@ -1,8 +1,13 @@
 import pluto_esm_logger
 from pluto_esm_hw_pkg import *
 import iio
+import socket
+import struct
 import time
 from multiprocessing import Process, Queue
+
+UDP_PORT          = 50055
+UDP_PAYLOAD_SIZE  = TRANSFER_SIZE + 4 #includes seq num
 
 class pluto_esm_hw_dma_reader_thread:
   WORD_SIZE = 4
@@ -10,31 +15,56 @@ class pluto_esm_hw_dma_reader_thread:
   TRANSFERS_PER_BUFFER = 1 #8 TODO: what is the optimal size?
   BUFFER_SIZE = TRANSFERS_PER_BUFFER*TRANSFER_SIZE // WORD_SIZE
 
+  PACKED_UDP_HEADER = struct.Struct("<" + PACKED_UINT32)
+
   def __init__(self, arg):
     self.logger = pluto_esm_logger.pluto_esm_logger(arg["log_dir"], "pluto_esm_hw_dma_reader_thread", arg["log_level"])
     self.request_queue  = arg["request_queue"]
     self.result_queue   = arg["result_queue"]
-    self.context        = iio.Context(arg["pluto_uri"])
-    self.dev_d2h        = self.context.find_device("axi-iio-dma-d2h")
-    self.chan_dma_d2h   = self.dev_d2h.find_channel("voltage0", False)
 
-    self.chan_dma_d2h.enabled = True
-    self.context.set_timeout(1000)
+    self.use_udp_dma_rx = True
 
-    self.buffer = iio.Buffer(self.chan_dma_d2h.device, self.BUFFER_SIZE, False)
-    self.buffer.set_blocking_mode(True)
-
-    self.logger.log(self.logger.LL_INFO, "init: queues={}/{} context={} dma_d2h={} buffer={}".format(self.request_queue, self.result_queue, self.context, self.chan_dma_d2h, self.buffer))
+    if self.use_udp_dma_rx:
+      self.next_udp_seq_num = 0
+      assert ("ip:" in arg["pluto_uri"])
+      self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+      self.sock.bind((arg["local_ip"], UDP_PORT))
+      #TODO: set timeout
+      self.logger.log(self.logger.LL_INFO, "init: [UDP mode] queues={}/{} sock={}".format(self.request_queue, self.result_queue, self.sock))
+    else:
+      self.context        = iio.Context(arg["pluto_uri"])
+      self.dev_d2h        = self.context.find_device("axi-iio-dma-d2h")
+      self.chan_dma_d2h   = self.dev_d2h.find_channel("voltage0", False)
+      #self.dev_d2h.set_kernel_buffers_count(64)
+      self.chan_dma_d2h.enabled = True
+      self.context.set_timeout(1000)
+      self.buffer = iio.Buffer(self.chan_dma_d2h.device, self.BUFFER_SIZE, False)
+      self.buffer.set_blocking_mode(True)
+      self.logger.log(self.logger.LL_INFO, "init: [IIO mode] queues={}/{} context={} dma_d2h={} buffer={}".format(self.request_queue, self.result_queue, self.context, self.chan_dma_d2h, self.buffer))
 
   def _read(self):
     data = []
-    try:
-      self.buffer.refill()
-      data = self.buffer.read()
-    except OSError as e:
-      self.logger.log(self.logger.LL_WARN, "timeout -- OSError: {}".format(e))
-    except Exception as e:
-      self.logger.log(self.logger.LL_WARN, "exception: {}".format(e))
+    if self.use_udp_dma_rx:
+      try:
+        data, addr = self.sock.recvfrom(8192)
+        assert (len(data) == UDP_PAYLOAD_SIZE)
+        unpacked_header = self.PACKED_UDP_HEADER.unpack(data[:self.PACKED_UDP_HEADER.size])
+        udp_seq_num = unpacked_header[0]
+        if udp_seq_num != self.next_udp_seq_num:
+          self.logger.log(self.logger.LL_WARN, "UDP seq num gap: expected {}, received {}".format(self.next_udp_seq_num, udp_seq_num))
+        self.next_udp_seq_num = (udp_seq_num + 1) & 0xFFFFFFFF
+        data = data[4:]
+
+      except Exception as e:
+        self.logger.log(self.logger.LL_WARN, "exception: {}".format(e))
+    else:
+      try:
+        self.buffer.refill()
+        data = self.buffer.read()
+      except OSError as e:
+        self.logger.log(self.logger.LL_WARN, "timeout -- OSError: {}".format(e))
+      except Exception as e:
+        self.logger.log(self.logger.LL_WARN, "exception: {}".format(e))
 
     return data
 
@@ -58,9 +88,10 @@ class pluto_esm_hw_dma_reader_thread:
           raise RuntimeError("invalid command")
           running = False
 
-    self.logger.shutdown("graceful exit")
+    self.shutdown("graceful exit")
 
   def shutdown(self, reason):
+    self.sock.close()
     self.logger.shutdown(reason)
 
 
@@ -73,7 +104,7 @@ def pluto_esm_hw_dma_reader_thread_func(arg):
 
 
 class pluto_esm_hw_dma_reader:
-  def __init__(self, pluto_uri, logger):
+  def __init__(self, logger, pluto_uri, local_ip):
     self.received_data = []
     self.pluto_uri = pluto_uri
     self.logger = logger
@@ -85,7 +116,9 @@ class pluto_esm_hw_dma_reader:
     self.output_data_status = []
 
     self.hwdr_process = Process(target=pluto_esm_hw_dma_reader_thread_func,
-                               args=({"pluto_uri": pluto_uri, "request_queue": self.request_queue, "result_queue": self.result_queue, "log_dir": logger.path, "log_level": logger.min_level}, ))
+                               args=({"pluto_uri": pluto_uri, "local_ip": local_ip,
+                                      "request_queue": self.request_queue, "result_queue": self.result_queue,
+                                      "log_dir": logger.path, "log_level": logger.min_level}, ))
     self.hwdr_process.start()
 
   def _update_receive_queue(self):
