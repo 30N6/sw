@@ -50,6 +50,7 @@ class pluto_esm_sequencer:
   def __init__(self, logger, recorder, sw_config, hw_interface, analysis_thread, sim_loader):
     self.logger                         = logger
     self.recorder                       = recorder
+    self.sw_config                      = sw_config
     self.sim_loader                     = sim_loader
     self.hw_interface                   = hw_interface
     self.analysis_thread                = analysis_thread
@@ -246,14 +247,14 @@ class pluto_esm_sequencer:
       dwell = self.scan_dwells[freq]
       fast_lock_profile = i % self.MAX_ACTIVE_SCAN_DWELLS
 
-      dwell.hw_dwell_entry = pluto_esm_hw_dwell.esm_message_dwell_entry.default_scan_dwell(i, i, freq, dwell.dwell_time, fast_lock_profile)
+      dwell.hw_dwell_entry = pluto_esm_hw_dwell.populate_dwell_entry(self.sw_config.config, i, freq, dwell.dwell_time, fast_lock_profile)
       dwell.hw_entry_valid = True
 
       dwell_key = self.dwell_ctrl_interface.send_dwell_entry(dwell.hw_dwell_entry)
       self.hw_dwell_entry_pending.append(dwell_key)
 
-      self.logger.log(self.logger.LL_INFO, "[sequencer] sending initial hw scan dwell for freq={}: dwell_time={} fast_lock_profile={} -- uk={}".format(
-        freq, dwell.dwell_time, fast_lock_profile, dwell_key))
+      self.logger.log(self.logger.LL_INFO, "[sequencer] sending initial hw scan dwell for freq={}: dwell_time={} fast_lock_profile={} -- uk={} -- hw_entry={}".format(
+        freq, dwell.dwell_time, fast_lock_profile, dwell_key, dwell.hw_dwell_entry))
 
   def _send_hw_dwell_program(self, dwell_program):
     key = self.dwell_ctrl_interface.send_dwell_program(dwell_program)

@@ -34,19 +34,19 @@ class pluto_esm_hw_dwell_reporter:
     unpacked_header = PACKED_DWELL_STATS_HEADER.unpack(data[:PACKED_DWELL_STATS_HEADER.size])
 
     report = {}
-    report["dwell_seq_num"]       = unpacked_header[4]
-    report["frequency"]           = unpacked_header[5]
-    report["tag"]                 = unpacked_header[6]
-    report["duration_requested"]  = unpacked_header[7]
-    report["num_channels"]        = unpacked_header[9]
-    report["fast_lock_profile"]   = unpacked_header[10]
-    report["gain"]                = unpacked_header[11]
-    report["threshold_narrow"]    = unpacked_header[12]
-    report["threshold_wide"]      = unpacked_header[13]
-    report["dwell_duration"]      = unpacked_header[14]
-    report["num_samples"]         = unpacked_header[15]
-    report["ts_dwell_start"]      = (unpacked_header[16] << 32) | unpacked_header[17]
-    report["ts_dwell_end"]        = (unpacked_header[18] << 32) | unpacked_header[19]
+    report["dwell_seq_num"]           = unpacked_header[4]
+    report["frequency"]               = unpacked_header[5]
+    report["tag"]                     = unpacked_header[6]
+    report["duration_requested"]      = unpacked_header[7]
+    report["num_channels"]            = unpacked_header[9]
+    report["fast_lock_profile"]       = unpacked_header[10]
+    report["gain"]                    = unpacked_header[11]
+    report["threshold_shift_wide"]    = unpacked_header[12]
+    report["threshold_shift_narrow"]  = unpacked_header[13]
+    report["dwell_duration"]          = unpacked_header[14]
+    report["num_samples"]             = unpacked_header[15]
+    report["ts_dwell_start"]          = (unpacked_header[16] << 32) | unpacked_header[17]
+    report["ts_dwell_end"]            = (unpacked_header[18] << 32) | unpacked_header[19]
 
     report_starting_channel = unpacked_header[8]
 

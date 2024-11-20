@@ -1,12 +1,12 @@
 {
-    "sim_mode": {"enable": 1, "filename": "./log/recorded_data-20241112-164730.log"},
-    "enable_recording": 0,
+    "sim_mode": {"enable": 0, "filename": "./log/recorded_data-20241112-164730.log"},
+    "enable_recording": 1,
     "fast_lock_config": {"recalibration_interval": 10.0, "recalibration_pause": 2.0},
     "dwell_config": {"freq_start": 96.0, "freq_step": 48.0, "channel_step": 0.96},
     "scan_config": {
       "randomize_scan_order": 0,
       "include_freqs": [
-          {"freq_range": [120, 6000],    "dwell_time": 0.050, "comment": "1.3"}
+          {"freq_range": [1330, 1340],    "dwell_time": 0.050, "comment": "1.3"}
       ],
       "exclude_freqs": []
     },
