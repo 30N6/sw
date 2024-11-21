@@ -7,11 +7,15 @@ class render_status:
     self.surface    = surface
     self.sequencer  = sequencer
 
+    self.colors = {}
+    self.colors["border"] = (0, 0, 255)
+    self.colors["stats"]  = (0, 192, 192)
+
     self.font = pygame.font.SysFont('Consolas', 14)
 
     self.frame_times = np.zeros(50)
 
-  def render(self):
+  def _render_status_bar(self):
     self.frame_times = np.roll(self.frame_times, 1)
     self.frame_times[0] = time.time()
     time_diff = -np.diff(self.frame_times)
@@ -24,6 +28,41 @@ class render_status:
     text_rect.left = 16
     text_rect.bottom = 792
     self.surface.blit(text_data, text_rect)
+
+  def _render_status_window(self):
+    status_rect = [1024, 0, 256, 768]
+    pygame.draw.rect(self.surface, self.colors["border"], status_rect, 1)
+
+    hw_stats = self.sequencer.hw_stats.stats
+
+    stats_desc = [{"format": "Dwell/sec         : {:.1f}", "value": hw_stats["dwells_per_sec"],             "pos_offset": [8, 16]},
+                  {"format": "Scan time         : {:.1f}", "value": hw_stats["scan_time"],                  "pos_offset": [8, 32]},
+                  {"format": "PPS total         : {}",     "value": hw_stats["pps_total"],                  "pos_offset": [8, 48]},
+                  {"format": "PPS drops         : {}",     "value": hw_stats["pps_dropped"],                "pos_offset": [8, 64]},
+                  {"format": "Scan pulse total  : {}",     "value": hw_stats["scan_pulses_total"],          "pos_offset": [8, 80]},
+                  {"format": "Scan pulse drops  : {}",     "value": hw_stats["scan_pulses_dropped"],        "pos_offset": [8, 96]},
+                  {"format": "Tot pulses        : {}",     "value": hw_stats["pulses_total"],               "pos_offset": [8, 112]},
+                  {"format": "Tot pulses dropped: {}",     "value": hw_stats["pulses_dropped"],             "pos_offset": [8, 128]},
+                  {"format": "Scan ack dly rpt  : {:.3f}", "value": hw_stats["scan_ack_delay_report"],      "pos_offset": [8, 144]},
+                  {"format": "Scan ack dly sp   : {:.3f}", "value": hw_stats["scan_ack_delay_sample_proc"], "pos_offset": [8, 160]},
+                  {"format": "Dwell cvrg fine   : {:.6f}", "value": hw_stats["dwell_coverage_fine"],        "pos_offset": [8, 176]},
+                  {"format": "PDW cvrg fine     : {:.6f}", "value": hw_stats["pdw_coverage_fine"],          "pos_offset": [8, 192]},
+                  {"format": "Dwell covrg coarse: {:.2f}", "value": hw_stats["dwell_coverage_coarse"],      "pos_offset": [8, 208]},
+                  {"format": "PDW covrg coarse  : {:.2f}", "value": hw_stats["pdw_coverage_coarse"],        "pos_offset": [8, 224]},
+                  {"format": "PDW dwells missing: {}",     "value": hw_stats["pdw_dwells_missing"],         "pos_offset": [8, 240]},
+                  ]
+
+    for entry in stats_desc:
+      stats_str = entry["format"].format(entry["value"])
+      text_data = self.font.render(stats_str, True, self.colors["stats"])
+      text_rect = text_data.get_rect()
+      text_rect.left = status_rect[0] + entry["pos_offset"][0]
+      text_rect.bottom = status_rect[1] + entry["pos_offset"][1]
+      self.surface.blit(text_data, text_rect)
+
+  def render(self):
+    self._render_status_bar()
+    self._render_status_window()
 
   def update(self):
     pass

@@ -6,17 +6,15 @@
     "scan_config": {
       "randomize_scan_order": 0,
       "include_freqs": [
-          {"freq_range": [1330, 1340],    "dwell_time": 0.050, "comment": "1.3"}
+          {"freq_range": [1200, 1400],  "dwell_time": 0.050, "comment": "1.3"},
+          {"freq_range": [2700, 3000],  "dwell_time": 0.050, "comment": "2.7"},
       ],
       "exclude_freqs": []
     },
     "emitter_config": {
         "pulsed_emitters": [
-            {"name": "ARSR-4",  "freq_range": [1200, 1400], "PW_range": [60, 90],     "PRI_range": [4600, 14000], "priority": 2},
-            {"name": "WSR-88D", "freq_range": [2700, 3000], "PW_range": [1.57, 4.57], "PRI_range": [760, 3150],   "priority": 2},
-            {"name": "SSR",     "freq_range": [1030, 1030], "PW_range": [0.5, 30.25], "PRI_range": [1.0, 20.2],   "priority": 2},
-            {"name": "SSR-rep", "freq_range": [1090, 1090], "PW_range": [0.45, 0.5],  "PRI_range": [1.0, 1.5],    "priority": 0},
-            {"name": "UAT",     "freq_range": [978, 978],   "PW_range": [144, 272],   "PRI_range": [],            "priority": 0}
+            {"name": "ARSR-4",  "freq_range": [1200, 1400], "PW_range": [60, 90],     "PRI_range": [4600, 14000], "priority": 2, "threshold_dB": 20},
+            {"name": "WSR-88D", "freq_range": [2700, 3000], "PW_range": [1.57, 4.57], "PRI_range": [760, 3150],   "priority": 2, "threshold_dB": 20}
         ],
         "cw_emitters": [
             {"name": "FM-radio",  "freq_range": [88.00,  108.00],   "priority": 0 },

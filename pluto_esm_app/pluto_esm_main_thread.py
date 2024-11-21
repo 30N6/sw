@@ -7,8 +7,9 @@ import pluto_esm_analysis_thread
 import pluto_esm_logger
 import pluto_esm_data_recorder
 import pluto_esm_data_loader
-import render_spectrum
 import render_status
+import render_spectrum
+import render_emitters
 
 class pluto_esm_main_thread:
   SCREEN_SIZE = (1280, 800)
@@ -41,9 +42,12 @@ class pluto_esm_main_thread:
     #self.hw_interface.test()
     self.render_status    = render_status.render_status(self.surface, self.sw_config, self.sequencer)
     self.render_spectrum  = render_spectrum.render_spectrum(self.surface, self.sw_config, self.sequencer)
+    self.render_emitters  = render_emitters.render_emitters(self.surface, self.sw_config, self.sequencer)
 
   def run(self):
     key_handlers = [self.render_spectrum]
+    update_calls = [self.hw_interface, self.analysis_thread, self.sequencer, self.render_status, self.render_spectrum, self.render_emitters]
+    render_calls = [self.render_status, self.render_spectrum, self.render_emitters]
 
     running = True
     while (running):
@@ -57,16 +61,12 @@ class pluto_esm_main_thread:
       self.logger.flush()
       self.recorder.flush()
 
-      self.hw_interface.update()
-      self.analysis_thread.update()
-      self.sequencer.update()
-      self.render_status.update()
-      self.render_spectrum.update()
-      #TODO: replace with loop
+      for mod in update_calls:
+        mod.update()
 
       self.surface.fill((0,0,0))
-      self.render_status.render()
-      self.render_spectrum.render()
+      for mod in render_calls:
+        mod.render()
 
       pygame.display.flip()
       self.clock.tick(self.FPS)

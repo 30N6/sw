@@ -56,8 +56,8 @@ class pluto_esm_hw_pdw_reporter:
     report["pulse_duration"]          = unpacked_header[10]
     report["pulse_frequency"]         = unpacked_header[11]
     report["pulse_start_time"]        = (unpacked_header[12] << 32) | unpacked_header[13]
-    report["buffered_frame_valid"]    = unpacked_header[14]
-    report["buffered_frame_index"]    = unpacked_header[15]
+    report["buffered_frame_index"]    = unpacked_header[14]
+    report["buffered_frame_valid"]    = unpacked_header[15]
 
     if report["buffered_frame_valid"]:
       pulse_iq_data = [[0, 0] for i in range(NUM_PDW_PULSE_TRAILER_WORDS)]
