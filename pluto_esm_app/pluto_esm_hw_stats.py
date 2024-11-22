@@ -19,6 +19,8 @@ class pluto_esm_hw_stats:
     self.ts_prev_dwell_end  = 0
     self.ts_prev_pdw_end    = 0
 
+    self.last_log_time      = 0
+
     self.stats = {}
     self.stats["dwells_per_sec"]                  = 0
     self.stats["scan_time"]                       = 0
@@ -46,6 +48,11 @@ class pluto_esm_hw_stats:
 
   def update(self):
     now = time.time()
+
+    self.stats["dwell_coverage_fine"]   = self.stats["dwell_actual_duration_total"] / max(1, self.stats["dwell_requested_duration_total"])
+    self.stats["pdw_coverage_fine"]     = self.stats["pdw_actual_duration_total"]   / max(1, self.stats["pdw_requested_duration_total"])
+    self.stats["dwell_coverage_coarse"] = self.stats["dwell_time_active"]           / max(1, self.stats["dwell_time_total"])
+    self.stats["pdw_coverage_coarse"]   = self.stats["pdw_time_active"]             / max(1, self.stats["pdw_time_total"])
 
     if len(self.dwell_reports_1sec) > 0:
       while (now - self.dwell_reports_1sec[0]["timestamp"]) > 1.0:
@@ -83,14 +90,10 @@ class pluto_esm_hw_stats:
       self.stats["scan_pulses_dropped"]         = scan_pulses_dropped
       self.stats["scan_ack_delay_report"]       = scan_ack_delay_report * FAST_CLOCK_PERIOD
       self.stats["scan_ack_delay_sample_proc"]  = scan_ack_delay_sample_proc * FAST_CLOCK_PERIOD
-
       self.matched_reports = []
 
-    self.stats["dwell_coverage_fine"]   = self.stats["dwell_actual_duration_total"] / max(1, self.stats["dwell_requested_duration_total"])
-    self.stats["pdw_coverage_fine"]     = self.stats["pdw_actual_duration_total"]   / max(1, self.stats["pdw_requested_duration_total"])
-    self.stats["dwell_coverage_coarse"] = self.stats["dwell_time_active"]           / max(1, self.stats["dwell_time_total"])
-    self.stats["pdw_coverage_coarse"]   = self.stats["pdw_time_active"]             / max(1, self.stats["pdw_time_total"])
-
+      if (now - self.last_log_time) >= 10.0:
+        self.logger.log(self.logger.LL_INFO, "[hw_stats] stats={}".format(self.stats))
 
   def submit_report(self, report):
     if "pdw_summary_report" in report:
