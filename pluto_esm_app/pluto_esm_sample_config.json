@@ -1,6 +1,7 @@
 {
     "sim_mode": {"enable": 0, "filename": "./log/recorded_data-20241114-151236.log"},
     "enable_recording": 1,
+    "analysis_config": {"enable_pdw_recording": 1},
     "fast_lock_config": {"recalibration_interval": 60.0, "recalibration_pause": 2.0},
     "dwell_config": {"freq_start": 96.0, "freq_step": 48.0, "channel_step": 0.96},
     "scan_config": {

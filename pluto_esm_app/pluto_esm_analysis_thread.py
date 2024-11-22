@@ -1,15 +1,16 @@
 import pluto_esm_logger
+import pluto_esm_analysis_processor
 from pluto_esm_hw_pkg import *
-import iio
 import time
 from multiprocessing import Process, Queue
 
 class pluto_esm_analysis_thread:
 
   def __init__(self, arg):
-    self.logger = pluto_esm_logger.pluto_esm_logger(arg["log_dir"], "pluto_esm_analysis_thread", arg["log_level"])
-    self.input_queue    = arg["input_queue"]
-    self.output_queue   = arg["output_queue"]
+    self.logger       = pluto_esm_logger.pluto_esm_logger(arg["log_dir"], "pluto_esm_analysis_thread", arg["log_level"])
+    self.processor    = pluto_esm_analysis_processor.pluto_esm_analysis_processor(self.logger, arg["log_dir"], arg["config"])
+    self.input_queue  = arg["input_queue"]
+    self.output_queue = arg["output_queue"]
 
     self.logger.log(self.logger.LL_INFO, "init: queues={}/{}".format(self.input_queue, self.output_queue))
 
@@ -21,6 +22,7 @@ class pluto_esm_analysis_thread:
         data = self.input_queue.get()
         if isinstance(data, dict):
           self.logger.log(self.logger.LL_DEBUG, data)
+          self.processor.submit_report(data)
         else:
           if data == "CMD_STOP":
             self.logger.log(self.logger.LL_INFO, "CMD_STOP")
@@ -29,10 +31,14 @@ class pluto_esm_analysis_thread:
             raise RuntimeError("invalid command")
             running = False
 
+      self.processor.update()
+        #TODO: output from processor
+
     self.shutdown("graceful exit")
 
   def shutdown(self, reason):
     self.logger.shutdown(reason)
+    self.processor.shutdown(reason)
 
 
 def pluto_esm_analysis_thread_func(arg):
@@ -44,7 +50,7 @@ def pluto_esm_analysis_thread_func(arg):
 
 
 class pluto_esm_analysis_runner:
-  def __init__(self, logger):
+  def __init__(self, logger, sw_config):
     self.logger       = logger
     self.input_queue  = Queue()
     self.output_queue = Queue()
@@ -52,7 +58,8 @@ class pluto_esm_analysis_runner:
     self.output_data_to_render = []
 
     self.analysis_process = Process(target=pluto_esm_analysis_thread_func,
-                               args=({"input_queue": self.input_queue, "output_queue": self.output_queue, "log_dir": logger.path, "log_level": logger.min_level}, ))
+                               args=({"input_queue": self.input_queue, "output_queue": self.output_queue,
+                                      "log_dir": logger.path, "log_level": logger.min_level, "config": sw_config.config}, ))
     self.analysis_process.start()
 
   def _update_output_queue(self):

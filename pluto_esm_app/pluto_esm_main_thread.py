@@ -35,7 +35,7 @@ class pluto_esm_main_thread:
       self.sim_loader = None
 
     self.hw_interface     = pluto_esm_hw_interface.pluto_esm_hw_interface(self.logger, "ip:192.168.3.100", "192.168.3.10")
-    self.analysis_thread  = pluto_esm_analysis_thread.pluto_esm_analysis_runner(self.logger)
+    self.analysis_thread  = pluto_esm_analysis_thread.pluto_esm_analysis_runner(self.logger, self.sw_config)
     self.sequencer        = pluto_esm_sequencer.pluto_esm_sequencer(self.logger, self.recorder, self.sw_config,
                                                                     self.hw_interface, self.analysis_thread, self.sim_loader)
 

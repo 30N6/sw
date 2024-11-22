@@ -88,8 +88,10 @@ class pluto_esm_sequencer:
     self.randomize_scan_order           = sw_config.randomize_scan_order
 
     self.scan_dwells = {}
+    self.scan_total_time = 0
     for freq in sw_config.scan_dwells:
       self.scan_dwells[freq] = dwell_data(freq, sw_config.scan_dwells[freq])
+      self.scan_total_time += self.scan_dwells[freq].dwell_time
 
     for freq in self.scan_dwells:
       self.logger.log(self.logger.LL_DEBUG, "[sequencer] scan_dwells[{}]=[{}]".format(freq, self.scan_dwells[freq]))
@@ -97,7 +99,7 @@ class pluto_esm_sequencer:
     self.sim_enabled = sw_config.sim_enabled
     #TODO: open file
 
-    self.logger.log(self.logger.LL_INFO, "[sequencer] init done; sim_enabled={}".format(self.sim_enabled))
+    self.logger.log(self.logger.LL_INFO, "[sequencer] init done; sim_enabled={}; scan_total_time={}".format(self.sim_enabled, self.scan_total_time))
 
   def _process_data_from_sim(self):
     entries = self.sim_loader.get_entries_up_to_time(time.time())
@@ -429,24 +431,27 @@ class pluto_esm_sequencer:
       #self.hw_interface.hw_cfg.send_reset()
 
   def update(self):
-    if self.state == "IDLE":
-      if self.sim_enabled:
-        self.state = "SIM"
-      else:
-        self.state = "INITIAL_CAL"
-    elif self.state == "INITIAL_CAL":
-      if self.fast_lock_initial_cal_done:
-        self.state = "LOAD_HW_SCAN_DWELLS"
-    elif self.state == "LOAD_HW_SCAN_DWELLS":
-      if self.initial_hw_scan_dwells_loaded:
-        self.state = "ACTIVE"
-    elif self.state == "ACTIVE":
-      pass
-    elif self.state == "SIM":
-      pass
+    cycles_per_update = 5
 
-    self._update_data_from_hw()
-    self._update_fast_lock_cal()
-    self._update_hw_dwells()
-    self._update_scan_dwells()
-    self.hw_stats.update()
+    for i in range(cycles_per_update):
+      if self.state == "IDLE":
+        if self.sim_enabled:
+          self.state = "SIM"
+        else:
+          self.state = "INITIAL_CAL"
+      elif self.state == "INITIAL_CAL":
+        if self.fast_lock_initial_cal_done:
+          self.state = "LOAD_HW_SCAN_DWELLS"
+      elif self.state == "LOAD_HW_SCAN_DWELLS":
+        if self.initial_hw_scan_dwells_loaded:
+          self.state = "ACTIVE"
+      elif self.state == "ACTIVE":
+        pass
+      elif self.state == "SIM":
+        pass
+
+      self._update_data_from_hw()
+      self._update_fast_lock_cal()
+      self._update_hw_dwells()
+      self._update_scan_dwells()
+      self.hw_stats.update()
