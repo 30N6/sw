@@ -18,7 +18,7 @@ class render_spectrum:
     self.surface              = surface
     self.sw_config            = sw_config
     self.sequencer            = sequencer
-    self.spectrogram          = pluto_esm_spectrogram.pluto_esm_spectrogram(self.sw_config, self.rect_waterfall_display_primary[2:4])
+    self.spectrogram          = pluto_esm_spectrogram.pluto_esm_spectrogram(self.sw_config, self.rect_waterfall_display_primary[2:4]) #[self.sequencer.dwell_buffer.buffer_width, 320])
     self.max_freq             = sw_config.max_freq
     self.dwell_bw             = sw_config.config["dwell_config"]["freq_step"]
     self.channel_step         = sw_config.config["dwell_config"]["channel_step"]

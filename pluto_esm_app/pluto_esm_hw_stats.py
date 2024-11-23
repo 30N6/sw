@@ -30,6 +30,7 @@ class pluto_esm_hw_stats:
     self.stats["scan_pulses_dropped"]             = 0
     self.stats["pulses_total"]                    = 0
     self.stats["pulses_dropped"]                  = 0
+    self.stats["pulses_accepted"]                 = 0
     self.stats["scan_ack_delay_report"]           = 0
     self.stats["scan_ack_delay_sample_proc"]      = 0
     self.stats["dwell_coverage_fine"]             = 0
@@ -158,6 +159,7 @@ class pluto_esm_hw_stats:
 
     self.stats["pulses_total"] += report["pdw_summary_report"]["dwell_pulse_total_count"]
     self.stats["pulses_dropped"] += report["pdw_summary_report"]["dwell_pulse_drop_count"]
+    self.stats["pulses_accepted"] = self.stats["pulses_total"] - self.stats["pulses_dropped"]
 
     if self.ts_prev_pdw_end == 0:
       self.ts_prev_pdw_end = report["pdw_summary_report"]["dwell_start_time"] + report["pdw_summary_report"]["dwell_duration"]

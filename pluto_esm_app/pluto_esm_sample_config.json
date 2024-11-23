@@ -23,7 +23,7 @@
     },
     "emitter_config": {
         "pulsed_emitters": [
-            {"name": "ARSR-4",  "freq_range": [1200, 1400], "PW_range": [60, 90],     "PRI_range": [4600, 14000], "priority": 2, "threshold_dB": 15},
+            {"name": "ARSR-4",  "freq_range": [1200, 1400], "PW_range": [60, 90],     "PRI_range": [4600, 14000], "priority": 2, "threshold_dB": 9},
             {"name": "WSR-88D", "freq_range": [2700, 3000], "PW_range": [1.57, 4.57], "PRI_range": [760, 3150],   "priority": 2, "threshold_dB": 15}
         ],
         "cw_emitters": [

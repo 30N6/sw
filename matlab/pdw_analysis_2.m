@@ -4,7 +4,7 @@ fast_clock_period = 1/(4*61.44e6);
 channel_clock_period = (32/61.44e6);
 
 if reload
-    filename = 'analysis-20241121-234119.log';
+    filename = 'analysis-20241122-214558.log';
     lines = readlines(filename);
     pdw_reports = [];
     init_done = false;
@@ -84,8 +84,15 @@ plot(ax3, pdw_freqs, pdw_mean_imp_snr_by_freq, 'o', pdw_freqs, pdw_mean_rec_snr_
 grid(ax3, 'on');
 
 
-freq = 1323.84; %pdw_freqs(5)
+%freq = 1224.0;
+%freq = 1323.84; %pdw_freqs(5)
 %freq = 1336.32; %pdw_freqs(6)
+%freq = 1252.8;
+%freq = 1253.76;
+
+%freq = 1212.48;
+freq = 2700.48;
+
 
 matching_pdws = pdw_reports([pdw_reports.channel_frequency] == freq);
 
@@ -109,32 +116,37 @@ for ii = 1:length(matching_pdws)
     end
 
     sample_start = sample_offset(ii) + 1;
-    sample_end = sample_start + valid_sample_count(ii) - 1;
-    combined_iq_data(sample_start:sample_end) = matching_pdws(ii).recorded_iq_data;
-    combined_power_data(sample_start:sample_end) = matching_pdws(ii).recorded_power;
+    if valid_sample_count(ii) == 50
+        sample_end = sample_start + valid_sample_count(ii) - 1;
+        combined_iq_data(sample_start:sample_end) = matching_pdws(ii).recorded_iq_data(1:valid_sample_count(ii));
+        combined_power_data(sample_start:sample_end) = matching_pdws(ii).recorded_power;
+    end
 end
 
 filtered_pri = diff([matching_pdws.pulse_start_time] * fast_clock_period);
 filtered_pri(filtered_pri > 50e-3) = nan;
 
-num_plots = 5;
+num_plots = 6;
 figure(2);
 ax1 = subplot(num_plots, 1, 1);
 plot(ax1, [matching_pdws.pulse_duration]);
 
 ax2 = subplot(num_plots, 1, 2);
-plot(ax2, [matching_pdws.pulse_power]);
+plot(ax2, 1:length(matching_pdws), [matching_pdws.pulse_power], 1:length(matching_pdws), [matching_pdws.recorded_pulse_power]);
 
-if length(matching_pdws) < 500
-    ax3 = subplot(num_plots, 1, 3);
-    plot(ax3, 1:length(combined_iq_data), real(combined_iq_data), 1:length(combined_iq_data), imag(combined_iq_data), 1:length(combined_power_data), sqrt(combined_power_data));
+ax3 = subplot(num_plots, 1, 3);
+plot(ax3, [matching_pdws.pulse_threshold]);
+
+if length(matching_pdws) < 5000
+    ax4 = subplot(num_plots, 1, 4);
+    plot(ax4, 1:length(combined_iq_data), real(combined_iq_data), 1:length(combined_iq_data), imag(combined_iq_data), 1:length(combined_power_data), sqrt(combined_power_data));
 end
 
-ax4 = subplot(num_plots, 1, 4);
-plot(ax4, filtered_pri, 'o');
-
 ax5 = subplot(num_plots, 1, 5);
-plot(ax5, pulse_gap, 'o');
+plot(ax5, filtered_pri, 'o');
+
+ax6 = subplot(num_plots, 1, 6);
+plot(ax6, pulse_gap, 'o');
 
 % valid_reports = pdw_reports([pdw_reports.buffered_frame_valid] & ([pdw_reports.pulse_duration] > 50) & ([pdw_reports.recorded_pulse_snr] > 10));
 % for ii = 1:16:length(valid_reports)

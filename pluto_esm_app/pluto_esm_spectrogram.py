@@ -74,7 +74,7 @@ class pluto_esm_spectrogram:
     return pluto_esm_spectrogram._normalize_row(r)
 
   def process_new_row(self, dwell_buffer):
-    scaled_duration = dwell_buffer.dwell_data_channel_duration[dwell_buffer.dwell_data_last_row_index] * FAST_CLOCK_PERIOD * CHANNELIZER_OVERSAMPLING
+    scaled_duration = dwell_buffer.dwell_data_channel_duration[dwell_buffer.dwell_data_last_row_index] #* FAST_CLOCK_PERIOD * CHANNELIZER_OVERSAMPLING
     scaled_duration[scaled_duration == 0] = 1
     input_row_avg = np.divide(dwell_buffer.dwell_data_channel_accum[dwell_buffer.dwell_data_last_row_index], scaled_duration)
     #input_row_avg[np.isinf(input_row_avg)] = 0

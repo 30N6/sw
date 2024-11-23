@@ -342,7 +342,7 @@ class pluto_esm_sequencer:
       #TODO: don't skip PLL checks
       dwell = entry["dwell"]
       next_instruction_index += 1
-      dwell_instructions.append(pluto_esm_hw_dwell.esm_dwell_instruction(1, 0, 0, 1, 1, 1, 0, dwell.hw_dwell_entry.entry_index, next_instruction_index))
+      dwell_instructions.append(pluto_esm_hw_dwell.esm_dwell_instruction(1, 0, 0, 0, 0, 1, 0, dwell.hw_dwell_entry.entry_index, next_instruction_index))
     for _ in range(pluto_esm_hw_pkg.ESM_NUM_DWELL_INSTRUCTIONS - len(dwell_instructions)):
       dwell_instructions.append(pluto_esm_hw_dwell.esm_dwell_instruction(0, 0, 0, 0, 0, 0, 0, 0, 0))
 
