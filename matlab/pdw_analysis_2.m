@@ -4,7 +4,7 @@ fast_clock_period = 1/(4*61.44e6);
 channel_clock_period = (32/61.44e6);
 
 if reload
-    filename = 'analysis-20241122-214558.log';
+    filename = 'analysis-20241123-140158.log';
     lines = readlines(filename);
     pdw_reports = [];
     init_done = false;
@@ -83,30 +83,40 @@ ax3 = subplot(3,1,3); grid('on');
 plot(ax3, pdw_freqs, pdw_mean_imp_snr_by_freq, 'o', pdw_freqs, pdw_mean_rec_snr_by_freq, 'x');
 grid(ax3, 'on');
 
+linkaxes([ax1, ax2, ax3], 'x');
+
+figure(2);
+plot([pdw_reports.pulse_power]);
+
 
 %freq = 1224.0;
 %freq = 1323.84; %pdw_freqs(5)
 %freq = 1336.32; %pdw_freqs(6)
+
 %freq = 1252.8;
 %freq = 1253.76;
 
 %freq = 1212.48;
-freq = 2700.48;
+%freq = 2700.48;
+%freq = 2880.0;
 
+%freq = pdw_freqs(176); %freq = 2929.92;
+freq = 2914.56;
+%freq = 2960.64;
 
-matching_pdws = pdw_reports([pdw_reports.channel_frequency] == freq);
+matching_pdws = pdw_reports(([pdw_reports.channel_frequency] == freq) & ([pdw_reports.pulse_duration] > 1));
 
-pulse_gap = zeros([length(matching_pdws), 1]);
-for ii = 2:length(matching_pdws)
-    pulse_gap(ii) = matching_pdws(ii).ts_pulse_start - matching_pdws(ii - 1).ts_pulse_end;
-end
-pulse_gap(pulse_gap > 50e-3) = 0;
+%pulse_gap = zeros([length(matching_pdws), 1]);
+%for ii = 2:length(matching_pdws)
+%    pulse_gap(ii) = matching_pdws(ii).ts_pulse_start - matching_pdws(ii - 1).ts_pulse_end;
+%end
+%pulse_gap(pulse_gap > 50e-3) = 0;
 
-min_gap = 4e-6;
-matching_pdws = matching_pdws(pulse_gap > min_gap);
-pulse_gap = pulse_gap(pulse_gap > min_gap);
+%min_gap = 4e-6;
+%matching_pdws = matching_pdws(pulse_gap > min_gap);
+%pulse_gap = pulse_gap(pulse_gap > min_gap);
 
-valid_sample_count = [matching_pdws.buffered_frame_valid] .* min(50, [matching_pdws.pulse_duration]);
+valid_sample_count = [matching_pdws.buffered_frame_valid] .* min(50, max([matching_pdws.pulse_duration] + 8, 16));
 sample_offset = [0, cumsum(valid_sample_count)];
 combined_iq_data    = zeros([sum(valid_sample_count), 1]);
 combined_power_data = zeros([sum(valid_sample_count), 1]);
@@ -116,18 +126,16 @@ for ii = 1:length(matching_pdws)
     end
 
     sample_start = sample_offset(ii) + 1;
-    if valid_sample_count(ii) == 50
-        sample_end = sample_start + valid_sample_count(ii) - 1;
-        combined_iq_data(sample_start:sample_end) = matching_pdws(ii).recorded_iq_data(1:valid_sample_count(ii));
-        combined_power_data(sample_start:sample_end) = matching_pdws(ii).recorded_power;
-    end
+    sample_end = sample_start + valid_sample_count(ii) - 1;
+    combined_iq_data(sample_start:sample_end) = matching_pdws(ii).recorded_iq_data(1:valid_sample_count(ii));
+    combined_power_data(sample_start:sample_end) = matching_pdws(ii).recorded_power(1:valid_sample_count(ii));
 end
 
 filtered_pri = diff([matching_pdws.pulse_start_time] * fast_clock_period);
 filtered_pri(filtered_pri > 50e-3) = nan;
 
 num_plots = 6;
-figure(2);
+figure(3);
 ax1 = subplot(num_plots, 1, 1);
 plot(ax1, [matching_pdws.pulse_duration]);
 
@@ -145,8 +153,8 @@ end
 ax5 = subplot(num_plots, 1, 5);
 plot(ax5, filtered_pri, 'o');
 
-ax6 = subplot(num_plots, 1, 6);
-plot(ax6, pulse_gap, 'o');
+%ax6 = subplot(num_plots, 1, 6);
+%plot(ax6, pulse_gap, 'o');
 
 % valid_reports = pdw_reports([pdw_reports.buffered_frame_valid] & ([pdw_reports.pulse_duration] > 50) & ([pdw_reports.recorded_pulse_snr] > 10));
 % for ii = 1:16:length(valid_reports)
