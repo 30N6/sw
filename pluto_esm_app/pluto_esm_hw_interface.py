@@ -191,7 +191,8 @@ class pluto_esm_hw_command_processor:
     assert (self.hwc_process.is_alive())
     self.send_command(hw_command.gen_stop(), False)
     self.hwc_process.join(1.0)
-    assert (not self.hwc_process.is_alive())
+    self.logger.log(self.logger.LL_INFO, "[hwcp] hwc_process.exitcode={} is_alive={}".format(self.hwc_process.exitcode, self.hwc_process.is_alive()))
+    assert (self.hwc_process.exitcode == 0) #assert (not self.hwc_process.is_alive())
 
 
 class pluto_esm_hw_config:
@@ -315,7 +316,7 @@ class pluto_esm_hw_interface:
 
   def shutdown(self):
     self.hw_cfg.send_reset()
-    self.logger.log(self.logger.LL_INFO, "sleeping for 3 seconds before shutdown")
-    time.sleep(3.0)
+    self.logger.log(self.logger.LL_INFO, "[hwi] sleeping for 1 second before shutdown")
+    time.sleep(1.0)
     self.hwcp.shutdown()
     self.hwdr.shutdown()

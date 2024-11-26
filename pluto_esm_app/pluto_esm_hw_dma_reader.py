@@ -29,7 +29,7 @@ class pluto_esm_hw_dma_reader_thread:
       assert ("ip:" in arg["pluto_uri"])
       self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
       self.sock.bind((arg["local_ip"], UDP_PORT))
-      #TODO: set timeout
+      self.sock.settimeout(0.1)
       self.logger.log(self.logger.LL_INFO, "init: [UDP mode] queues={}/{} sock={}".format(self.request_queue, self.result_queue, self.sock))
     else:
       self.context        = iio.Context(arg["pluto_uri"])
@@ -55,8 +55,12 @@ class pluto_esm_hw_dma_reader_thread:
         self.next_udp_seq_num = (udp_seq_num + 1) & 0xFFFFFFFF
         data = data[4:]
 
+      except TimeoutError as e:
+        pass
+
       except Exception as e:
-        self.logger.log(self.logger.LL_WARN, "exception: {}".format(e))
+        self.logger.log(self.logger.LL_WARN, "Exception: {}".format(e))
+
     else:
       try:
         self.buffer.refill()
@@ -163,6 +167,7 @@ class pluto_esm_hw_dma_reader:
       raise RuntimeError("unknown message type: {}".format(msg_type))
 
   def update(self):
+    assert (self.hwdr_process.is_alive())
     self._update_receive_queue()
     self._update_output_queues()
 
@@ -170,5 +175,6 @@ class pluto_esm_hw_dma_reader:
     self.logger.log(self.logger.LL_INFO, "[hwdr] shutdown")
     assert (self.hwdr_process.is_alive())
     self.request_queue.put("CMD_STOP", block=False)
-    self.hwdr_process.join(5.0)
-    assert (not self.hwdr_process.is_alive())
+    self.hwdr_process.join(1.0)
+    self.logger.log(self.logger.LL_INFO, "[hwdr] hwdr_process.exitcode={} is_alive={}".format(self.hwdr_process.exitcode, self.hwdr_process.is_alive()))
+    assert (self.hwdr_process.exitcode == 0) #assert (not self.hwdr_process.is_alive())

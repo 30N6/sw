@@ -71,8 +71,6 @@ class pluto_esm_main_thread:
       pygame.display.flip()
       self.clock.tick(self.FPS)
 
-    #TODO: improve reliability
-    print("sending shutdown")
     self.hw_interface.shutdown()
     self.analysis_thread.shutdown()
     self.logger.shutdown("quit")
