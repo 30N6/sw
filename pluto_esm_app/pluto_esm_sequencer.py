@@ -112,7 +112,10 @@ class pluto_esm_sequencer:
                   "last_in_sequence"  : data["last_in_sequence"]}
         self.logger.log(self.logger.LL_INFO, "[sequencer] _process_data_from_sim: simulated report received for frequency={}".format(report["dwell_data"].frequency))
         self._process_combined_dwell_report(report)
-      #TODO: PDW
+      elif "pdw_pulse_report" in entry["data"]:
+        self._process_pdw_report(entry["data"])
+      elif "pdw_summary_report" in entry["data"]:
+        self._process_pdw_report(entry["data"])
 
   def _process_dwell_reports_from_hw(self):
     while len(self.hw_interface.hwdr.output_data_dwell) > 0:

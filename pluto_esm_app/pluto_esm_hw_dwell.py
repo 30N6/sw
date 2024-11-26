@@ -83,7 +83,7 @@ class esm_message_dwell_entry:
   @staticmethod
   def from_dict(d):
     return esm_message_dwell_entry(d["entry_index"], d["tag"], d["frequency"], d["duration"], d["gain"], d["fast_lock_profile"],
-                                   d["threshold_narrow"], d["threshold_wide"], d["channel_mask_narrow"], d["channel_mask_wide"], d["min_pulse_duration"])
+                                   d["threshold_shift_narrow"], d["threshold_shift_wide"], d["channel_mask_narrow"], d["channel_mask_wide"], d["min_pulse_duration"])
 
 class esm_dwell_instruction:
   def __init__(self, valid, global_counter_check, global_counter_dec, skip_pll_prelock_wait, skip_pll_lock_check, skip_pll_postlock_wait, repeat_count, entry_index, next_instruction_index):
