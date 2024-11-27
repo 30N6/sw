@@ -10,13 +10,12 @@ class pluto_esm_analysis_processor:
     self.recorder = pluto_esm_data_recorder.pluto_esm_data_recorder(log_dir, "analysis", config["analysis_config"]["enable_pdw_recording"])
     self.config   = config
 
-    self.pdw_processor = pluto_esm_pdw_processor(logger)
+    self.pdw_processor = pluto_esm_pdw_processor(logger, config["emitter_config"]["pulsed_emitters"])
 
     self.pending_dwell_reports        = []
     self.pending_pdw_summary_reports  = []
     self.pending_pdw_pulse_reports    = []
     self.pending_combined_data        = []
-    #self.merged_pdws                  = []
 
     self.center_channel_index = (ESM_NUM_CHANNELS_NARROW // 2)
     self.channel_spacing      = (ADC_CLOCK_FREQUENCY / ESM_NUM_CHANNELS_NARROW) / 1e6
@@ -29,14 +28,24 @@ class pluto_esm_analysis_processor:
       pulse_channel = pdw["pulse_channel"]
       pdw["channel_frequency"]      = dwell_freq + (pulse_channel - self.center_channel_index) * self.channel_spacing
       pdw["dwell_channel_entry"]    = dwell_report["channel_data"][pulse_channel]
-      pdw["dwell_num_samples"]      = dwell_report["num_samples"]
       pdw["dwell_threshold_shift"]  = dwell_report["threshold_shift_narrow"]
-
-      #self.merged_pdws.append(pdw)
       self.recorder.log(pdw)
 
-    self.pdw_processor.submit_pdws_for_dwell(combined_data["pdw_pulse_reports"])
+    #self.pdw_processor.submit_pdws_for_dwell(combined_data["pdw_pulse_reports"])
     self.recorder.flush()
+
+  def _populate_dwell_channels(self, combined_data):
+    dwell_freq = combined_data["dwell_report"]["dwell_data"].frequency
+    dwell_num_samples = combined_data["dwell_report"]["dwell_report"]["num_samples"]
+    channel_mask = combined_data["dwell_report"]["dwell_data"].hw_dwell_entry.channel_mask_narrow
+
+    num_samples_by_channel = {}
+    for i in range(ESM_NUM_CHANNELS_NARROW):
+      if (channel_mask & (1 << i)) == 0:
+        continue
+      channel_freq = dwell_freq + (i - self.center_channel_index) * self.channel_spacing
+      num_samples_by_channel[channel_freq] = dwell_num_samples
+    combined_data["dwell_num_samples_for_pdw"] = num_samples_by_channel
 
   def _process_matched_reports(self):
     while len(self.pending_combined_data) > 0:
@@ -47,8 +56,9 @@ class pluto_esm_analysis_processor:
       self.logger.log(self.logger.LL_INFO, "[analysis_processor] _process_matched_reports: seq_num={} freq={} num_pulses={}".format(combined_data["pdw_summary_report"]["dwell_seq_num"],
                                                                                                                                     combined_data["dwell_report"]["dwell_data"].frequency,
                                                                                                                                     actual_pulse_count))
-      if actual_pulse_count > 0:
-        self._merge_pdws(combined_data)
+      self._merge_pdws(combined_data)
+      self._populate_dwell_channels(combined_data)
+      self.pdw_processor.submit_dwell_data(combined_data)
 
   def _match_dwell_reports(self):
     if (len(self.pending_dwell_reports) == 0) or (len(self.pending_pdw_summary_reports) == 0):
@@ -94,47 +104,176 @@ class pluto_esm_analysis_processor:
 
 
 class pluto_esm_pdw_processor:
-  def __init__(self, logger):
+  def __init__(self, logger, pulsed_emitter_config):
     self.logger = logger
+    self.pulsed_emitter_config = pulsed_emitter_config
 
-    self.pdw_history = []
-    self.max_pdw_age = 60 #TODO: config?
+    self.dwell_history_pdw = []
+    self.dwell_history_accum = []
+    self.max_dwell_age = 60 #TODO: config?
 
-    self.hist_pd  = multi_level_histogram([0, 16383], [1, 4, 16, 64])
-    self.hist_pri = multi_level_histogram([0, 65535], [1, 8, 64, 256])
+    #TODO: config?
+    #self.hist_pd  = histogram_multi_level([0, 16383], [1, 4, 16, 64])
+    #self.hist_pri = histogram_multi_level([0, 65535], [1, 8, 64, 256])
+    #self.hist_pri_pd = histogram_2d([65536, 1024])
+    self.hist_pri         = histogram_1d(65536)
+    self.hist_pd          = histogram_1d(1024)
+    self.dwell_time_accum = {}
 
-  def submit_pdws_for_dwell(self, pdws):
+    self.scale_factor_pd  = ((ESM_NUM_CHANNELS_NARROW / CHANNELIZER_OVERSAMPLING) * ADC_CLOCK_PERIOD) / 1.0e-6
+    self.scale_factor_toa = FAST_CLOCK_PERIOD / 1.0e-6
+
+    self.emitter_search_interval = 0.5
+    self.last_emitter_search_time = 0
+
+  def submit_dwell_data(self, combined_dwell_data):
     now = time.time()
+
+    pdws              = combined_dwell_data["pdw_pulse_reports"]
+    dwell_num_samples = combined_dwell_data["dwell_num_samples_for_pdw"]
 
     dwell_freqs = np.unique([p["channel_frequency"] for p in pdws])
     for channel_freq in dwell_freqs:
-      channel_pdws    = [p for p in pdws if (p["channel_frequency"] == channel_freq)]
-      pulse_duration  = np.asarray([p["pulse_duration"] for p in channel_pdws])
-      pulse_toa       = np.asarray([p["pulse_start_time"] for p in channel_pdws])
-      pulse_pri       = np.diff(pulse_toa)
-      pulse_power     = np.asarray([p["pulse_power_accum"] for p in channel_pdws]) / pulse_duration
+      channel_pdws        = [p for p in pdws if (p["channel_frequency"] == channel_freq)]
+      channel_num_samples = dwell_num_samples[channel_freq]
 
-      self.pdw_history.append({"time": now,
-                               "pdws": channel_pdws,
-                               "channel_freq": channel_freq,
-                               "pulse_duration": pulse_duration,
-                               "pulse_pri": pulse_pri,
-                               "pulse_power": pulse_power})
+      pulse_duration_raw  = np.asarray([p["pulse_duration"] for p in channel_pdws])
+      pulse_duration      = pulse_duration_raw * self.scale_factor_pd
+      pulse_toa           = np.asarray([p["pulse_start_time"] for p in channel_pdws]) * self.scale_factor_toa
+      pulse_pri           = np.diff(pulse_toa)
+      pulse_power         = np.asarray([p["pulse_power_accum"] for p in channel_pdws]) / pulse_duration_raw
+
+      self.dwell_history_pdw.append({"time": now,
+                                 "pdws": channel_pdws,
+                                 "channel_freq": channel_freq,
+                                 "pulse_duration": pulse_duration,
+                                 "pulse_pri": pulse_pri,
+                                 "pulse_power": pulse_power,
+                                 "dwell_num_samples": channel_num_samples})
       self.hist_pd.add_dwell_pdws(channel_freq, pulse_duration)
       self.hist_pri.add_dwell_pdws(channel_freq, pulse_pri)
 
-  def update(self):
+    for channel_freq in dwell_num_samples:
+      if channel_freq not in self.dwell_time_accum:
+        self.dwell_time_accum[channel_freq] = 0
+      self.dwell_time_accum[channel_freq] += dwell_num_samples[channel_freq] #* FAST_CLOCK_PERIOD
+    self.dwell_history_accum.append({"time": now, "dwell_num_samples": dwell_num_samples})
+
+    #TODO: process recorded samples to check for modulation
+
+  def _scrub_history(self):
     now = time.time()
 
-    while len(self.pdw_history) > 0:
-      if (now - self.pdw_history[0]["time"]) > self.max_pdw_age:
-        removed_pdws = self.pdw_history.pop(0)
-        self.hist_pd.remove_dwell_pdws(removed_pdws["channel_freq"], removed_pdws["pulse_duration"])
-        self.hist_pri.remove_dwell_pdws(removed_pdws["channel_freq"], removed_pdws["pulse_pri"])
+    while len(self.dwell_history_pdw) > 0:
+      if (now - self.dwell_history_pdw[0]["time"]) > self.max_dwell_age:
+        removed_dwell = self.dwell_history_pdw.pop(0)
+        self.hist_pd.remove_dwell_pdws(removed_dwell["channel_freq"], removed_dwell["pulse_duration"])
+        self.hist_pri.remove_dwell_pdws(removed_dwell["channel_freq"], removed_dwell["pulse_pri"])
       else:
         break
 
-class multi_level_histogram:
+    while len(self.dwell_history_accum) > 0:
+      if (now - self.dwell_history_accum[0]["time"]) > self.max_dwell_age:
+        removed_dwell = self.dwell_history_accum.pop(0)
+        for freq in removed_dwell["dwell_num_samples"]:
+          self.dwell_time_accum[freq] -= removed_dwell["dwell_num_samples"][freq]
+      else:
+        break
+
+  def _search_emitters(self):
+    now = time.time()
+    if (now - self.last_emitter_search_time) < self.emitter_search_interval:
+      return
+    self.last_emitter_search_time = now
+
+    #print("hist_pd: data_count={}".format(self.hist_pd.data_count))
+
+    #TODO: move to separate class
+    for freq in sorted(self.hist_pd.data_count):
+      accumulated_dwell_time = self.dwell_time_accum[freq] * FAST_CLOCK_PERIOD
+
+      for emitter in self.pulsed_emitter_config:
+        if (freq < emitter["freq_range"][0]) or (freq > emitter["freq_range"][1]):
+          continue
+
+        expected_pulse_count = (accumulated_dwell_time / (emitter["PRI_range"][1] * 1e-6)) * 0.25 #TODO: make into a parameter - pulse_count_threshold?
+
+        expected_pd_range   = [emitter["PW_range"][0]  * 0.25,  emitter["PW_range"][1]  * 1.25] #TODO: make factors into parameters?
+        expected_pri_range  = [emitter["PRI_range"][0] * 0.75,  emitter["PRI_range"][1] * 1.25] #TODO: make factors into parameters?
+
+        num_matching_pd   = self.hist_pd.get_count_in_range(freq, expected_pd_range)
+        num_matching_pri  = self.hist_pri.get_count_in_range(freq, expected_pri_range)
+
+        if (num_matching_pd > expected_pulse_count) and (num_matching_pri > expected_pulse_count):
+          print("emitter={} : freq={} dwell_time_accum={:.3f} expected_pulse_count={:.1f} data_count={} num_matching_pd={} num_matching_pri={}".format(emitter["name"], freq,
+            accumulated_dwell_time, expected_pulse_count, self.hist_pd.data_count[freq], num_matching_pd, num_matching_pri))
+
+  def update(self):
+    self._scrub_history()
+    self._search_emitters()
+
+
+class histogram_1d:
+  def __init__(self, bin_count):
+    self.bin_count = bin_count
+    self.hist_count = {}
+    self.data_count = {}
+
+  def add_dwell_pdws(self, freq, data):
+    if freq not in self.hist_count:
+      self.hist_count[freq] = np.zeros(self.bin_count, dtype=np.uint32)
+      self.data_count[freq] = 0
+
+    data_index = data.astype(np.uint32)
+    data_index[data_index >= self.bin_count] = self.bin_count - 1
+    self.hist_count[freq][data_index] += 1
+    self.data_count[freq] += len(data)
+
+  def remove_dwell_pdws(self, freq, data):
+    data_index = data.astype(np.uint32)
+    data_index[data_index >= self.bin_count] = self.bin_count - 1
+    self.hist_count[freq][data_index] -= 1
+    self.data_count[freq] -= len(data)
+
+  def get_count_in_range(self, freq, hist_range):
+    i_start = int(min(hist_range[0], self.bin_count - 1))
+    i_end   = int(min(hist_range[1], self.bin_count))
+    assert (i_end > i_start)
+
+    return np.sum(self.hist_count[freq][i_start:i_end])
+
+
+#TODO: remove
+class histogram_2d:
+  def __init__(self, bin_count):
+    assert len(bin_count) == 2
+    self.bin_count = bin_count
+    self.hist_count = {}
+    self.data_count = {}
+
+  def add_dwell_pdws(self, freq, data_r, data_c):
+    if freq not in self.hist_count:
+      self.hist_count[freq] = np.zeros(self.bin_count, dtype=np.uint32)
+      self.data_count[freq] = 0
+
+    data_index_r = data_r.copy() #TODO: copy needed?
+    data_index_c = data_c.copy()
+    data_index_r[data_index_r >= self.bin_count[0]] = self.bin_count[0] - 1
+    data_index_c[data_index_c >= self.bin_count[1]] = self.bin_count[1] - 1
+    self.hist_count[freq][data_index_r, data_index_c] += 1
+    self.data_count[freq] += len(data)
+
+  def remove_dwell_pdws(self, freq, data_r, data_c):
+    data_index_r = data_r.copy() #TODO: copy needed?
+    data_index_c = data_c.copy()
+    data_index_r[data_index_r >= self.bin_count[0]] = self.bin_count[0] - 1
+    data_index_c[data_index_c >= self.bin_count[1]] = self.bin_count[1] - 1
+
+    self.hist_count[freq][data_index_r, data_index_c] -= 1
+    self.data_count[freq] -= len(data)
+
+#TODO: remove
+class histogram_multi_level:
   def __init__(self, hist_range, bin_sizes):
     self.hist_range = hist_range
     self.bin_sizes = bin_sizes
@@ -143,7 +282,9 @@ class multi_level_histogram:
     self.bin_count_by_bin_size = {}
     for bin_size in bin_sizes:
       self.hist_data_by_bin_size[bin_size] = {}
-      self.bin_count_by_bin_size[bin_size] = (hist_range[1] - hist_range[0] + 1) // bin_size
+      self.bin_count_by_bin_size[bin_size] = (hist_range[1] - hist_range[0] + 1) // bin_size  #TODO: assert hist_range[0] == 0
+
+    self.data_count = {}
 
   def add_dwell_pdws(self, freq, data):
     for bin_size in self.bin_sizes:
@@ -156,6 +297,10 @@ class multi_level_histogram:
       data_index[data_index >= bin_count] = bin_count - 1
       self.hist_data_by_bin_size[bin_size][freq][data_index] += 1
 
+    if freq not in self.data_count:
+      self.data_count[freq] = 0
+    self.data_count[freq] += len(data)
+
   def remove_dwell_pdws(self, freq, data):
     for bin_size in self.bin_sizes:
       bin_count = self.bin_count_by_bin_size[bin_size]
@@ -163,3 +308,5 @@ class multi_level_histogram:
       data_index = data // bin_size
       data_index[data_index >= bin_count] = bin_count - 1
       self.hist_data_by_bin_size[bin_size][freq][data_index] -= 1
+
+    self.data_count[freq] -= len(data)

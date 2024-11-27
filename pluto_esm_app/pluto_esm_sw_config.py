@@ -20,6 +20,8 @@ class pluto_esm_sw_config:
 
     self.enable_recording = self.config["enable_recording"]
 
+    #TODO: assertions for emitter entries - min/max of ranges, etc.
+
   def _compute_scan_dwells(self, config):
     max_freq = 0
     min_freq = 99999
