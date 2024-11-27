@@ -55,14 +55,12 @@ class pluto_esm_hw_stats:
     self.stats["dwell_coverage_coarse"] = self.stats["dwell_time_active"]           / max(1, self.stats["dwell_time_total"])
     self.stats["pdw_coverage_coarse"]   = self.stats["pdw_time_active"]             / max(1, self.stats["pdw_time_total"])
 
-    if len(self.dwell_reports_1sec) > 0:
-      while (now - self.dwell_reports_1sec[0]["timestamp"]) > 1.0:
-        self.dwell_reports_1sec.pop(0)
+    while (len(self.dwell_reports_1sec) > 0) and ((now - self.dwell_reports_1sec[0]["timestamp"]) > 1.0):
+      self.dwell_reports_1sec.pop(0)
     self.stats["dwells_per_sec"] = len(self.dwell_reports_1sec)
 
-    if len(self.pdw_summaries_1sec) > 0:
-      while (now - self.pdw_summaries_1sec[0]["timestamp"]) > 1.0:
-        self.pdw_summaries_1sec.pop(0)
+    while (len(self.pdw_summaries_1sec) > 0) and ((now - self.pdw_summaries_1sec[0]["timestamp"]) > 1.0):
+      self.pdw_summaries_1sec.pop(0)
 
     pps_total = 0
     pps_dropped = 0
