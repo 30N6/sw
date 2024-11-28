@@ -42,7 +42,7 @@ class pluto_esm_main_thread:
     #self.hw_interface.test()
     self.render_status    = render_status.render_status(self.surface, self.sw_config, self.sequencer)
     self.render_spectrum  = render_spectrum.render_spectrum(self.surface, self.sw_config, self.sequencer)
-    self.render_emitters  = render_emitters.render_emitters(self.surface, self.sw_config, self.sequencer)
+    self.render_emitters  = render_emitters.render_emitters(self.surface, self.sw_config, self.analysis_thread)
 
   def run(self):
     key_handlers = [self.render_spectrum]

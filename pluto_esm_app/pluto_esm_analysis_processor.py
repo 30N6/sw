@@ -10,7 +10,10 @@ class pluto_esm_analysis_processor:
     self.recorder = pluto_esm_data_recorder.pluto_esm_data_recorder(log_dir, "analysis", config["analysis_config"]["enable_pdw_recording"])
     self.config   = config
 
-    self.pdw_processor = pluto_esm_pdw_processor(logger, config["emitter_config"]["pulsed_emitters"])
+    self.pdw_processor = pluto_esm_pdw_processor(logger)
+    self.pulsed_tracker = pluto_esm_pulsed_emitter_tracker(logger, self.pdw_processor, config["emitter_config"]["pulsed_emitters"])
+
+    self.confirmed_emitters_to_render = []
 
     self.pending_dwell_reports        = []
     self.pending_pdw_summary_reports  = []
@@ -19,6 +22,9 @@ class pluto_esm_analysis_processor:
 
     self.center_channel_index = (ESM_NUM_CHANNELS_NARROW // 2)
     self.channel_spacing      = (ADC_CLOCK_FREQUENCY / ESM_NUM_CHANNELS_NARROW) / 1e6
+
+    self.emitter_update_interval = 0.1
+    self.last_emitter_update_time = 0
 
   def _merge_pdws(self, combined_data):
     dwell_report = combined_data["dwell_report"]["dwell_report"]
@@ -86,6 +92,14 @@ class pluto_esm_analysis_processor:
                                        "pdw_summary_report": self.pending_pdw_summary_reports.pop(0)["pdw_summary_report"],
                                        "pdw_pulse_reports": matched_pulse_reports})
 
+  def _update_tracked_emitters(self):
+    now = time.time()
+    if (now - self.last_emitter_update_time) < self.emitter_update_interval:
+      return
+    self.last_emitter_update_time = now
+
+    self.confirmed_emitters_to_render = self.pulsed_tracker.confirmed_emitters.copy()
+
   def submit_report(self, report):
     if "pdw_pulse_report" in report:
       self.pending_pdw_pulse_reports.append(report)
@@ -96,17 +110,18 @@ class pluto_esm_analysis_processor:
 
   def update(self):
     self.pdw_processor.update()
+    self.pulsed_tracker.update()
     self._match_dwell_reports()
     self._process_matched_reports()
+    self._update_tracked_emitters()
 
   def shutdown(self, reason):
     self.recorder.shutdown(reason)
 
 
 class pluto_esm_pdw_processor:
-  def __init__(self, logger, pulsed_emitter_config):
+  def __init__(self, logger):
     self.logger = logger
-    self.pulsed_emitter_config = pulsed_emitter_config
 
     self.dwell_history_pdw = []
     self.dwell_history_accum = []
@@ -123,9 +138,6 @@ class pluto_esm_pdw_processor:
     self.scale_factor_pd  = ((ESM_NUM_CHANNELS_NARROW / CHANNELIZER_OVERSAMPLING) * ADC_CLOCK_PERIOD) / 1.0e-6
     self.scale_factor_toa = FAST_CLOCK_PERIOD / 1.0e-6
 
-    self.emitter_search_interval = 0.5
-    self.last_emitter_search_time = 0
-
   def submit_dwell_data(self, combined_dwell_data):
     now = time.time()
 
@@ -141,14 +153,17 @@ class pluto_esm_pdw_processor:
       pulse_duration      = pulse_duration_raw * self.scale_factor_pd
       pulse_toa           = np.asarray([p["pulse_start_time"] for p in channel_pdws]) * self.scale_factor_toa
       pulse_pri           = np.diff(pulse_toa)
-      pulse_power         = np.asarray([p["pulse_power_accum"] for p in channel_pdws]) / pulse_duration_raw
+      #pulse_power         = np.asarray([p["pulse_power_accum"] for p in channel_pdws]) / pulse_duration_raw
+
+      for pdw in channel_pdws:
+        pdw["processor_time"] = now
 
       self.dwell_history_pdw.append({"time": now,
                                  "pdws": channel_pdws,
                                  "channel_freq": channel_freq,
                                  "pulse_duration": pulse_duration,
                                  "pulse_pri": pulse_pri,
-                                 "pulse_power": pulse_power,
+                                 #"pulse_power": pulse_power,
                                  "dwell_num_samples": channel_num_samples})
       self.hist_pd.add_dwell_pdws(channel_freq, pulse_duration)
       self.hist_pri.add_dwell_pdws(channel_freq, pulse_pri)
@@ -180,17 +195,99 @@ class pluto_esm_pdw_processor:
       else:
         break
 
-  def _search_emitters(self):
+  def update(self):
+    self._scrub_history()
+
+
+class pluto_esm_pulsed_emitter_tracker:
+  def __init__(self, logger, pdw_processor, pulsed_emitter_config):
+    self.logger = logger
+    self.pdw_processor = pdw_processor
+    self.pulsed_emitter_config = pulsed_emitter_config
+
+    self.last_update_time = 0
+
+    #TODO: config?
+    self.emitter_update_interval = 0.5
+    self.min_matched_pulses       = 40
+    self.max_emitter_age          = 30
+    self.max_pdw_age_to_confirm   = 20
+
+    self.confirmed_emitters = []
+
+  def update(self):
     now = time.time()
-    if (now - self.last_emitter_search_time) < self.emitter_search_interval:
+    if (now - self.last_update_time) < self.emitter_update_interval:
       return
-    self.last_emitter_search_time = now
+    self.last_update_time = now
 
-    #print("hist_pd: data_count={}".format(self.hist_pd.data_count))
+    self._search_emitters()
+    self._scrub_emitters()
 
-    #TODO: move to separate class
-    for freq in sorted(self.hist_pd.data_count):
-      accumulated_dwell_time = self.dwell_time_accum[freq] * FAST_CLOCK_PERIOD
+  def _confirm_emitter(self, freq, expected_pd_range, expected_pri_range, expected_pulse_count):
+    combined_pri = np.empty(0)
+    combined_pd = np.empty(0)
+    combined_pdw = []
+
+    for dwell in self.pdw_processor.dwell_history_pdw:
+      if dwell["channel_freq"] != freq:
+        continue
+
+      combined_pri = np.concatenate([combined_pri, dwell["pulse_pri"]])
+      combined_pd = np.concatenate([combined_pd, dwell["pulse_duration"][:-1]])
+      combined_pdw.extend(dwell["pdws"][:-1])
+
+    matching_pri = (combined_pri > expected_pri_range[0]) & (combined_pri < expected_pri_range[1])
+    matching_pd = (combined_pd > expected_pd_range[0]) & (combined_pd < expected_pd_range[1])
+    matching_all = matching_pri & matching_pd
+
+    num_matched_pulses = np.sum(matching_all)
+    matching_pdws = [combined_pdw[i] for i in range(len(combined_pdw)) if matching_all[i]]
+
+    if len(matching_pdws) > 0:
+      min_pdw_age = time.time() - matching_pdws[-1]["processor_time"]
+    else:
+      min_pdw_age = -1
+
+    confirmed = (num_matched_pulses >= expected_pulse_count) and (num_matched_pulses >= self.min_matched_pulses) and (min_pdw_age < self.max_pdw_age_to_confirm)
+
+    return confirmed, matching_pdws, min_pdw_age
+
+  def _update_confirmed_emitter(self, freq, emitter, matched_pulses):
+    now = time.time()
+
+    matched_emitter = None
+    for entry in self.confirmed_emitters:
+      if (entry["freq"] == freq) and (entry["name"] == emitter["name"]):
+        matched_emitter = entry
+        break
+
+    if matched_emitter is None:
+      matched_emitter = {"freq": freq,
+                         "name": emitter["name"],
+                         #"pdws": matched_pulses,
+                         "pdw_time_initial": matched_pulses[0]["processor_time"],
+                         "pdw_time_final": matched_pulses[-1]["processor_time"]}
+      self.confirmed_emitters.append(matched_emitter)
+      self.logger.log(self.logger.LL_INFO, "[pulsed_tracker] _update_confirmed_emitter: NEW - [{}/{}] matched_pulses={}".format(emitter["name"], freq, len(matched_pulses)))
+    else:
+      #matched_emitter["pdws"] = matched_pulses
+      matched_emitter["pdw_time_final"] = matched_pulses[-1]["processor_time"]
+
+    pulse_duration  = np.asarray([p["pulse_duration"] for p in matched_pulses])
+    pulse_power     = np.asarray([p["pulse_power_accum"] for p in matched_pulses]) / pulse_duration
+
+    #TODO: dB?
+    matched_emitter["power_mean"] = np.mean(pulse_power)
+    matched_emitter["power_max"]  = np.max(pulse_power)
+    matched_emitter["power_std"]  = np.std(pulse_power)
+
+    self.logger.log(self.logger.LL_INFO, "[pulsed_tracker] _update_confirmed_emitter: [{}/{}] matched_pulses={} power_mean={:.1f} power_max={:.1f} power_std={:.1f} age={:.1f}".format(emitter["name"], freq, len(matched_pulses),
+      matched_emitter["power_mean"], matched_emitter["power_max"], matched_emitter["power_std"], matched_emitter["pdw_time_final"] - matched_emitter["pdw_time_initial"]))
+
+  def _search_emitters(self):
+    for freq in sorted(self.pdw_processor.hist_pd.data_count):
+      accumulated_dwell_time = self.pdw_processor.dwell_time_accum[freq] * FAST_CLOCK_PERIOD
 
       for emitter in self.pulsed_emitter_config:
         if (freq < emitter["freq_range"][0]) or (freq > emitter["freq_range"][1]):
@@ -201,16 +298,27 @@ class pluto_esm_pdw_processor:
         expected_pd_range   = [emitter["PW_range"][0]  * 0.25,  emitter["PW_range"][1]  * 1.25] #TODO: make factors into parameters?
         expected_pri_range  = [emitter["PRI_range"][0] * 0.75,  emitter["PRI_range"][1] * 1.25] #TODO: make factors into parameters?
 
-        num_matching_pd   = self.hist_pd.get_count_in_range(freq, expected_pd_range)
-        num_matching_pri  = self.hist_pri.get_count_in_range(freq, expected_pri_range)
+        num_matching_pd   = self.pdw_processor.hist_pd.get_count_in_range(freq, expected_pd_range)
+        num_matching_pri  = self.pdw_processor.hist_pri.get_count_in_range(freq, expected_pri_range)
 
         if (num_matching_pd > expected_pulse_count) and (num_matching_pri > expected_pulse_count):
-          print("emitter={} : freq={} dwell_time_accum={:.3f} expected_pulse_count={:.1f} data_count={} num_matching_pd={} num_matching_pri={}".format(emitter["name"], freq,
-            accumulated_dwell_time, expected_pulse_count, self.hist_pd.data_count[freq], num_matching_pd, num_matching_pri))
+          self.logger.log(self.logger.LL_INFO, "[pulsed_tracker] _search_emitters: initial candidate - name={} freq={} dt_accum={:.3f} exp_pulses={:.1f} hist_count={} match_pd={} match_pri={}".format(emitter["name"],
+            freq, accumulated_dwell_time, expected_pulse_count, self.pdw_processor.hist_pd.data_count[freq], num_matching_pd, num_matching_pri))
 
-  def update(self):
-    self._scrub_history()
-    self._search_emitters()
+          confirmed, matched_pulses, min_pdw_age = self._confirm_emitter(freq, expected_pd_range, expected_pri_range, expected_pulse_count)
+          if confirmed:
+            self._update_confirmed_emitter(freq, emitter, matched_pulses)
+
+  def _scrub_emitters(self):
+    now = time.time()
+    emitters_to_keep = []
+    for entry in self.confirmed_emitters:
+      if (now - entry["pdw_time_final"]) < self.max_emitter_age:
+        emitters_to_keep.append(entry)
+      else:
+        self.logger.log(self.logger.LL_INFO, "[pulsed_tracker] _scrub_emitters: confirmed emitter timeout - {}".format(entry))
+
+    self.confirmed_emitters = emitters_to_keep
 
 
 class histogram_1d:
@@ -241,72 +349,3 @@ class histogram_1d:
     assert (i_end > i_start)
 
     return np.sum(self.hist_count[freq][i_start:i_end])
-
-
-#TODO: remove
-class histogram_2d:
-  def __init__(self, bin_count):
-    assert len(bin_count) == 2
-    self.bin_count = bin_count
-    self.hist_count = {}
-    self.data_count = {}
-
-  def add_dwell_pdws(self, freq, data_r, data_c):
-    if freq not in self.hist_count:
-      self.hist_count[freq] = np.zeros(self.bin_count, dtype=np.uint32)
-      self.data_count[freq] = 0
-
-    data_index_r = data_r.copy() #TODO: copy needed?
-    data_index_c = data_c.copy()
-    data_index_r[data_index_r >= self.bin_count[0]] = self.bin_count[0] - 1
-    data_index_c[data_index_c >= self.bin_count[1]] = self.bin_count[1] - 1
-    self.hist_count[freq][data_index_r, data_index_c] += 1
-    self.data_count[freq] += len(data)
-
-  def remove_dwell_pdws(self, freq, data_r, data_c):
-    data_index_r = data_r.copy() #TODO: copy needed?
-    data_index_c = data_c.copy()
-    data_index_r[data_index_r >= self.bin_count[0]] = self.bin_count[0] - 1
-    data_index_c[data_index_c >= self.bin_count[1]] = self.bin_count[1] - 1
-
-    self.hist_count[freq][data_index_r, data_index_c] -= 1
-    self.data_count[freq] -= len(data)
-
-#TODO: remove
-class histogram_multi_level:
-  def __init__(self, hist_range, bin_sizes):
-    self.hist_range = hist_range
-    self.bin_sizes = bin_sizes
-
-    self.hist_data_by_bin_size = {}
-    self.bin_count_by_bin_size = {}
-    for bin_size in bin_sizes:
-      self.hist_data_by_bin_size[bin_size] = {}
-      self.bin_count_by_bin_size[bin_size] = (hist_range[1] - hist_range[0] + 1) // bin_size  #TODO: assert hist_range[0] == 0
-
-    self.data_count = {}
-
-  def add_dwell_pdws(self, freq, data):
-    for bin_size in self.bin_sizes:
-      bin_count = self.bin_count_by_bin_size[bin_size]
-
-      if freq not in self.hist_data_by_bin_size[bin_size]:
-        self.hist_data_by_bin_size[bin_size][freq] = np.zeros(bin_count, dtype=np.uint32)
-
-      data_index = data // bin_size
-      data_index[data_index >= bin_count] = bin_count - 1
-      self.hist_data_by_bin_size[bin_size][freq][data_index] += 1
-
-    if freq not in self.data_count:
-      self.data_count[freq] = 0
-    self.data_count[freq] += len(data)
-
-  def remove_dwell_pdws(self, freq, data):
-    for bin_size in self.bin_sizes:
-      bin_count = self.bin_count_by_bin_size[bin_size]
-
-      data_index = data // bin_size
-      data_index[data_index >= bin_count] = bin_count - 1
-      self.hist_data_by_bin_size[bin_size][freq][data_index] -= 1
-
-    self.data_count[freq] -= len(data)

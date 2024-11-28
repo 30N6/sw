@@ -6,10 +6,10 @@ import math
 
 class render_emitters:
 
-  def __init__(self, surface, sw_config, sequencer):
-    self.surface    = surface
-    self.sw_config  = sw_config
-    self.sequencer  = sequencer
+  def __init__(self, surface, sw_config, analysis_thread):
+    self.surface          = surface
+    self.sw_config        = sw_config
+    self.analysis_thread  = analysis_thread
 
     self.colors = {}
     self.colors["border"] = (0, 0, 255)
