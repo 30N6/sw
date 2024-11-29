@@ -1,12 +1,10 @@
-reload = 1;
+reload = 0;
 
 fast_clock_period = 1/(4*61.44e6);
 channel_clock_period = (32/61.44e6);
 
 if reload
-    %filename = 'analysis-20241123-132126.log';
-    %filename = 'analysis-20241129-141222.log';
-    filename = 'analysis-20241129-145039-1213.44.log';
+    filename = 'analysis-20241123-132126.log';
     lines = readlines(filename);
     pdw_reports = [];
     init_done = false;
@@ -58,33 +56,14 @@ if reload
 end
 
 pdw_freqs = unique([pdw_reports.channel_frequency]');
-pdw_counts = zeros([length(pdw_freqs), 1]);
-for ii = 1:length(pdw_freqs)
-    freq = pdw_freqs(ii);
-    pdw_counts(ii) = sum([pdw_reports.channel_frequency] == freq);
-end
-
-pdw_counts_by_freq = [pdw_freqs, pdw_counts];
 
 %freq = 1336.32;    %LFM
 %freq = 1213.44;
 %freq = 1218.24;
 %freq = 1253.76;
-
 freq = 1213.44;
-%freq = 1227.84;
-
-%freq = 1204.8;
-%freq = 1230.72;
-%freq = 1278.72;
 
 matching_pdws = pdw_reports(([pdw_reports.channel_frequency] == freq) & ([pdw_reports.buffered_frame_valid] == 1));
-
-figure(2);
-pri = diff([matching_pdws.ts_pulse_start]);
-pri(pri > 0.5) = nan;
-plot(pri);
-
 
 dt = channel_clock_period;
 
@@ -106,7 +85,7 @@ for ii = 1:num_subplots
     r_squared_phase = 1 - ss_res/ss_tot;
     p_phase = p_p(1) * (x_phase.^2) + p_p(2) * x_phase + p_p(3);
 
-    x_freq = (0:length(freq)-1) * dt;
+    x_freq = (0:length(freq)-1).' * dt;
     [p_f, S_freq] = polyfit(x_freq, freq, 1);
     ss_res = S_freq.normr ^ 2;
     ss_tot = sum((freq - mean(freq)).^2);
@@ -124,5 +103,30 @@ for ii = 1:num_subplots
     plot(x_freq, freq, 'o-', x_freq, p_freq);
 
     subplot(num_subplots, 4, 4 * ii);
-    hist(freq, 50);
+
+    if r_squared_freq > 0.1
+        continue;
+    end
+
+    x_freq_a = x_freq(freq < p_freq);
+    y_freq_a = freq(freq < p_freq);
+    x_freq_b = x_freq(freq >= p_freq);
+    y_freq_b = freq(freq >= p_freq);
+
+    [p_fa, S_fa] = polyfit(x_freq_a, y_freq_a, 1);
+    [p_fb, S_fb] = polyfit(x_freq_b, y_freq_b, 1);
+    p_freq_a = p_fa(1) * x_freq_a + p_fa(2);
+    p_freq_b = p_fb(1) * x_freq_b + p_fb(2);
+        
+    ss_res_a = S_fa.normr ^ 2;
+    ss_tot_a = sum((y_freq_a - mean(y_freq_a)).^2);
+    r_squared_freq_a = 1 - ss_res_a/ss_tot_a;
+    
+    ss_res_b = S_fa.normr ^ 2;
+    ss_tot_b = sum((y_freq_b - mean(y_freq_b)).^2);
+    r_squared_freq_b = 1 - ss_res_b/ss_tot_b;
+
+    fprintf("  FSK: r_squared=%f %f\n", r_squared_freq_a, r_squared_freq_b);
+        
+    plot(x_freq_a, y_freq_a, 'o-', x_freq_b, y_freq_b, 'o-', x_freq_a, p_freq_a, x_freq_b, p_freq_b);
 end
