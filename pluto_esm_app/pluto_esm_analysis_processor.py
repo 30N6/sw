@@ -1,4 +1,5 @@
 import pluto_esm_data_recorder
+import pluto_esm_pdw_modulation_analysis
 from pluto_esm_hw_pkg import *
 import time
 import numpy as np
@@ -9,8 +10,9 @@ class pluto_esm_analysis_processor:
     self.recorder = pluto_esm_data_recorder.pluto_esm_data_recorder(log_dir, "analysis", config["analysis_config"]["enable_pdw_recording"])
     self.config   = config
 
-    self.pdw_processor = pluto_esm_pdw_processor(logger)
-    self.pulsed_tracker = pluto_esm_pulsed_emitter_tracker(logger, self.pdw_processor, config["emitter_config"]["pulsed_emitters"])
+    self.pdw_processor        = pluto_esm_pdw_processor(logger)
+    self.pulsed_tracker       = pluto_esm_pulsed_emitter_tracker(logger, self.pdw_processor, config)
+    self.modulation_analyzer  = pluto_esm_pdw_modulation_analysis.pluto_esm_pdw_modulation_analysis(config["analysis_config"]["modulation_analysis"])
 
     self.confirmed_emitters_to_render = []
 
@@ -34,6 +36,13 @@ class pluto_esm_analysis_processor:
       pdw["channel_frequency"]      = dwell_freq + (pulse_channel - self.center_channel_index) * self.channel_spacing
       pdw["dwell_channel_entry"]    = dwell_report["channel_data"][pulse_channel]
       pdw["dwell_threshold_shift"]  = dwell_report["threshold_shift_narrow"]
+
+      if pdw["buffered_frame_valid"]:
+        mod_data = self.modulation_analyzer.check_intrapulse_modulation(pdw["pulse_duration"], pdw["buffered_frame_data"])
+      else:
+        mod_data = None
+      pdw["modulation_data"] = mod_data
+
       self.recorder.log(pdw)
 
     #self.pdw_processor.submit_pdws_for_dwell(combined_data["pdw_pulse_reports"])
@@ -197,12 +206,13 @@ class pluto_esm_pdw_processor:
   def update(self):
     self._scrub_history()
 
-
+#TODO: separate file
 class pluto_esm_pulsed_emitter_tracker:
-  def __init__(self, logger, pdw_processor, pulsed_emitter_config):
+  def __init__(self, logger, pdw_processor, config):
     self.logger = logger
     self.pdw_processor = pdw_processor
-    self.pulsed_emitter_config = pulsed_emitter_config
+    self.pulsed_emitter_config = config["emitter_config"]["pulsed_emitters"]
+    self.modulation_threshold = config["analysis_config"]["modulation_threshold"]
 
     self.last_update_time = 0
 
@@ -278,10 +288,19 @@ class pluto_esm_pulsed_emitter_tracker:
     pulse_duration  = np.asarray([p["pulse_duration"] for p in matched_pulses])
     pulse_power     = np.asarray([p["pulse_power_accum"] for p in matched_pulses]) / pulse_duration
 
-    #TODO: dB?
     matched_emitter["power_mean"] = np.mean(pulse_power)
     matched_emitter["power_max"]  = np.max(pulse_power)
     matched_emitter["power_std"]  = np.std(pulse_power)
+
+    mod_data = [p["modulation_data"] for p in matched_pulses if (p["modulation_data"] is not None)]
+    mod_FM   = [md for md in mod_data if md["modulation_type"] == "FM"]
+
+    if (len(mod_data) > 0) and ((len(mod_FM) / len(mod_data)) > self.modulation_threshold):
+      mean_slope      = np.mean([md["LFM_slope"] for md in mod_FM])
+      mean_r_squared  = np.mean([md["LFM_r_squared"] for md in mod_FM])
+      matched_emitter["modulation"] = {"modulation_type": "FM", "pulses_analyzed": len(mod_data), "pulses_with_mod": len(mod_FM), "FM_mean_slope": mean_slope, "FM_mean_r_squared": mean_r_squared}
+    else:
+      matched_emitter["modulation"] = None
 
     self.logger.log(self.logger.LL_INFO, "[pulsed_tracker] _update_confirmed_emitter: [{}/{}] matched_pulses={} power_mean={:.1f} power_max={:.1f} power_std={:.1f} age={:.1f}".format(emitter["name"], freq, len(matched_pulses),
       matched_emitter["power_mean"], matched_emitter["power_max"], matched_emitter["power_std"], matched_emitter["pdw_time_final"] - matched_emitter["pdw_time_initial"]))

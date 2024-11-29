@@ -57,7 +57,6 @@ pdw_freqs = unique([pdw_reports.channel_frequency]');
 
 %freq = 1224.0;
 %freq = 1323.84; %pdw_freqs(5)
-freq = 1336.32; %pdw_freqs(6)
 
 % freq_1 = 1252.8;
 % freq_2 = 1253.76;
@@ -70,9 +69,9 @@ freq = 1336.32; %pdw_freqs(6)
 % plot([matching_pdws_1.pulse_start_time], [matching_pdws_1.pulse_duration], 'o', [matching_pdws_2.pulse_start_time], [matching_pdws_2.pulse_duration], 'x');
 % 
 
-%freq = 1336.32;
+freq = 1336.32;
 %freq = 2711.04;
-%freq = 2880.
+%freq = 2880;
 matching_pdws = pdw_reports([pdw_reports.channel_frequency] == freq);
 
 td = get_pri_hist_full([matching_pdws.pulse_start_time], [matching_pdws.dwell_seq_num]);
@@ -81,7 +80,7 @@ max_pri = 14000e-6 * 4;
 ts = 1/1.92e6;
 max_pri_clks = max_pri / ts;
 adjusted_max_pri_clks = 2^ceil(log2(max_pri_clks));
-max_hist_length = 1024;
+max_hist_length = 4096;
 if adjusted_max_pri_clks > max_hist_length
     pri_bin_width = adjusted_max_pri_clks / max_hist_length; 
     hist_length = max_hist_length;
@@ -107,6 +106,9 @@ for ii = 1:16
 
     subplot(16, 1, ii);
     bar(pri_bin_ranges * ts, dwell_bc, 'histc');
+
+    dwell_bc_norm = dwell_bc ./ sum(dwell_bc);
+    fprintf('dwell[%d]: std=%f\n', ii, std(dwell_bc_norm));
 end
 
 

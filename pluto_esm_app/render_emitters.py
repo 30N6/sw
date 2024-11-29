@@ -50,13 +50,18 @@ class render_emitters:
       update_age        = min(99, round(entry["update_age"]))
       pulses_in_window  = min(9999, entry["analysis_data"]["pulses_in_window"])
 
+      if entry["analysis_data"]["modulation"] is not None:
+        mod_str = entry["analysis_data"]["modulation"]["modulation_type"]
+      else:
+        mod_str = ""
+
       if entry["update_age"] < self.emitter_stale_threshold:
         emitter_color = self.colors["emitter_entry_active"]
       else:
         emitter_color = self.colors["emitter_entry_stale"]
 
-      s = "{:2} {:<8} {:5.1f}  {:3.1f} {:3.1f}  {:3.0f} {:>2.0f} {:>4}".format(index, entry["analysis_data"]["name"], entry["analysis_data"]["freq"],
-        power_mean_dB, power_max_db, emitter_age, update_age, pulses_in_window)
+      s = "{:2} {:<8} {:5.1f}  {:3.1f} {:3.1f}  {:3.0f} {:>2.0f} {:>4} {:>3}".format(index, entry["analysis_data"]["name"], entry["analysis_data"]["freq"],
+        power_mean_dB, power_max_db, emitter_age, update_age, pulses_in_window, mod_str)
       pos_offset = [8, 16 + self.emitter_text_height * (index - 1)]
 
       emitter_entries.append({"str": s, "pos_offset": pos_offset, "color": emitter_color})

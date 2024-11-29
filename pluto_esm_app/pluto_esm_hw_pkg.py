@@ -34,8 +34,10 @@ ESM_NUM_FAST_LOCK_PROFILES              = 8
 ADC_CLOCK_FREQUENCY                     = 61.44e6
 ADC_CLOCK_PERIOD                        = 1/61.44e6
 FAST_CLOCK_PERIOD                       = 1/(4*61.44e6)
-
 CHANNELIZER_OVERSAMPLING                = 2.0
+
+ESM_PDW_BUFFERED_SAMPLES_PER_FRAME      = 48
+ESM_PDW_BUFFERED_IQ_DELAY_SAMPLES       = 8
 
 TRANSFER_SIZE = 256
 
