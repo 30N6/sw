@@ -50,7 +50,8 @@ class render_status:
                   {"format": "PDW covrg fine    : {:.6f}", "value": hw_stats["pdw_coverage_fine"],          "pos_offset": [8, 208]},
                   {"format": "Dwell covrg coarse: {:.2f}", "value": hw_stats["dwell_coverage_coarse"],      "pos_offset": [8, 224]},
                   {"format": "PDW covrg coarse  : {:.2f}", "value": hw_stats["pdw_coverage_coarse"],        "pos_offset": [8, 240]},
-                  {"format": "PDW dwells missing: {}",     "value": hw_stats["pdw_dwells_missing"],         "pos_offset": [8, 256]},
+                  {"format": "PDW IQ rcrd covrg : {:.2f}", "value": hw_stats["pdw_recording_coverage"],     "pos_offset": [8, 256]},
+                  {"format": "PDW dwells missing: {}",     "value": hw_stats["pdw_dwells_missing"],         "pos_offset": [8, 272]},
                   ]
 
     for entry in stats_desc:

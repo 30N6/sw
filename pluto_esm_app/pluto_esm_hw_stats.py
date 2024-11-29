@@ -46,14 +46,18 @@ class pluto_esm_hw_stats:
     self.stats["pdw_time_total"]                  = 0
     self.stats["pdw_time_active"]                 = 0
     self.stats["pdw_dwells_missing"]              = 0
+    self.stats["pdw_pulse_reports"]               = 0
+    self.stats["pdw_pulse_recordings"]            = 0
+    self.stats["pdw_recording_coverage"]          = 0
 
   def update(self):
     now = time.time()
 
-    self.stats["dwell_coverage_fine"]   = self.stats["dwell_actual_duration_total"] / max(1, self.stats["dwell_requested_duration_total"])
-    self.stats["pdw_coverage_fine"]     = self.stats["pdw_actual_duration_total"]   / max(1, self.stats["pdw_requested_duration_total"])
-    self.stats["dwell_coverage_coarse"] = self.stats["dwell_time_active"]           / max(1, self.stats["dwell_time_total"])
-    self.stats["pdw_coverage_coarse"]   = self.stats["pdw_time_active"]             / max(1, self.stats["pdw_time_total"])
+    self.stats["dwell_coverage_fine"]     = self.stats["dwell_actual_duration_total"] / max(1, self.stats["dwell_requested_duration_total"])
+    self.stats["pdw_coverage_fine"]       = self.stats["pdw_actual_duration_total"]   / max(1, self.stats["pdw_requested_duration_total"])
+    self.stats["dwell_coverage_coarse"]   = self.stats["dwell_time_active"]           / max(1, self.stats["dwell_time_total"])
+    self.stats["pdw_coverage_coarse"]     = self.stats["pdw_time_active"]             / max(1, self.stats["pdw_time_total"])
+    self.stats["pdw_recording_coverage"]  = self.stats["pdw_pulse_recordings"]        / max(1, self.stats["pdw_pulse_reports"])
 
     while (len(self.dwell_reports_1sec) > 0) and ((now - self.dwell_reports_1sec[0]["timestamp"]) > 1.0):
       self.dwell_reports_1sec.pop(0)
@@ -167,4 +171,5 @@ class pluto_esm_hw_stats:
     self._match_dwell_reports()
 
   def _process_pdw_pulse_report(self, report):
-    pass
+    self.stats["pdw_pulse_reports"]     += 1
+    self.stats["pdw_pulse_recordings"]  += report["pdw_pulse_report"]["buffered_frame_valid"]

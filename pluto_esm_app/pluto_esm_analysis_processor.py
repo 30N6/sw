@@ -1,4 +1,3 @@
-import pluto_esm_logger
 import pluto_esm_data_recorder
 from pluto_esm_hw_pkg import *
 import time
@@ -266,12 +265,14 @@ class pluto_esm_pulsed_emitter_tracker:
       matched_emitter = {"freq": freq,
                          "name": emitter["name"],
                          #"pdws": matched_pulses,
+                         "pulses_in_window": len(matched_pulses),
                          "pdw_time_initial": matched_pulses[0]["processor_time"],
                          "pdw_time_final": matched_pulses[-1]["processor_time"]}
       self.confirmed_emitters.append(matched_emitter)
       self.logger.log(self.logger.LL_INFO, "[pulsed_tracker] _update_confirmed_emitter: NEW - [{}/{}] matched_pulses={}".format(emitter["name"], freq, len(matched_pulses)))
     else:
       #matched_emitter["pdws"] = matched_pulses
+      matched_emitter["pulses_in_window"] = len(matched_pulses)
       matched_emitter["pdw_time_final"] = matched_pulses[-1]["processor_time"]
 
     pulse_duration  = np.asarray([p["pulse_duration"] for p in matched_pulses])
