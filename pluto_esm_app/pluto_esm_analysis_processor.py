@@ -211,8 +211,12 @@ class pluto_esm_pulsed_emitter_tracker:
   def __init__(self, logger, pdw_processor, config):
     self.logger = logger
     self.pdw_processor = pdw_processor
-    self.pulsed_emitter_config = config["emitter_config"]["pulsed_emitters"]
-    self.modulation_threshold = config["analysis_config"]["modulation_threshold"]
+
+    self.pulsed_emitter_config        = config["emitter_config"]["pulsed_emitters"]
+    self.modulation_threshold         = config["analysis_config"]["modulation_threshold"]
+    self.pd_range_scaling             = config["analysis_config"]["pulsed_emitter_search"]["PW_range_scaling"]
+    self.pri_range_scaling            = config["analysis_config"]["pulsed_emitter_search"]["PRI_range_scaling"]
+    self.expected_pulse_count_factor  = config["analysis_config"]["pulsed_emitter_search"]["expected_pulse_count"]
 
     self.last_update_time = 0
 
@@ -245,6 +249,8 @@ class pluto_esm_pulsed_emitter_tracker:
       combined_pri = np.concatenate([combined_pri, dwell["pulse_pri"]])
       combined_pd = np.concatenate([combined_pd, dwell["pulse_duration"][:-1]])
       combined_pdw.extend(dwell["pdws"][:-1])
+
+    #print("_confirm_emitter: pri={}".format(combined_pri))
 
     matching_pri = (combined_pri > expected_pri_range[0]) & (combined_pri < expected_pri_range[1])
     matching_pd = (combined_pd > expected_pd_range[0]) & (combined_pd < expected_pd_range[1])
@@ -313,13 +319,14 @@ class pluto_esm_pulsed_emitter_tracker:
         if (freq < emitter["freq_range"][0]) or (freq > emitter["freq_range"][1]):
           continue
 
-        expected_pulse_count = (accumulated_dwell_time / (emitter["PRI_range"][1] * 1e-6)) * 0.25 #TODO: make into a parameter - pulse_count_threshold?
-
-        expected_pd_range   = [emitter["PW_range"][0]  * 0.25,  emitter["PW_range"][1]  * 1.25] #TODO: make factors into parameters?
-        expected_pri_range  = [emitter["PRI_range"][0] * 0.75,  emitter["PRI_range"][1] * 1.25] #TODO: make factors into parameters?
+        expected_pulse_count  = (accumulated_dwell_time / (emitter["PRI_range"][1] * 1e-6)) * self.expected_pulse_count_factor
+        expected_pd_range     = [emitter["PW_range"][0]  * self.pd_range_scaling[0],  emitter["PW_range"][1]  * self.pd_range_scaling[1]]
+        expected_pri_range    = [emitter["PRI_range"][0] * self.pri_range_scaling[1], emitter["PRI_range"][1] * self.pri_range_scaling[1]]
 
         num_matching_pd   = self.pdw_processor.hist_pd.get_count_in_range(freq, expected_pd_range)
         num_matching_pri  = self.pdw_processor.hist_pri.get_count_in_range(freq, expected_pri_range)
+
+        #print("freq={} expected_pulse_count={} num_matching_pd={}-{} num_matching_pri={}-{}".format(freq, expected_pulse_count, num_matching_pd, (num_matching_pd > expected_pulse_count), num_matching_pri, (num_matching_pri > expected_pulse_count)))
 
         if (num_matching_pd > expected_pulse_count) and (num_matching_pri > expected_pulse_count):
           self.logger.log(self.logger.LL_INFO, "[pulsed_tracker] _search_emitters: initial candidate - name={} freq={} dt_accum={:.3f} exp_pulses={:.1f} hist_count={} match_pd={} match_pri={}".format(emitter["name"],
