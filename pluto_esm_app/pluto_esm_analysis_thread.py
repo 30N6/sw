@@ -81,8 +81,10 @@ class pluto_esm_analysis_runner:
 
   def shutdown(self):
     self.logger.log(self.logger.LL_INFO, "[analysis] shutdown")
-    assert (self.analysis_process.is_alive())
-    self.input_queue.put("CMD_STOP", block=False)
-    self.analysis_process.join(1.0)
-    self.logger.log(self.logger.LL_INFO, "[analysis] analysis_process.exitcode={} is_alive={}".format(self.analysis_process.exitcode, self.analysis_process.is_alive()))
-    assert (self.analysis_process.exitcode == 0) #assert (not self.analysis_process.is_alive())
+    if self.analysis_process.is_alive():
+      self.input_queue.put("CMD_STOP", block=False)
+      self.analysis_process.join(1.0)
+      self.logger.log(self.logger.LL_INFO, "[analysis] analysis_process.exitcode={} is_alive={}".format(self.analysis_process.exitcode, self.analysis_process.is_alive()))
+    else:
+      self.logger.log(self.logger.LL_INFO, "[analysis] analysis_process already dead, exitcode={}".format(self.analysis_process.exitcode))
+    self.logger.flush()

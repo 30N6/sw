@@ -188,11 +188,13 @@ class pluto_esm_hw_command_processor:
 
   def shutdown(self):
     self.logger.log(self.logger.LL_INFO, "[hwcp] shutdown")
-    assert (self.hwc_process.is_alive())
-    self.send_command(hw_command.gen_stop(), False)
-    self.hwc_process.join(1.0)
-    self.logger.log(self.logger.LL_INFO, "[hwcp] hwc_process.exitcode={} is_alive={}".format(self.hwc_process.exitcode, self.hwc_process.is_alive()))
-    assert (self.hwc_process.exitcode == 0) #assert (not self.hwc_process.is_alive())
+    if self.hwc_process.is_alive():
+      self.send_command(hw_command.gen_stop(), False)
+      self.hwc_process.join(1.0)
+      self.logger.log(self.logger.LL_INFO, "[hwcp] hwc_process.exitcode={} is_alive={}".format(self.hwc_process.exitcode, self.hwc_process.is_alive()))
+    else:
+      self.logger.log(self.logger.LL_INFO, "[hwcp] hwc_process already dead, exitcode={}".format(self.hwc_process.exitcode))
+    self.logger.flush()
 
 
 class pluto_esm_hw_config:

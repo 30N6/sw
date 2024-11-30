@@ -11,14 +11,14 @@ from pstats import SortKey
 class render_spectrum:
 
   def __init__(self, surface, sw_config, sequencer):
-    self.rect_dwell_display               = [16, 4,  600, 16]
-    self.rect_waterfall_display_primary   = [16, 56,  600, 320]
-    self.rect_waterfall_display_secondary = [16, 416, 600, 320]
+    self.rect_dwell_display               = [24, 4,  600, 16]
+    self.rect_spectrum_display_primary    = [24, 56,  600, 320]
+    self.rect_spectrum_display_secondary  = [24, 400, 600, 288]
 
     self.surface              = surface
     self.sw_config            = sw_config
     self.sequencer            = sequencer
-    self.spectrogram          = pluto_esm_spectrogram.pluto_esm_spectrogram(self.sw_config, self.rect_waterfall_display_primary[2:4]) #[self.sequencer.dwell_buffer.buffer_width, 320])
+    self.spectrogram          = pluto_esm_spectrogram.pluto_esm_spectrogram(self.sw_config, self.rect_spectrum_display_primary[2:4]) #[self.sequencer.dwell_buffer.buffer_width, 320])
     self.max_freq             = sw_config.max_freq
     self.dwell_bw             = sw_config.config["dwell_config"]["freq_step"]
     self.channel_step         = sw_config.config["dwell_config"]["channel_step"]
@@ -105,72 +105,87 @@ class render_spectrum:
 
     pygame.draw.rect(self.surface, self.colors["frame_elements"], self.rect_dwell_display, 1)
 
-  def _render_waterfall_display(self):
+  def _render_spectrum_display(self):
     #t0 = time.time()
 
     data_p = self.spectrogram.get_spectrogram(False, True)
-    data_s = self.spectrogram.get_spectrogram(True, True)
+    data_s = self.spectrogram.get_spectrum_trace()
 
-    mhz_per_px = self.max_freq / self.spectrogram.output_width
-    zoom_i_start = round(self.freq_zoom_range[0] / mhz_per_px)
-    zoom_i_stop  = round(self.freq_zoom_range[1] / mhz_per_px)
+    spec_mhz_per_px = self.max_freq / self.spectrogram.output_width
+    spec_zoom_i_start = round(self.freq_zoom_range[0] / spec_mhz_per_px)
+    spec_zoom_i_stop  = round(self.freq_zoom_range[1] / spec_mhz_per_px)
+
+    trace_mhz_per_px = self.max_freq / self.spectrogram.output_width_trace
+    trace_zoom_i_start = round(self.freq_zoom_range[0] / trace_mhz_per_px)
+    trace_zoom_i_stop  = round(self.freq_zoom_range[1] / trace_mhz_per_px)
 
     if self.freq_zoom_active or True:
-      data_p = data_p[zoom_i_start:zoom_i_stop]
-      data_s = data_s[zoom_i_start:zoom_i_stop]
+      data_p = data_p[spec_zoom_i_start:spec_zoom_i_stop]
       surf_p = pygame.surfarray.make_surface(data_p)
+      surf_p = pygame.transform.scale(surf_p, self.rect_spectrum_display_primary[2:4])
+
+      data_s = data_s[trace_zoom_i_start:trace_zoom_i_stop]
       surf_s = pygame.surfarray.make_surface(data_s)
-      surf_p = pygame.transform.scale(surf_p, self.rect_waterfall_display_primary[2:4])
-      surf_s = pygame.transform.scale(surf_p, self.rect_waterfall_display_secondary[2:4])
+      surf_s = pygame.transform.scale(surf_s, self.rect_spectrum_display_secondary[2:4])
     else:
       surf_p = pygame.surfarray.make_surface(data_p)
       surf_s = pygame.surfarray.make_surface(data_s)
 
-    self.surface.blit(surf_p, self.rect_waterfall_display_primary)
-    self.surface.blit(surf_s, self.rect_waterfall_display_secondary)
+    self.surface.blit(surf_p, self.rect_spectrum_display_primary)
+    self.surface.blit(surf_s, self.rect_spectrum_display_secondary)
 
-    pygame.draw.rect(self.surface, self.colors["frame_elements"], self.rect_waterfall_display_primary, 1)
-    pygame.draw.rect(self.surface, self.colors["frame_elements"], self.rect_waterfall_display_secondary, 1)
+    pygame.draw.rect(self.surface, self.colors["frame_elements"], self.rect_spectrum_display_primary, 1)
+    pygame.draw.rect(self.surface, self.colors["frame_elements"], self.rect_spectrum_display_secondary, 1)
 
-    waterfall_rects = [self.rect_waterfall_display_primary, self.rect_waterfall_display_secondary]
+    graph_rects = [self.rect_spectrum_display_primary, self.rect_spectrum_display_secondary]
 
     freq_tick_height = 6
-    freq_tick_count = 5
-
+    freq_tick_count = 7
     for i in range(freq_tick_count):
       tick_frac = (i / (freq_tick_count - 1))
       freq_str = "{}".format(round(self.freq_zoom_range[0] + tick_frac * (self.freq_zoom_range[1] - self.freq_zoom_range[0])))
       text_data = self.font.render(freq_str, True, self.colors["frame_elements"])
 
-      for j in range(len(waterfall_rects)):
-        x = waterfall_rects[j][0] + tick_frac * (waterfall_rects[j][2] - 1)
+      for j in range(len(graph_rects)):
+        x = graph_rects[j][0] + tick_frac * (graph_rects[j][2] - 1)
 
-        pos_start = (x, waterfall_rects[j][1])
-        pos_end   = (x, waterfall_rects[j][1] - freq_tick_height)
+        pos_start = (x, graph_rects[j][1])
+        pos_end   = (x, graph_rects[j][1] - freq_tick_height)
         pygame.draw.line(self.surface, self.colors["frame_elements"], pos_start, pos_end)
 
         text_rect = text_data.get_rect()
         text_rect.centerx = x
-        text_rect.bottom = waterfall_rects[j][1] - freq_tick_height - 1
+        text_rect.bottom = graph_rects[j][1] - freq_tick_height - 1
         self.surface.blit(text_data, text_rect)
+
+    power_label_count = 7
+    for i in range(power_label_count):
+      power_frac = (i / (power_label_count - 1))
+      freq_str = "{}".format(round(self.spectrogram.spec_trace_min_dB + power_frac * (self.spectrogram.spec_trace_max_dB - self.spectrogram.spec_trace_min_dB)))
+      text_data = self.font.render(freq_str, True, self.colors["frame_elements"])
+      text_data = pygame.transform.rotate(text_data, 90)
+
+      text_rect = text_data.get_rect()
+      text_rect.left = self.rect_spectrum_display_secondary[0] - 12
+      text_rect.centery = self.rect_spectrum_display_secondary[1] + self.rect_spectrum_display_secondary[3] * (1 - power_frac)
+      self.surface.blit(text_data, text_rect)
 
      #pygame.mouse.get_pos()
 
-    peaks       = [self._get_spectrum_peaks(self.spectrogram.filter_buffer_avg[0],  3, [zoom_i_start, zoom_i_stop], mhz_per_px, True),
-                   self._get_spectrum_peaks(self.spectrogram.filter_buffer_peak[0], 3, [zoom_i_start, zoom_i_stop], mhz_per_px, False)]
-    status_str  = ["[AVERAGE] peak_val_dB={} peak_freq={}", "[PEAK] peak_val={} peak_freq={}"]
+    peaks       = [self._get_spectrum_peaks(self.spectrogram.last_buffer_avg,  3, [spec_zoom_i_start, spec_zoom_i_stop], spec_mhz_per_px, True),
+                   self._get_spectrum_peaks(self.spectrogram.last_buffer_peak, 3, [spec_zoom_i_start, spec_zoom_i_stop], spec_mhz_per_px, False)]
+    status_str  = ["[AVERAGE] peak_val_dB={:<28} peak_freq={:<24}",
+                   "[PEAK]    peak_val   ={:<28} peak_freq={:<24}"]
 
-    #print(peaks)
-
-    for i in range(len(waterfall_rects)):
-      peak_values = "[" + " ".join(["{:.1f}".format(v) for v in peaks[i][1]]) + "]"
-      peak_freqs = "[" + " ".join(["{:.1f}".format(v) for v in peaks[i][0]]) + "]"
+    for i in range(len(peaks)):
+      peak_values = "[" + " ".join(["{:8.1f}".format(v) for v in peaks[i][1]]) + "]"
+      peak_freqs = "[" + " ".join(["{:6.1f}".format(v) for v in peaks[i][0]]) + "]"
 
       s = status_str[i].format(peak_values, peak_freqs)
       text_data = self.font.render(s, True, self.colors["frame_elements"])
       text_rect = text_data.get_rect()
-      text_rect.left = waterfall_rects[i][0]
-      text_rect.bottom = waterfall_rects[i][1] + waterfall_rects[i][3] + 16
+      text_rect.left = graph_rects[1][0]
+      text_rect.bottom = graph_rects[1][1] + graph_rects[i][3] + 16 * i
       self.surface.blit(text_data, text_rect)
 
   def _update_zoom(self, key):
@@ -202,7 +217,7 @@ class render_spectrum:
   def render(self):
 
     self._render_dwell_display()
-    self._render_waterfall_display()
+    self._render_spectrum_display()
 
     pygame.draw.rect(self.surface, (0, 0, 255), [0, 0, 640, 768], 1)
 

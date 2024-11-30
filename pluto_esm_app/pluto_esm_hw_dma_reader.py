@@ -173,8 +173,10 @@ class pluto_esm_hw_dma_reader:
 
   def shutdown(self):
     self.logger.log(self.logger.LL_INFO, "[hwdr] shutdown")
-    assert (self.hwdr_process.is_alive())
-    self.request_queue.put("CMD_STOP", block=False)
-    self.hwdr_process.join(1.0)
-    self.logger.log(self.logger.LL_INFO, "[hwdr] hwdr_process.exitcode={} is_alive={}".format(self.hwdr_process.exitcode, self.hwdr_process.is_alive()))
-    assert (self.hwdr_process.exitcode == 0) #assert (not self.hwdr_process.is_alive())
+    if self.hwdr_process.is_alive():
+      self.request_queue.put("CMD_STOP", block=False)
+      self.hwdr_process.join(1.0)
+      self.logger.log(self.logger.LL_INFO, "[hwdr] hwdr_process.exitcode={} is_alive={}".format(self.hwdr_process.exitcode, self.hwdr_process.is_alive()))
+    else:
+      self.logger.log(self.logger.LL_INFO, "[hwdr] hwdr_process already dead, exitcode={}".format(self.hwdr_process.exitcode))
+    self.logger.flush()

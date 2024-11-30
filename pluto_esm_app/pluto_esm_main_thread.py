@@ -71,8 +71,12 @@ class pluto_esm_main_thread:
       pygame.display.flip()
       self.clock.tick(self.FPS)
 
+    self.shutdown()
+
+  def shutdown(self):
     self.hw_interface.shutdown()
     self.analysis_thread.shutdown()
-    self.logger.shutdown("quit")
     self.recorder.shutdown("quit")
+    self.logger.log(self.logger.LL_INFO, "[main_thread] shutting down")
     pygame.quit()
+    self.logger.shutdown("quit")

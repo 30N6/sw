@@ -14,13 +14,22 @@ class pluto_esm_spectrogram:
     self.output_width           = main_spec_dimensions[0]
     self.output_depth           = main_spec_dimensions[1] // self.output_row_height
 
-    self.filter_buffer_avg      = np.zeros((self.filter_depth, self.output_width))
-    self.filter_buffer_peak     = np.zeros((self.filter_depth, self.output_width))
+    self.output_width_trace     = main_spec_dimensions[0]
+    self.output_depth_trace     = main_spec_dimensions[1]
+
+    #self.filter_buffer_avg      = np.zeros((self.filter_depth, self.output_width))
+    #self.filter_buffer_peak     = np.zeros((self.filter_depth, self.output_width))
 
     self.spec_main_avg          = np.zeros((self.output_depth, self.output_width, 3))
     self.spec_main_peak         = np.zeros((self.output_depth, self.output_width, 3))
-    self.spec_filt_avg          = np.zeros((self.output_depth, self.output_width, 3))
-    self.spec_filt_peak         = np.zeros((self.output_depth, self.output_width, 3))
+    #self.spec_filt_avg          = np.zeros((self.output_depth, self.output_width, 3))
+    #self.spec_filt_peak         = np.zeros((self.output_depth, self.output_width, 3))
+    self.last_buffer_avg        = np.zeros(self.output_width)
+    self.last_buffer_peak       = np.zeros(self.output_width)
+
+    self.spec_trace             = np.zeros((self.output_depth, self.output_width, 3))
+    self.spec_trace_max_dB      = 50
+    self.spec_trace_min_dB      = -30
 
   def get_spectrogram(self, peak_not_avg, main_not_filt):
     if main_not_filt:
@@ -33,6 +42,9 @@ class pluto_esm_spectrogram:
         return self.spec_filt_peak.transpose((1,0,2)).repeat(self.output_row_height, 1)
       else:
         return self.spec_filt_avg.transpose((1,0,2)).repeat(self.output_row_height, 1)
+
+  def get_spectrum_trace(self):
+    return self.spec_trace.transpose((1,0,2))
 
   @staticmethod
   def _normalize_row_sqrt(data):
@@ -77,10 +89,9 @@ class pluto_esm_spectrogram:
     scaled_duration = dwell_buffer.dwell_data_channel_duration[dwell_buffer.dwell_data_last_row_index] #* FAST_CLOCK_PERIOD * CHANNELIZER_OVERSAMPLING
     scaled_duration[scaled_duration == 0] = 1
     input_row_avg = np.divide(dwell_buffer.dwell_data_channel_accum[dwell_buffer.dwell_data_last_row_index], scaled_duration)
-    #input_row_avg[np.isinf(input_row_avg)] = 0
-    input_row_avg[dwell_buffer.dwell_data_channel_center[dwell_buffer.dwell_data_last_row_index]] = 0
-
     input_row_peak = dwell_buffer.dwell_data_channel_peak[dwell_buffer.dwell_data_last_row_index].copy()
+
+    input_row_avg[dwell_buffer.dwell_data_channel_center[dwell_buffer.dwell_data_last_row_index]] = 0
     input_row_peak[dwell_buffer.dwell_data_channel_center[dwell_buffer.dwell_data_last_row_index]] = 0
 
     buf_avg = np.zeros(self.output_width)
@@ -95,8 +106,31 @@ class pluto_esm_spectrogram:
     self.spec_main_avg      = self._shift_and_insert(self.spec_main_avg,      np.expand_dims(turbo_colormap.interpolate_color(self._normalize_row_sqrt(buf_avg)), 0))
     self.spec_main_peak     = self._shift_and_insert(self.spec_main_peak,     np.expand_dims(turbo_colormap.interpolate_color(self._normalize_row_sqrt(buf_peak)), 0))
 
-    self.spec_filt_avg      = self._shift_and_insert(self.spec_filt_avg,      np.expand_dims(turbo_colormap.interpolate_color(self._compute_new_filtered_row(buf_avg, self.filter_buffer_avg)), 0))
-    self.spec_filt_peak     = self._shift_and_insert(self.spec_filt_peak,     np.expand_dims(turbo_colormap.interpolate_color(self._compute_new_filtered_row(buf_peak, self.filter_buffer_peak)), 0))
+    self.spec_main_avg      = self._shift_and_insert(self.spec_main_avg,      np.expand_dims(turbo_colormap.interpolate_color(self._normalize_row_sqrt(buf_avg)), 0))
+    self.spec_main_peak     = self._shift_and_insert(self.spec_main_peak,     np.expand_dims(turbo_colormap.interpolate_color(self._normalize_row_sqrt(buf_peak)), 0))
 
-    self.filter_buffer_avg  = self._shift_and_insert(self.filter_buffer_avg,  buf_avg)
-    self.filter_buffer_peak = self._shift_and_insert(self.filter_buffer_peak, buf_peak)
+    self.last_buffer_avg    = buf_avg.copy()
+    self.last_buffer_peak   = buf_peak.copy()
+
+    power_floor = 10 ** (self.spec_trace_min_dB / 10)
+    buf_avg[buf_avg < power_floor] = power_floor
+    buf_peak[buf_peak < power_floor] = power_floor
+    buf_avg_dB  = 10*np.log10(buf_avg)
+    buf_peak_dB = 10*np.log10(buf_peak)
+
+    self.spec_trace_max_dB = max(np.ceil(np.max(buf_peak_dB) / 10) * 10, self.spec_trace_max_dB)
+    vertical_px_per_dB = (self.output_depth_trace - 4) / (self.spec_trace_max_dB - self.spec_trace_min_dB)
+
+    self.spec_trace = np.zeros((self.output_depth_trace, self.output_width_trace, 3))
+    trace_x         = np.arange(self.output_width_trace)
+    trace_y_peak    = self.output_depth_trace - (np.round((buf_peak_dB - self.spec_trace_min_dB) * vertical_px_per_dB).astype(np.uint32) + 2)
+    trace_y_avg     = self.output_depth_trace - (np.round((buf_avg_dB - self.spec_trace_min_dB) * vertical_px_per_dB).astype(np.uint32) + 2)
+
+    for i in range(3):
+      self.spec_trace[trace_y_peak - 1 + i, trace_x] = np.asarray([32, 255, 32])
+      self.spec_trace[trace_y_avg - 1 + i, trace_x]  = np.asarray([255, 32, 32])
+
+    #self.spec_filt_avg      = self._shift_and_insert(self.spec_filt_avg,      np.expand_dims(turbo_colormap.interpolate_color(self._compute_new_filtered_row(buf_avg, self.filter_buffer_avg)), 0))
+    #self.spec_filt_peak     = self._shift_and_insert(self.spec_filt_peak,     np.expand_dims(turbo_colormap.interpolate_color(self._compute_new_filtered_row(buf_peak, self.filter_buffer_peak)), 0))
+    #self.filter_buffer_avg  = self._shift_and_insert(self.filter_buffer_avg,  buf_avg)
+    #self.filter_buffer_peak = self._shift_and_insert(self.filter_buffer_peak, buf_peak)
