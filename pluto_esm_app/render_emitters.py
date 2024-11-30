@@ -33,8 +33,6 @@ class render_emitters:
     self.emitters = []
 
   def render(self):
-
-
     pygame.draw.rect(self.surface, self.colors["border"], self.rect_frame_pulsed, 1)
     pygame.draw.rect(self.surface, self.colors["border"], self.rect_frame_cw, 1)
 
@@ -80,11 +78,11 @@ class render_emitters:
 
     now = time.time()
 
-    self.emitters = []
     for entry in self.analysis_thread.output_data_to_render:
       if "pulsed_emitters" not in entry:
         continue
 
+      self.emitters = []
       for analysis_data in entry["pulsed_emitters"]:
         emitter = {}
         emitter["analysis_data"]  = analysis_data

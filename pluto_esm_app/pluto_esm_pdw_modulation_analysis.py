@@ -10,7 +10,6 @@ class pluto_esm_pdw_modulation_analysis:
     self.threshold_slope      = config["FM_threshold_slope"]
     self.threshold_samples    = config["FM_min_samples"]
 
-
   def check_intrapulse_modulation(self, pulse_duration, pulse_iq_samples):
     valid_duration = min(ESM_PDW_BUFFERED_SAMPLES_PER_FRAME, pulse_duration)
     if (valid_duration - ESM_PDW_BUFFERED_IQ_DELAY_SAMPLES) < self.threshold_samples:

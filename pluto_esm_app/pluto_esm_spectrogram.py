@@ -28,7 +28,7 @@ class pluto_esm_spectrogram:
     self.last_buffer_peak       = np.zeros(self.output_width)
 
     self.spec_trace             = np.zeros((self.output_depth, self.output_width, 3))
-    self.spec_trace_max_dB      = 50
+    self.spec_trace_max_dB      = 60
     self.spec_trace_min_dB      = -30
 
   def get_spectrogram(self, peak_not_avg, main_not_filt):

@@ -72,6 +72,7 @@ class pluto_esm_main_thread:
       self.clock.tick(self.FPS)
 
     self.shutdown()
+    os._exit(0)
 
   def shutdown(self):
     self.hw_interface.shutdown()

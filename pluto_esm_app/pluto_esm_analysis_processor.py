@@ -294,9 +294,10 @@ class pluto_esm_pulsed_emitter_tracker:
     pulse_duration  = np.asarray([p["pulse_duration"] for p in matched_pulses])
     pulse_power     = np.asarray([p["pulse_power_accum"] for p in matched_pulses]) / pulse_duration
 
-    matched_emitter["power_mean"] = np.mean(pulse_power)
-    matched_emitter["power_max"]  = np.max(pulse_power)
-    matched_emitter["power_std"]  = np.std(pulse_power)
+    matched_emitter["power_mean"]   = np.mean(pulse_power)
+    matched_emitter["power_max"]    = np.max(pulse_power)
+    matched_emitter["power_std"]    = np.std(pulse_power)
+    matched_emitter["pulse_power"]  = pulse_power
 
     mod_data = [p["modulation_data"] for p in matched_pulses if (p["modulation_data"] is not None)]
     mod_FM   = [md for md in mod_data if md["modulation_type"] == "FM"]
