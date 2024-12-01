@@ -163,8 +163,11 @@ class pluto_esm_pdw_processor:
       pulse_pri           = np.diff(pulse_toa)
       #pulse_power         = np.asarray([p["pulse_power_accum"] for p in channel_pdws]) / pulse_duration_raw
 
-      for pdw in channel_pdws:
-        pdw["processor_time"] = now
+      for i in range(len(channel_pdws) - 1):
+        channel_pdws[i]["pulse_pri"]      = pulse_pri[i]
+        channel_pdws[i]["processor_time"] = now
+      channel_pdws[-1]["pulse_pri"]       = -1
+      channel_pdws[-1]["processor_time"]  = now
 
       self.dwell_history_pdw.append({"time": now,
                                  "pdws": channel_pdws,
@@ -181,8 +184,6 @@ class pluto_esm_pdw_processor:
         self.dwell_time_accum[channel_freq] = 0
       self.dwell_time_accum[channel_freq] += dwell_num_samples[channel_freq] #* FAST_CLOCK_PERIOD
     self.dwell_history_accum.append({"time": now, "dwell_num_samples": dwell_num_samples})
-
-    #TODO: process recorded samples to check for modulation
 
   def _scrub_history(self):
     now = time.time()
@@ -293,11 +294,16 @@ class pluto_esm_pulsed_emitter_tracker:
 
     pulse_duration  = np.asarray([p["pulse_duration"] for p in matched_pulses])
     pulse_power     = np.asarray([p["pulse_power_accum"] for p in matched_pulses]) / pulse_duration
+    pulse_pri       = np.asarray([p["pulse_pri"] for p in matched_pulses if p["pulse_pri"] > 0])
 
-    matched_emitter["power_mean"]   = np.mean(pulse_power)
-    matched_emitter["power_max"]    = np.max(pulse_power)
-    matched_emitter["power_std"]    = np.std(pulse_power)
-    matched_emitter["pulse_power"]  = pulse_power
+    matched_emitter["power_mean"]           = np.mean(pulse_power)
+    matched_emitter["power_max"]            = np.max(pulse_power)
+    matched_emitter["power_std"]            = np.std(pulse_power)
+    matched_emitter["pulse_power"]          = pulse_power
+    matched_emitter["pulse_duration"]       = pulse_duration
+    matched_emitter["pulse_duration_mean"]  = np.mean(pulse_duration)
+    matched_emitter["pulse_duration_std"]   = np.std(pulse_duration)
+    matched_emitter["sorted_pulse_pri"]     = np.sort(pulse_pri)
 
     mod_data = [p["modulation_data"] for p in matched_pulses if (p["modulation_data"] is not None)]
     mod_FM   = [md for md in mod_data if md["modulation_type"] == "FM"]
@@ -324,6 +330,7 @@ class pluto_esm_pulsed_emitter_tracker:
         expected_pd_range     = [emitter["PW_range"][0]  * self.pd_range_scaling[0],  emitter["PW_range"][1]  * self.pd_range_scaling[1]]
         expected_pri_range    = [emitter["PRI_range"][0] * self.pri_range_scaling[1], emitter["PRI_range"][1] * self.pri_range_scaling[1]]
 
+        #TODO: skip the histogram and check the pulses directly?
         num_matching_pd   = self.pdw_processor.hist_pd.get_count_in_range(freq, expected_pd_range)
         num_matching_pri  = self.pdw_processor.hist_pri.get_count_in_range(freq, expected_pri_range)
 

@@ -14,5 +14,8 @@ if __name__ == "__main__":
     main()
   except KeyboardInterrupt:
     main_thread.shutdown()
-    #sys.exit(0)
-    os._exit(0)
+  except Exception as e:
+    print("Exception: {}".format(e))
+
+  #sys.exit(0)
+  os._exit(0)

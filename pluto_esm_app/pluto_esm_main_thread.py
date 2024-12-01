@@ -38,8 +38,6 @@ class pluto_esm_main_thread:
     self.analysis_thread  = pluto_esm_analysis_thread.pluto_esm_analysis_runner(self.logger, self.sw_config)
     self.sequencer        = pluto_esm_sequencer.pluto_esm_sequencer(self.logger, self.recorder, self.sw_config,
                                                                     self.hw_interface, self.analysis_thread, self.sim_loader)
-
-    #self.hw_interface.test()
     self.render_status    = render_status.render_status(self.surface, self.sw_config, self.sequencer)
     self.render_spectrum  = render_spectrum.render_spectrum(self.surface, self.sw_config, self.sequencer)
     self.render_emitters  = render_emitters.render_emitters(self.surface, self.sw_config, self.analysis_thread)
