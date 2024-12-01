@@ -170,6 +170,7 @@ class render_spectrum:
       text_rect.centery = self.rect_spectrum_display_secondary[1] + self.rect_spectrum_display_secondary[3] * (1 - power_frac)
       self.surface.blit(text_data, text_rect)
 
+    #TODO: cursors
      #pygame.mouse.get_pos()
 
     peaks       = [self._get_spectrum_peaks(self.spectrogram.last_buffer_avg,  3, [spec_zoom_i_start, spec_zoom_i_stop], spec_mhz_per_px, True),
@@ -215,12 +216,10 @@ class render_spectrum:
       self.freq_zoom_active = True
 
   def render(self):
-
     self._render_dwell_display()
     self._render_spectrum_display()
 
     pygame.draw.rect(self.surface, (0, 0, 255), [0, 0, 640, 768], 1)
-
 
   def update(self):
     #self.pr.enable()

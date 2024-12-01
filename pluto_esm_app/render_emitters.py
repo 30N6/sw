@@ -138,6 +138,12 @@ class render_emitters:
       text_rect.bottom = entry["y_pos"]
       self.surface.blit(text_data, text_rect)
 
+  def _clamp_selected_emitter(self):
+    if self.selected_emitter >= len(self.emitters):
+      self.selected_emitter = len(self.emitters) - 1
+    if self.selected_emitter < 0:
+      self.selected_emitter = 0
+
   def render(self):
     pygame.draw.rect(self.surface, self.colors["border"], self.rect_frame_pulsed, 1)
     pygame.draw.rect(self.surface, self.colors["border"], self.rect_frame_cw, 1)
@@ -169,5 +175,13 @@ class render_emitters:
     for emitter in self.emitters:
       emitter["histogram_pri"] = self.pri_plot.get_pri_plot(emitter["analysis_data"]["sorted_pulse_pri"], self.colors["emitter_histogram"])
 
-    if self.selected_emitter >= len(self.emitters):
-      self.selected_emitter = 0
+  def process_keydown(self, key):
+    if key not in (pygame.K_f, pygame.K_v):
+      return
+
+    if key == pygame.K_f:
+      self.selected_emitter -= 1
+    elif key == pygame.K_v:
+      self.selected_emitter += 1
+
+    self._clamp_selected_emitter()
