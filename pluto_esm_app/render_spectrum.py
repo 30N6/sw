@@ -51,6 +51,14 @@ class render_spectrum:
             ca[1] + pct*(cb[1]-ca[1]),
             ca[2] + pct*(cb[2]-ca[2]))
 
+  @staticmethod
+  def _check_inside_rect(p, r):
+    if (p[0] < r[0]) or (p[0] > (r[0] + r[2])):
+      return False
+    if (p[1] < r[1]) or (p[1] > (r[1] + r[3])):
+      return False
+    return True
+
   def _get_spectrum_peaks(self, data, N, zoom_range, mhz_per_px, compute_dB):
     zoomed_data = data[zoom_range[0]:zoom_range[1]]
 
@@ -170,9 +178,6 @@ class render_spectrum:
       text_rect.centery = self.rect_spectrum_display_secondary[1] + self.rect_spectrum_display_secondary[3] * (1 - power_frac)
       self.surface.blit(text_data, text_rect)
 
-    #TODO: cursors
-     #pygame.mouse.get_pos()
-
     peaks       = [self._get_spectrum_peaks(self.spectrogram.last_buffer_avg,  3, [spec_zoom_i_start, spec_zoom_i_stop], spec_mhz_per_px, True),
                    self._get_spectrum_peaks(self.spectrogram.last_buffer_peak, 3, [spec_zoom_i_start, spec_zoom_i_stop], spec_mhz_per_px, False)]
     status_str  = ["[AVERAGE] peak_val_dB={:<28} peak_freq={:<24}",
@@ -187,6 +192,23 @@ class render_spectrum:
       text_rect = text_data.get_rect()
       text_rect.left = graph_rects[1][0]
       text_rect.bottom = graph_rects[1][1] + graph_rects[i][3] + 16 * i
+      self.surface.blit(text_data, text_rect)
+
+    cursor_pos          = pygame.mouse.get_pos()
+    cursor_in_primary   = self._check_inside_rect(cursor_pos, self.rect_spectrum_display_primary)
+    cursor_in_secondary = self._check_inside_rect(cursor_pos, self.rect_spectrum_display_secondary)
+    if cursor_in_primary or cursor_in_secondary:
+      if cursor_in_primary:
+        x_frac = (cursor_pos[0] - self.rect_spectrum_display_primary[0]) / self.rect_spectrum_display_primary[2]
+      else:
+        x_frac = (cursor_pos[0] - self.rect_spectrum_display_secondary[0]) / self.rect_spectrum_display_secondary[2]
+
+      freq = self.freq_zoom_range[0] + x_frac * (self.freq_zoom_range[1] - self.freq_zoom_range[0])
+      s = "[CURSOR]: freq={:<.1f}".format(freq)
+      text_data = self.font.render(s, True, self.colors["frame_elements"])
+      text_rect = text_data.get_rect()
+      text_rect.left = graph_rects[1][0]
+      text_rect.bottom = graph_rects[1][1] + graph_rects[i][3] + 16 * 3
       self.surface.blit(text_data, text_rect)
 
   def _update_zoom(self, key):

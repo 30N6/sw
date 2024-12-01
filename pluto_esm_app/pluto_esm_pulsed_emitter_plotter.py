@@ -25,6 +25,6 @@ class pluto_esm_pulsed_emitter_plotter:
     hist_image = np.zeros((self.plot_dimensions[0], self.plot_dimensions[1], 3), dtype=np.uint8)
     for i_col in range(self.plot_dimensions[0]):
       if hist_data[i_col] > 0:
-        hist_image[i_col, (self.plot_dimensions[1] - hist_data[i_col]):self.plot_dimensions[1] ] = color
+        hist_image[i_col, (self.plot_dimensions[1] - hist_data[i_col]):self.plot_dimensions[1]] = color
 
     return hist_image, max_pri
