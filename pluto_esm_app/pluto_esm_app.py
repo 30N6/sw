@@ -1,5 +1,6 @@
 import sys, os
 import pluto_esm_main_thread
+import multiprocessing
 
 main_thread = []
 
@@ -17,5 +18,10 @@ if __name__ == "__main__":
   except Exception as e:
     print("Exception: {}".format(e))
 
-  #sys.exit(0)
-  os._exit(0)
+  processes = multiprocessing.active_children()
+  for child in processes:
+    print("pluto_esm_app: terminating child process {}".format(child))
+    child.terminate()
+
+  sys.exit(0)
+  #os._exit(0)

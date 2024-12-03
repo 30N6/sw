@@ -4,6 +4,7 @@ import iio
 import socket
 import struct
 import time
+import multiprocessing
 from multiprocessing import Process, Queue
 
 UDP_PORT          = 50055
@@ -30,7 +31,7 @@ class pluto_esm_hw_dma_reader_thread:
       self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
       self.sock.bind((arg["local_ip"], UDP_PORT))
       self.sock.settimeout(0.1)
-      self.logger.log(self.logger.LL_INFO, "init: [UDP mode] queues={}/{} sock={}".format(self.request_queue, self.result_queue, self.sock))
+      self.logger.log(self.logger.LL_INFO, "init: [UDP mode] queues={}/{} sock={}, current_process={}".format(self.request_queue, self.result_queue, self.sock, multiprocessing.current_process()))
     else:
       self.context        = iio.Context(arg["pluto_uri"])
       self.dev_d2h        = self.context.find_device("axi-iio-dma-d2h")
@@ -40,7 +41,7 @@ class pluto_esm_hw_dma_reader_thread:
       self.context.set_timeout(1000)
       self.buffer = iio.Buffer(self.chan_dma_d2h.device, self.BUFFER_SIZE, False)
       self.buffer.set_blocking_mode(True)
-      self.logger.log(self.logger.LL_INFO, "init: [IIO mode] queues={}/{} context={} dma_d2h={} buffer={}".format(self.request_queue, self.result_queue, self.context, self.chan_dma_d2h, self.buffer))
+      self.logger.log(self.logger.LL_INFO, "init: [IIO mode] queues={}/{} context={} dma_d2h={} buffer={}, current_process={}".format(self.request_queue, self.result_queue, self.context, self.chan_dma_d2h, self.buffer, multiprocessing.current_process()))
 
   def _read(self):
     data = []
@@ -114,6 +115,7 @@ class pluto_esm_hw_dma_reader:
     self.logger = logger
     self.request_queue = Queue()
     self.result_queue = Queue()
+    self.running = True
 
     self.output_data_dwell = []
     self.output_data_pdw = []
@@ -172,11 +174,19 @@ class pluto_esm_hw_dma_reader:
     self._update_output_queues()
 
   def shutdown(self):
+    self.running = False
     self.logger.log(self.logger.LL_INFO, "[hwdr] shutdown")
     if self.hwdr_process.is_alive():
       self.request_queue.put("CMD_STOP", block=False)
       self.hwdr_process.join(1.0)
-      self.logger.log(self.logger.LL_INFO, "[hwdr] hwdr_process.exitcode={} is_alive={}".format(self.hwdr_process.exitcode, self.hwdr_process.is_alive()))
+      self.logger.log(self.logger.LL_INFO, "[hwdr] shutdown: hwdr_process.exitcode={} is_alive={}".format(self.hwdr_process.exitcode, self.hwdr_process.is_alive()))
     else:
-      self.logger.log(self.logger.LL_INFO, "[hwdr] hwdr_process already dead, exitcode={}".format(self.hwdr_process.exitcode))
+      self.logger.log(self.logger.LL_INFO, "[hwdr] shutdown: hwdr_process already dead, exitcode={}".format(self.hwdr_process.exitcode))
     self.logger.flush()
+
+    while not self.request_queue.empty():
+      data = self.request_queue.get(block=False)
+      self.logger.log(self.logger.LL_INFO, "[hwdr] shutdown: request_queue data dropped")
+    while not self.result_queue.empty():
+      data = self.result_queue.get(block=False)
+      self.logger.log(self.logger.LL_INFO, "[hwdr] shutdown: result_queue data dropped")

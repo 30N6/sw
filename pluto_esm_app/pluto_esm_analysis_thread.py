@@ -2,6 +2,7 @@ import pluto_esm_logger
 import pluto_esm_analysis_processor
 from pluto_esm_hw_pkg import *
 import time
+import multiprocessing
 from multiprocessing import Process, Queue
 
 class pluto_esm_analysis_thread:
@@ -12,7 +13,7 @@ class pluto_esm_analysis_thread:
     self.input_queue  = arg["input_queue"]
     self.output_queue = arg["output_queue"]
 
-    self.logger.log(self.logger.LL_INFO, "init: queues={}/{}".format(self.input_queue, self.output_queue))
+    self.logger.log(self.logger.LL_INFO, "init: queues={}/{}, current_process={}".format(self.input_queue, self.output_queue, multiprocessing.current_process()))
 
   def _send_tracked_emitters(self):
     if len(self.processor.confirmed_emitters_to_render) > 0:
@@ -42,8 +43,8 @@ class pluto_esm_analysis_thread:
     self.shutdown("graceful exit")
 
   def shutdown(self, reason):
-    self.logger.shutdown(reason)
     self.processor.shutdown(reason)
+    self.logger.shutdown(reason)
 
 
 def pluto_esm_analysis_thread_func(arg):
@@ -53,12 +54,12 @@ def pluto_esm_analysis_thread_func(arg):
   except KeyboardInterrupt:
     thread.shutdown("interrupted")
 
-
 class pluto_esm_analysis_runner:
   def __init__(self, logger, sw_config):
     self.logger       = logger
     self.input_queue  = Queue()
     self.output_queue = Queue()
+    self.running      = True
 
     self.output_data_to_render = []
 
@@ -74,17 +75,28 @@ class pluto_esm_analysis_runner:
       self.logger.log(self.logger.LL_DEBUG, "[analysis] _update_output_queue: received data: len={} data={}".format(len(data), data))
 
   def submit_report(self, report):
-    self.input_queue.put(report, block=False)
+    if self.running:
+      self.input_queue.put(report, block=False)
+    else:
+      self.logger.log(self.logger.LL_INFO, "[analysis] submit_report: shutting down -- report dropped: {}".format(report))
 
   def update(self):
     self._update_output_queue()
 
   def shutdown(self):
+    self.running = False
     self.logger.log(self.logger.LL_INFO, "[analysis] shutdown")
     if self.analysis_process.is_alive():
       self.input_queue.put("CMD_STOP", block=False)
       self.analysis_process.join(1.0)
-      self.logger.log(self.logger.LL_INFO, "[analysis] analysis_process.exitcode={} is_alive={}".format(self.analysis_process.exitcode, self.analysis_process.is_alive()))
+      self.logger.log(self.logger.LL_INFO, "[analysis] shutdown: analysis_process.exitcode={} is_alive={}".format(self.analysis_process.exitcode, self.analysis_process.is_alive()))
     else:
-      self.logger.log(self.logger.LL_INFO, "[analysis] analysis_process already dead, exitcode={}".format(self.analysis_process.exitcode))
+      self.logger.log(self.logger.LL_INFO, "[analysis] shutdown: analysis_process already dead, exitcode={}".format(self.analysis_process.exitcode))
     self.logger.flush()
+
+    while not self.input_queue.empty():
+      data = self.input_queue.get(block=False)
+      self.logger.log(self.logger.LL_INFO, "[analysis] shutdown: input_queue data dropped")
+    while not self.output_queue.empty():
+      data = self.output_queue.get(block=False)
+      self.logger.log(self.logger.LL_INFO, "[analysis] shutdown: output_queue data dropped")

@@ -4,6 +4,7 @@ import pluto_esm_status_reporter
 from pluto_esm_hw_pkg import *
 import iio
 import time
+import multiprocessing
 from multiprocessing import Process, Queue
 
 class hw_command:
@@ -77,7 +78,7 @@ class pluto_esm_hw_command_processor_thread:
 
     self.dma_writer = pluto_esm_hw_dma_writer(self.logger, self.chan_dma_h2d)
 
-    self.logger.log(self.logger.LL_INFO, "init: queues={}/{} context={} dma_h2d={} phy={} rx_lo={}".format(self.request_queue, self.result_queue, self.context, self.chan_dma_h2d, self.chan_ad9361_phy, self.chan_ad9361_rx_lo))
+    self.logger.log(self.logger.LL_INFO, "init: queues={}/{} context={} dma_h2d={} phy={} rx_lo={}, current_process={}".format(self.request_queue, self.result_queue, self.context, self.chan_dma_h2d, self.chan_ad9361_phy, self.chan_ad9361_rx_lo, multiprocessing.current_process()))
 
   def run(self):
     running = True
@@ -146,9 +147,9 @@ class pluto_esm_hw_command_processor:
     self.ack_not_expected = []
     self.pluto_uri = pluto_uri
     self.logger = logger
-
     self.request_queue = Queue()
     self.result_queue = Queue()
+    self.running = True
 
     self.hwc_process = Process(target=pluto_esm_hw_command_processor_thread_func, args=({"pluto_uri": pluto_uri, "request_queue": self.request_queue, "result_queue": self.result_queue, "log_dir": logger.path}, ))
     self.hwc_process.start()
@@ -164,10 +165,14 @@ class pluto_esm_hw_command_processor:
         self.received_data[data["unique_key"]] = data
 
   def send_command(self, cmd, expect_ack):
-    self.logger.log(self.logger.LL_DEBUG, "[hwcp] send_command: {} expect_ack={}".format(cmd, expect_ack))
-    if not expect_ack:
-      self.ack_not_expected.append(cmd["unique_key"])
-    self.request_queue.put(cmd, block=False)
+    if self.running:
+      self.logger.log(self.logger.LL_DEBUG, "[hwcp] send_command: {} expect_ack={}".format(cmd, expect_ack))
+      if not expect_ack:
+        self.ack_not_expected.append(cmd["unique_key"])
+      self.request_queue.put(cmd, block=False)
+    else:
+      self.logger.log(self.logger.LL_INFO, "[hwcp] send_command: shutting down, command dropped: {}".format(cmd))
+
     return cmd["unique_key"]
 
   def try_get_result(self, unique_key):
@@ -190,12 +195,19 @@ class pluto_esm_hw_command_processor:
     self.logger.log(self.logger.LL_INFO, "[hwcp] shutdown")
     if self.hwc_process.is_alive():
       self.send_command(hw_command.gen_stop(), False)
+      self.running = False
       self.hwc_process.join(1.0)
       self.logger.log(self.logger.LL_INFO, "[hwcp] hwc_process.exitcode={} is_alive={}".format(self.hwc_process.exitcode, self.hwc_process.is_alive()))
     else:
       self.logger.log(self.logger.LL_INFO, "[hwcp] hwc_process already dead, exitcode={}".format(self.hwc_process.exitcode))
     self.logger.flush()
 
+    while not self.request_queue.empty():
+      data = self.request_queue.get(block=False)
+      self.logger.log(self.logger.LL_INFO, "[hwcp] shutdown: request_queue data dropped")
+    while not self.result_queue.empty():
+      data = self.result_queue.get(block=False)
+      self.logger.log(self.logger.LL_INFO, "[hwcp] shutdown: result_queue data dropped")
 
 class pluto_esm_hw_config:
   def __init__(self, logger, hwcp):
