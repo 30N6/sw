@@ -54,6 +54,7 @@ def pluto_esm_analysis_thread_func(arg):
   except KeyboardInterrupt:
     thread.shutdown("interrupted")
 
+
 class pluto_esm_analysis_runner:
   def __init__(self, logger, sw_config):
     self.logger       = logger

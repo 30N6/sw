@@ -179,12 +179,12 @@ class render_spectrum:
       self.surface.blit(text_data, text_rect)
 
     peaks       = [self._get_spectrum_peaks(self.spectrogram.last_buffer_avg,  3, [spec_zoom_i_start, spec_zoom_i_stop], spec_mhz_per_px, True),
-                   self._get_spectrum_peaks(self.spectrogram.last_buffer_peak, 3, [spec_zoom_i_start, spec_zoom_i_stop], spec_mhz_per_px, False)]
-    status_str  = ["[AVERAGE] peak_val_dB={:<28} peak_freq={:<24}",
-                   "[PEAK]    peak_val   ={:<28} peak_freq={:<24}"]
+                   self._get_spectrum_peaks(self.spectrogram.last_buffer_peak, 3, [spec_zoom_i_start, spec_zoom_i_stop], spec_mhz_per_px, True)]
+    status_str  = ["[AVERAGE] peak_val_dB={:<18} peak_freq={:<24}",
+                   "[PEAK]    peak_val_dB={:<18} peak_freq={:<24}"]
 
     for i in range(len(peaks)):
-      peak_values = "[" + " ".join(["{:8.1f}".format(v) for v in peaks[i][1]]) + "]"
+      peak_values = "[" + " ".join(["{:4.1f}".format(v) for v in peaks[i][1]]) + "]"
       peak_freqs = "[" + " ".join(["{:6.1f}".format(v) for v in peaks[i][0]]) + "]"
 
       s = status_str[i].format(peak_values, peak_freqs)
