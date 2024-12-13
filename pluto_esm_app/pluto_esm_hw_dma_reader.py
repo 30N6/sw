@@ -181,7 +181,7 @@ class pluto_esm_hw_dma_reader_runner_thread:
       return
 
     self.logger.log(self.logger.LL_INFO, "starting dma reader, command={}".format(command_list))
-    self.dma_reader_process = subprocess.Popen(command_list, text=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE, creationflags=subprocess.CREATE_NEW_PROCESS_GROUP)
+    self.dma_reader_process = subprocess.Popen(command_list, text=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
     self.dma_reader_process.stdin.write("n\n")
     self.dma_reader_process.stdin.flush()
     self.logger.log(self.logger.LL_INFO, "starting dma reader, p={}".format(self.dma_reader_process))
