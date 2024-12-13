@@ -152,7 +152,7 @@ class pluto_esm_hw_dma_reader_runner_thread:
     if self.os_type == "Windows":
       command_list = ["pscp", "-scp", "-pw", self.credentials["password"], self.reader_path, "{}@{}:~/".format(self.credentials["username"], self.remote_ip)]
     elif self.os_type == "Linux":
-      command_list = ["sshpass", "-p", self.credentials["password"], "scp", "-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null",
+      command_list = ["sshpass", "-p", self.credentials["password"], "scp", "-O", "-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null",
         self.reader_path, "{}@{}:~/".format(self.credentials["username"], self.remote_ip)]
     else:
       raise RuntimeError("unsupported OS: {}".format(os_type))
