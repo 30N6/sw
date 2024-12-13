@@ -138,7 +138,8 @@ class pluto_esm_hw_dma_reader_runner_thread:
     if self.os_type == "Windows":
       command_list = ["plink", "-pw", self.credentials["password"], "{}@{}".format(self.credentials["username"], self.remote_ip), "killall {}".format(self.reader_file)]
     elif self.os_type == "Linux":
-      command_list = ["sshpass", "-p", self.credentials["password"], "ssh", "-o", "StrictHostKeyChecking=no", "{}@{}".format(self.credentials["username"], self.remote_ip), "killall {}".format(self.reader_file)]
+      command_list = ["sshpass", "-p", self.credentials["password"], "ssh", "-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null",
+        "{}@{}".format(self.credentials["username"], self.remote_ip), "killall {}".format(self.reader_file)]
     else:
       raise RuntimeError("unsupported OS: {}".format(os_type))
 
@@ -151,7 +152,8 @@ class pluto_esm_hw_dma_reader_runner_thread:
     if self.os_type == "Windows":
       command_list = ["pscp", "-scp", "-pw", self.credentials["password"], self.reader_path, "{}@{}:~/".format(self.credentials["username"], self.remote_ip)]
     elif self.os_type == "Linux":
-      command_list = ["sshpass", "-p", self.credentials["password"], "scp", "-o", "StrictHostKeyChecking=no", self.reader_path, "{}@{}:~/".format(self.credentials["username"], self.remote_ip)]
+      command_list = ["sshpass", "-p", self.credentials["password"], "scp", "-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null",
+        self.reader_path, "{}@{}:~/".format(self.credentials["username"], self.remote_ip)]
     else:
       raise RuntimeError("unsupported OS: {}".format(os_type))
 
@@ -170,7 +172,8 @@ class pluto_esm_hw_dma_reader_runner_thread:
       command_list = ["plink", "-pw", self.credentials["password"], "{}@{}".format(self.credentials["username"], self.remote_ip),
         "chmod +x ./{0}; ./{0} -p local: -c {1}".format(self.reader_file, self.local_ip)]
     elif self.os_type == "Linux":
-      command_list = ["sshpass", "-p", self.credentials["password"], "ssh", "-o", "StrictHostKeyChecking=no", "{}@{}".format(self.credentials["username"], self.remote_ip),
+      command_list = ["sshpass", "-p", self.credentials["password"], "ssh", "-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null",
+        "{}@{}".format(self.credentials["username"], self.remote_ip),
         "chmod +x ./{0}; ./{0} -p local: -c {1}".format(self.reader_file, self.local_ip)]
     else:
       self.logger.log(self.logger.LL_ERROR, "unsupported OS: {}".format(os_type))
