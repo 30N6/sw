@@ -15,6 +15,7 @@ class pluto_esm_sw_config:
     self.fast_lock_recal_pause = self.config["fast_lock_config"]["recalibration_pause"]
     self.pluto_dma_reader_path = self.config["pluto_dma_reader_path"]
     self.pluto_credentials = self.config["pluto_credentials"]
+    self.graphics = self.config["graphics"]
 
     self.sim_enabled = self.config["sim_mode"]["enable"]
     if self.sim_enabled:

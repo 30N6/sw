@@ -27,14 +27,20 @@ class pluto_esm_main_thread:
     if not os.path.exists(self.log_dir):
       os.makedirs(self.log_dir)
 
+    self.sw_config = pluto_esm_sw_config.pluto_esm_sw_config(self.config_file)
+
+    flags = pygame.SCALED
+    if self.sw_config.graphics["fullscreen"]:
+      flags |= pygame.FULLSCREEN
+    if self.sw_config.graphics["noframe"]:
+      flags |= pygame.NOFRAME
+
     pygame.init()
-    self.surface = pygame.display.set_mode(self.SCREEN_SIZE)
+    self.surface = pygame.display.set_mode(self.SCREEN_SIZE, flags, vsync=1)
     pygame.display.set_caption("pluto_esm")
     self.clock = pygame.time.Clock()
 
-    self.sw_config    = pluto_esm_sw_config.pluto_esm_sw_config(self.config_file)
     self.logger       = pluto_esm_logger.pluto_esm_logger(self.log_dir, "pluto_esm_main_thread", pluto_esm_logger.pluto_esm_logger.LL_INFO)
-
     self.recorder     = pluto_esm_data_recorder.pluto_esm_data_recorder(self.log_dir, "recorded_data", self.sw_config.enable_recording)
     if self.sw_config.sim_enabled:
       self.sim_loader = pluto_esm_data_loader.pluto_esm_data_loader(self.logger, self.sw_config.sim_filename)
@@ -60,6 +66,9 @@ class pluto_esm_main_thread:
         if i.type == pygame.QUIT:
           running = False
         elif i.type == pygame.KEYDOWN:
+          if i.key == pygame.K_ESCAPE:
+            running = False
+
           for handler in key_handlers:
             handler.process_keydown(i.key)
 

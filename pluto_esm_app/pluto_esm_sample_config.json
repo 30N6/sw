@@ -46,5 +46,6 @@
         ]
     },
     "pluto_dma_reader_path": "../pluto_dma_reader/pluto_dma_reader",
-    "pluto_credentials": {"username": "root", "password": "analog"}
+    "pluto_credentials": {"username": "root", "password": "analog"},
+    "graphics": {"fullscreen": 1, "noframe": 1}
 }
