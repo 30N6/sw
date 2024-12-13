@@ -1,5 +1,6 @@
 import pluto_esm_data_recorder
 import pluto_esm_pdw_processor
+import pluto_esm_dwell_processor
 import pluto_esm_pulsed_emitter_tracker
 import pluto_esm_pdw_modulation_analysis
 from pluto_esm_hw_pkg import *
@@ -13,6 +14,7 @@ class pluto_esm_analysis_processor:
     self.config   = config
 
     self.pdw_processor        = pluto_esm_pdw_processor.pluto_esm_pdw_processor(logger)
+    self.dwell_processor      = pluto_esm_dwell_processor.pluto_esm_dwell_processor(logger)
     self.pulsed_tracker       = pluto_esm_pulsed_emitter_tracker.pluto_esm_pulsed_emitter_tracker(logger, self.pdw_processor, config)
     self.modulation_analyzer  = pluto_esm_pdw_modulation_analysis.pluto_esm_pdw_modulation_analysis(config["analysis_config"]["modulation_analysis"])
 
@@ -47,7 +49,6 @@ class pluto_esm_analysis_processor:
 
       self.recorder.log(pdw)
 
-    #self.pdw_processor.submit_pdws_for_dwell(combined_data["pdw_pulse_reports"])
     self.recorder.flush()
 
   def _populate_dwell_channels(self, combined_data):
@@ -75,6 +76,7 @@ class pluto_esm_analysis_processor:
       self._merge_pdws(combined_data)
       self._populate_dwell_channels(combined_data)
       self.pdw_processor.submit_dwell_data(combined_data)
+      self.dwell_processor.submit_dwell_data(combined_data["dwell_report"])
 
   def _match_dwell_reports(self):
     if (len(self.pending_dwell_reports) == 0) or (len(self.pending_pdw_summary_reports) == 0):
@@ -121,6 +123,7 @@ class pluto_esm_analysis_processor:
       raise RuntimeError("invalid report")
 
   def update(self):
+    self.dwell_processor.update()
     self.pdw_processor.update()
     self.pulsed_tracker.update()
     self._match_dwell_reports()
