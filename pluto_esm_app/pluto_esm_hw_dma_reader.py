@@ -1,9 +1,12 @@
 import pluto_esm_logger
 from pluto_esm_hw_pkg import *
+import os
 import iio
 import socket
 import struct
 import time
+import platform
+import subprocess
 import multiprocessing
 from multiprocessing import Process, Queue
 
@@ -19,11 +22,10 @@ class pluto_esm_hw_dma_reader_thread:
   PACKED_UDP_HEADER = struct.Struct("<" + PACKED_UINT32)
 
   def __init__(self, arg):
-    self.logger = pluto_esm_logger.pluto_esm_logger(arg["log_dir"], "pluto_esm_hw_dma_reader_thread", arg["log_level"])
+    self.logger         = pluto_esm_logger.pluto_esm_logger(arg["log_dir"], "pluto_esm_hw_dma_reader_thread", arg["log_level"])
     self.request_queue  = arg["request_queue"]
     self.result_queue   = arg["result_queue"]
-
-    self.use_udp_dma_rx = True
+    self.use_udp_dma_rx = arg["use_udp_dma_rx"]
 
     if self.use_udp_dma_rx:
       self.next_udp_seq_num = 0
@@ -87,7 +89,7 @@ class pluto_esm_hw_dma_reader_thread:
       if not self.request_queue.empty():
         cmd = self.request_queue.get()
         if cmd == "CMD_STOP":
-          self.logger.log(self.logger.LL_DEBUG, "CMD_STOP")
+          self.logger.log(self.logger.LL_INFO, "CMD_STOP")
           running = False
         else:
           raise RuntimeError("invalid command")
@@ -108,28 +110,150 @@ def pluto_esm_hw_dma_reader_thread_func(arg):
     thread.shutdown("interrupted")
 
 
+class pluto_esm_hw_dma_reader_runner_thread:
+  def __init__(self, arg):
+    self.logger         = pluto_esm_logger.pluto_esm_logger(arg["log_dir"], "pluto_esm_hw_dma_reader_runner_thread", arg["log_level"])
+    self.request_queue  = arg["request_queue"]
+    self.use_udp_dma_rx = arg["use_udp_dma_rx"]
+    self.reader_path    = arg["pluto_dma_reader_path"]
+    self.reader_file    = os.path.split(self.reader_path)[-1]
+    self.credentials    = arg["pluto_credentials"]
+    self.os_type        = platform.system()
+
+    self.dma_reader_process = None
+
+    if self.use_udp_dma_rx:
+      assert ("ip:" in arg["pluto_uri"])
+      self.local_ip   = arg["local_ip"]
+      self.remote_ip  = arg["pluto_uri"].split(":")[1]
+      self.logger.log(self.logger.LL_INFO, "init: [UDP mode] local_ip={} remote_ip={} queue={} current_process={}".format(self.local_ip, self.remote_ip, self.request_queue, multiprocessing.current_process()))
+
+      self._kill_dma_reader()
+      self._transfer_dma_reader()
+
+    else:
+      self.logger.log(self.logger.LL_INFO, "init: [IIO mode] nothing to do...")
+
+  def _kill_dma_reader(self):
+    if self.os_type == "Windows":
+      command_list = ["plink", "-pw", self.credentials["password"], "{}@{}".format(self.credentials["username"], self.remote_ip), "killall {}".format(self.reader_file)]
+    elif self.os_type == "Linux":
+      command_list = ["sshpass", "-p", self.credentials["password"], "ssh", "{}@{}".format(self.credentials["username"], self.remote_ip), "killall {}".format(self.reader_file)]
+    else:
+      raise RuntimeError("unsupported OS: {}".format(os_type))
+
+    self.logger.log(self.logger.LL_INFO, "killing old dma reader instances, command={}".format(command_list))
+    r = subprocess.run(command_list, input="n", text=True)
+    self.logger.log(self.logger.LL_INFO, "killing old dma reader instances, returncode={}".format(r.returncode))
+    self.logger.flush()
+
+  def _transfer_dma_reader(self):
+    if self.os_type == "Windows":
+      command_list = ["pscp", "-scp", "-pw", self.credentials["password"], self.reader_path, "{}@{}:~/".format(self.credentials["username"], self.remote_ip)]
+    elif self.os_type == "Linux":
+      command_list = ["sshpass", "-p", self.credentials["password"], "scp", self.reader_path, "{}@{}:~/".format(self.credentials["username"], self.remote_ip)]
+    else:
+      raise RuntimeError("unsupported OS: {}".format(os_type))
+
+    self.logger.log(self.logger.LL_INFO, "transferring dma reader, command={}".format(command_list))
+    r = subprocess.run(command_list, input="n", text=True)
+    self.logger.log(self.logger.LL_INFO, "transferring dma reader, returncode={}".format(r.returncode))
+    assert (r.returncode == 0)
+    self.logger.flush()
+
+  def run(self):
+    if not self.use_udp_dma_rx:
+      self.shutdown("use_udp_dma_rx=False")
+      return
+
+    if self.os_type == "Windows":
+      command_list = ["plink", "-pw", self.credentials["password"], "{}@{}".format(self.credentials["username"], self.remote_ip),
+        "chmod +x ./{0}; ./{0} -p local: -c {1}".format(self.reader_file, self.local_ip)]
+    elif self.os_type == "Linux":
+      command_list = ["sshpass", "-p", self.credentials["password"], "ssh", "{}@{}".format(self.credentials["username"], self.remote_ip),
+        "chmod +x ./{0}; ./{0} -p local: -c {1}".format(self.reader_file, self.local_ip)]
+    else:
+      self.logger.log(self.logger.LL_ERROR, "unsupported OS: {}".format(os_type))
+      self.shutdown("error")
+      return
+
+    self.logger.log(self.logger.LL_INFO, "starting dma reader, command={}".format(command_list))
+    self.dma_reader_process = subprocess.Popen(command_list, text=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE, creationflags=subprocess.CREATE_NEW_PROCESS_GROUP)
+    self.dma_reader_process.stdin.write("n\n")
+    self.dma_reader_process.stdin.flush()
+    self.logger.log(self.logger.LL_INFO, "starting dma reader, p={}".format(self.dma_reader_process))
+    self.logger.flush()
+
+    running = True
+    while running:
+      assert (self.dma_reader_process.poll() is None)
+      if not self.request_queue.empty():
+        cmd = self.request_queue.get()
+        if cmd == "CMD_STOP":
+          self.logger.log(self.logger.LL_INFO, "CMD_STOP")
+          running = False
+        else:
+          raise RuntimeError("invalid command")
+          running = False
+      else:
+        time.sleep(0)
+
+    self.shutdown("graceful exit")
+
+  def shutdown(self, reason):
+    if self.dma_reader_process is not None:
+      self.dma_reader_process.terminate()
+      outs, errs = self.dma_reader_process.communicate()
+      self.logger.log(self.logger.LL_INFO, "dma reader terminated, p={}".format(self.dma_reader_process))
+
+    self.logger.shutdown(reason)
+
+
+def pluto_esm_hw_dma_reader_runner_thread_func(arg):
+  thread = pluto_esm_hw_dma_reader_runner_thread(arg)
+
+  try:
+    thread.run()
+  except KeyboardInterrupt:
+    thread.shutdown("interrupted")
+  except Exception as e:
+    thread.shutdown("exception: {}".format(e))
+
+
 class pluto_esm_hw_dma_reader:
-  def __init__(self, logger, pluto_uri, local_ip):
+  def __init__(self, logger, pluto_uri, local_ip, pluto_dma_reader_path, pluto_credentials):
     self.received_data = []
     self.pluto_uri = pluto_uri
     self.logger = logger
-    self.request_queue = Queue()
-    self.result_queue = Queue()
+    self.hwdr_request_queue = Queue()
+    self.hwdr_result_queue = Queue()
+    self.runner_request_queue = Queue()
     self.running = True
 
     self.output_data_dwell = []
     self.output_data_pdw = []
     self.output_data_status = []
 
+    self.use_udp_dma_rx = True
+
+    self.runner_process = Process(target=pluto_esm_hw_dma_reader_runner_thread_func,
+                               args=({"pluto_uri": pluto_uri, "local_ip": local_ip,
+                                      "request_queue": self.runner_request_queue,
+                                      "log_dir": logger.path, "log_level": logger.min_level,
+                                      "use_udp_dma_rx": self.use_udp_dma_rx,
+                                      "pluto_dma_reader_path": pluto_dma_reader_path, "pluto_credentials": pluto_credentials}, ))
+    self.runner_process.start()
+
     self.hwdr_process = Process(target=pluto_esm_hw_dma_reader_thread_func,
                                args=({"pluto_uri": pluto_uri, "local_ip": local_ip,
-                                      "request_queue": self.request_queue, "result_queue": self.result_queue,
-                                      "log_dir": logger.path, "log_level": logger.min_level}, ))
+                                      "request_queue": self.hwdr_request_queue, "result_queue": self.hwdr_result_queue,
+                                      "log_dir": logger.path, "log_level": logger.min_level,
+                                      "use_udp_dma_rx": self.use_udp_dma_rx}, ))
     self.hwdr_process.start()
 
   def _update_receive_queue(self):
-    while not self.result_queue.empty():
-      data = self.result_queue.get(block=False)
+    while not self.hwdr_result_queue.empty():
+      data = self.hwdr_result_queue.get(block=False)
       self.received_data.append(data["data"])
       self.logger.log(self.logger.LL_DEBUG, "[hwdr] _update_receive_queue: received data: len={} uk={}".format(len(data), data["unique_key"]))
 
@@ -176,17 +300,29 @@ class pluto_esm_hw_dma_reader:
   def shutdown(self):
     self.running = False
     self.logger.log(self.logger.LL_INFO, "[hwdr] shutdown")
+
     if self.hwdr_process.is_alive():
-      self.request_queue.put("CMD_STOP", block=False)
+      self.hwdr_request_queue.put("CMD_STOP", block=False)
       self.hwdr_process.join(1.0)
       self.logger.log(self.logger.LL_INFO, "[hwdr] shutdown: hwdr_process.exitcode={} is_alive={}".format(self.hwdr_process.exitcode, self.hwdr_process.is_alive()))
     else:
       self.logger.log(self.logger.LL_INFO, "[hwdr] shutdown: hwdr_process already dead, exitcode={}".format(self.hwdr_process.exitcode))
+
+    if self.runner_process.is_alive():
+      self.runner_request_queue.put("CMD_STOP", block=False)
+      self.runner_process.join(1.0)
+      self.logger.log(self.logger.LL_INFO, "[hwdr] shutdown: runner_process.exitcode={} is_alive={}".format(self.runner_process.exitcode, self.runner_process.is_alive()))
+    else:
+      self.logger.log(self.logger.LL_INFO, "[hwdr] shutdown: runner_process already dead, exitcode={}".format(self.runner_process.exitcode))
+
     self.logger.flush()
 
-    while not self.request_queue.empty():
-      data = self.request_queue.get(block=False)
-      self.logger.log(self.logger.LL_INFO, "[hwdr] shutdown: request_queue data dropped")
-    while not self.result_queue.empty():
-      data = self.result_queue.get(block=False)
-      self.logger.log(self.logger.LL_INFO, "[hwdr] shutdown: result_queue data dropped")
+    while not self.runner_request_queue.empty():
+      data = self.runner_request_queue.get(block=False)
+      self.logger.log(self.logger.LL_INFO, "[hwdr] shutdown: runner_request_queue data dropped")
+    while not self.hwdr_request_queue.empty():
+      data = self.hwdr_request_queue.get(block=False)
+      self.logger.log(self.logger.LL_INFO, "[hwdr] shutdown: hwdr_request_queue data dropped")
+    while not self.hwdr_result_queue.empty():
+      data = self.hwdr_result_queue.get(block=False)
+      self.logger.log(self.logger.LL_INFO, "[hwdr] shutdown: hwdr_result_queue data dropped")

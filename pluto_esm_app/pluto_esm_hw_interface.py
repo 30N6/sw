@@ -250,11 +250,11 @@ class pluto_esm_hw_config:
 
 
 class pluto_esm_hw_interface:
-  def __init__(self, logger, pluto_uri, local_ip):
+  def __init__(self, logger, pluto_uri, local_ip, pluto_dma_reader_path, pluto_credentials):
     #todo: iio info
     self.logger           = logger
     self.hwcp             = pluto_esm_hw_command_processor(self.logger, pluto_uri)
-    self.hwdr             = pluto_esm_hw_dma_reader.pluto_esm_hw_dma_reader(self.logger, pluto_uri, local_ip)
+    self.hwdr             = pluto_esm_hw_dma_reader.pluto_esm_hw_dma_reader(self.logger, pluto_uri, local_ip, pluto_dma_reader_path, pluto_credentials)
     self.hw_cfg           = pluto_esm_hw_config(self.logger, self.hwcp)
     self.status_reporter  = pluto_esm_status_reporter.pluto_esm_status_reporter(self.logger, self.hwdr.output_data_status)
 

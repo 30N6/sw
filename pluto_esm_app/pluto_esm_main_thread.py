@@ -14,27 +14,34 @@ import render_emitters
 class pluto_esm_main_thread:
   SCREEN_SIZE = (1280, 800)
   FPS = 60
-  LOG_DIR = "./log"
 
   def __init__(self):
-    if not os.path.exists(self.LOG_DIR):
-      os.makedirs(self.LOG_DIR)
+    if len(sys.argv) < 5:
+      raise RuntimeError("insufficient number of arguments, expected format: pluto_esm_app.py [config_file] [log_dir] [local_ip] [pluto_uri]")
+
+    self.config_file  = sys.argv[1]
+    self.log_dir      = sys.argv[2]
+    self.local_ip     = sys.argv[3]
+    self.pluto_uri    = sys.argv[4]
+
+    if not os.path.exists(self.log_dir):
+      os.makedirs(self.log_dir)
 
     pygame.init()
     self.surface = pygame.display.set_mode(self.SCREEN_SIZE)
     pygame.display.set_caption("pluto_esm")
     self.clock = pygame.time.Clock()
 
-    self.sw_config    = pluto_esm_sw_config.pluto_esm_sw_config("./pluto_esm_sample_config.json")
-    self.logger       = pluto_esm_logger.pluto_esm_logger(self.LOG_DIR, "pluto_esm_main_thread", pluto_esm_logger.pluto_esm_logger.LL_INFO)
+    self.sw_config    = pluto_esm_sw_config.pluto_esm_sw_config(self.config_file)
+    self.logger       = pluto_esm_logger.pluto_esm_logger(self.log_dir, "pluto_esm_main_thread", pluto_esm_logger.pluto_esm_logger.LL_INFO)
 
-    self.recorder     = pluto_esm_data_recorder.pluto_esm_data_recorder(self.LOG_DIR, "recorded_data", self.sw_config.enable_recording)
+    self.recorder     = pluto_esm_data_recorder.pluto_esm_data_recorder(self.log_dir, "recorded_data", self.sw_config.enable_recording)
     if self.sw_config.sim_enabled:
       self.sim_loader = pluto_esm_data_loader.pluto_esm_data_loader(self.logger, self.sw_config.sim_filename)
     else:
       self.sim_loader = None
 
-    self.hw_interface     = pluto_esm_hw_interface.pluto_esm_hw_interface(self.logger, "ip:192.168.3.100", "192.168.3.10")
+    self.hw_interface     = pluto_esm_hw_interface.pluto_esm_hw_interface(self.logger, self.pluto_uri, self.local_ip, self.sw_config.pluto_dma_reader_path, self.sw_config.pluto_credentials)
     self.analysis_thread  = pluto_esm_analysis_thread.pluto_esm_analysis_runner(self.logger, self.sw_config)
     self.sequencer        = pluto_esm_sequencer.pluto_esm_sequencer(self.logger, self.recorder, self.sw_config,
                                                                     self.hw_interface, self.analysis_thread, self.sim_loader)

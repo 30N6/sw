@@ -1,5 +1,5 @@
 {
-    "sim_mode": {"enable": 1, "filename": "./log/recorded_data-20241125-174304.log"},
+    "sim_mode": {"enable": 0, "filename": "./log/recorded_data-20241125-174304.log"},
     "enable_recording": 0,
     "analysis_config": {
       "enable_pdw_recording": 0,
@@ -44,5 +44,7 @@
             {"name": "TV-UHF1",   "freq_range": [470.00, 608.00],   "priority": 0 },
             {"name": "TV-UHF2",   "freq_range": [614.00, 698.00],   "priority": 0 }
         ]
-    }
+    },
+    "pluto_dma_reader_path": "../pluto_dma_reader/pluto_dma_reader",
+    "pluto_credentials": {"username": "root", "password": "analog"}
 }
