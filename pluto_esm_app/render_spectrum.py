@@ -215,16 +215,16 @@ class render_spectrum:
     zoom_width  = (self.freq_zoom_range[1] - self.freq_zoom_range[0])
     zoom_center = zoom_width / 2 + self.freq_zoom_range[0]
 
-    if key == pygame.K_c:
+    if key == pygame.K_TAB:
       zoom_width = self.max_freq
       zoom_center = self.max_freq / 2
-    elif key == pygame.K_z:
+    elif key == pygame.K_DOWN:
       zoom_width = 0.75*zoom_width
-    elif key == pygame.K_x:
+    elif key == pygame.K_UP:
       zoom_width = 1.5*zoom_width
-    elif key == pygame.K_a:
+    elif key == pygame.K_LEFT:
       zoom_center = max(0 + zoom_width * 0.5, zoom_center - zoom_width * 0.3)
-    elif key == pygame.K_s:
+    elif key == pygame.K_RIGHT:
       zoom_center = min(self.max_freq - zoom_width * 0.5, zoom_center + zoom_width * 0.3)
     else:
       return
@@ -258,5 +258,5 @@ class render_spectrum:
       #print(s.getvalue())
 
   def process_keydown(self, key):
-    if key in (pygame.K_z, pygame.K_x, pygame.K_a, pygame.K_s, pygame.K_c):
+    if key in (pygame.K_TAB, pygame.K_UP, pygame.K_DOWN, pygame.K_LEFT, pygame.K_RIGHT):
       self._update_zoom(key)

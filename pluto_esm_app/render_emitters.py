@@ -32,6 +32,8 @@ class render_emitters:
     self.emitter_text_height      = 16
     self.emitter_stale_threshold  = 10
 
+    self.max_rendered_emitters = 12
+
     self.emitters = []
     self.selected_emitter = 0
 
@@ -41,7 +43,7 @@ class render_emitters:
     emitter_entries = []
     index = 1
     for entry in self.emitters:
-      if index > 12:
+      if index > self.max_rendered_emitters:
         break
 
       power_mean_dB     = 10*np.log10(entry["analysis_data"]["power_mean"])
@@ -139,6 +141,8 @@ class render_emitters:
       self.surface.blit(text_data, text_rect)
 
   def _clamp_selected_emitter(self):
+    if self.selected_emitter >= self.max_rendered_emitters:
+      self.selected_emitter = self.max_rendered_emitters - 1
     if self.selected_emitter >= len(self.emitters):
       self.selected_emitter = len(self.emitters) - 1
     if self.selected_emitter < 0:
@@ -175,13 +179,15 @@ class render_emitters:
     for emitter in self.emitters:
       emitter["histogram_pri"] = self.pri_plot.get_pri_plot(emitter["analysis_data"]["sorted_pulse_pri"], self.colors["emitter_histogram"])
 
+    self._clamp_selected_emitter()
+
   def process_keydown(self, key):
-    if key not in (pygame.K_f, pygame.K_v):
+    if key not in (pygame.K_PAGEUP, pygame.K_PAGEDOWN):
       return
 
-    if key == pygame.K_f:
+    if key == pygame.K_PAGEUP:
       self.selected_emitter -= 1
-    elif key == pygame.K_v:
+    elif key == pygame.K_PAGEDOWN:
       self.selected_emitter += 1
 
     self._clamp_selected_emitter()
