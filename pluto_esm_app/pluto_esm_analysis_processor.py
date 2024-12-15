@@ -18,7 +18,8 @@ class pluto_esm_analysis_processor:
     self.pulsed_tracker       = pluto_esm_pulsed_emitter_tracker.pluto_esm_pulsed_emitter_tracker(logger, self.pdw_processor, config)
     self.modulation_analyzer  = pluto_esm_pdw_modulation_analysis.pluto_esm_pdw_modulation_analysis(config["analysis_config"]["modulation_analysis"])
 
-    self.confirmed_emitters_to_render = []
+    self.confirmed_pulsed_signals_to_render = []
+    self.confirmed_cw_signals_to_render     = []
 
     self.pending_dwell_reports        = []
     self.pending_pdw_summary_reports  = []
@@ -52,17 +53,22 @@ class pluto_esm_analysis_processor:
     self.recorder.flush()
 
   def _populate_dwell_channels(self, combined_data):
-    dwell_freq = combined_data["dwell_report"]["dwell_data"].frequency
-    dwell_num_samples = combined_data["dwell_report"]["dwell_report"]["num_samples"]
-    channel_mask = combined_data["dwell_report"]["dwell_data"].hw_dwell_entry.channel_mask_narrow
+    dwell_freq          = combined_data["dwell_report"]["dwell_data"].frequency
+    dwell_num_samples   = combined_data["dwell_report"]["dwell_report"]["num_samples"]
+    dwell_channel_data  = combined_data["dwell_report"]["dwell_report"]["channel_data"]
+    channel_mask        = combined_data["dwell_report"]["dwell_data"].hw_dwell_entry.channel_mask_narrow
 
-    num_samples_by_channel = {}
+    num_samples_by_channel_pdw = {}
+    channel_data = {}
+
     for i in range(ESM_NUM_CHANNELS_NARROW):
-      if (channel_mask & (1 << i)) == 0:
-        continue
       channel_freq = dwell_freq + (i - self.center_channel_index) * self.channel_spacing
-      num_samples_by_channel[channel_freq] = dwell_num_samples
-    combined_data["dwell_num_samples_for_pdw"] = num_samples_by_channel
+      if (channel_mask & (1 << i)):
+        num_samples_by_channel_pdw[channel_freq] = dwell_num_samples
+      channel_data[channel_freq] = {"accum": dwell_channel_data[i]["accum"], "max": dwell_channel_data[i]["max"]}
+
+    combined_data["dwell_num_samples_pdw"]  = num_samples_by_channel_pdw
+    combined_data["dwell_channel_data"]     = channel_data
 
   def _process_matched_reports(self):
     while len(self.pending_combined_data) > 0:
@@ -76,7 +82,7 @@ class pluto_esm_analysis_processor:
       self._merge_pdws(combined_data)
       self._populate_dwell_channels(combined_data)
       self.pdw_processor.submit_dwell_data(combined_data)
-      self.dwell_processor.submit_dwell_data(combined_data["dwell_report"])
+      self.dwell_processor.submit_dwell_data(combined_data)
 
   def _match_dwell_reports(self):
     if (len(self.pending_dwell_reports) == 0) or (len(self.pending_pdw_summary_reports) == 0):
@@ -110,7 +116,15 @@ class pluto_esm_analysis_processor:
       return
     self.last_emitter_update_time = now
 
-    self.confirmed_emitters_to_render = self.pulsed_tracker.confirmed_emitters.copy()
+    self.confirmed_pulsed_signals_to_render = self.pulsed_tracker.confirmed_emitters.copy()
+
+    self.confirmed_cw_signals_to_render = []
+    for freq in self.dwell_processor.detection_data:
+      old_entry = self.dwell_processor.detection_data[freq]
+      new_entry = {"freq": freq}
+      for key in old_entry:
+        new_entry[key] = old_entry[key]
+      self.confirmed_cw_signals_to_render.append(new_entry)
 
   def submit_report(self, report):
     if "pdw_pulse_report" in report:

@@ -29,21 +29,23 @@ class render_emitters:
     self.rect_frame_pulsed_plot_frame = [648, 200, 368, 96]
     self.rect_frame_pulsed_plot_image = [649, 201, 366, 94]
 
-    self.emitter_text_height      = 16
-    self.emitter_stale_threshold  = 10
+    self.emitter_text_height          = 16
+    self.emitter_stale_threshold      = 10
+    self.max_rendered_emitters_pulsed = 12
+    self.max_rendered_emitters_cw     = 24
 
-    self.max_rendered_emitters = 12
-
-    self.emitters = []
-    self.selected_emitter = 0
+    self.emitters_pulsed          = []
+    self.emitters_cw              = []
+    self.selected_emitter_pulsed  = 0
+    self.selected_emitter_cw      = 0
 
     self.pri_plot = pluto_esm_pulsed_emitter_plotter.pluto_esm_pulsed_emitter_plotter(self.rect_frame_pulsed_plot_image[2:4])
 
   def _render_pulsed_emitter_list(self):
     emitter_entries = []
     index = 1
-    for entry in self.emitters:
-      if index > self.max_rendered_emitters:
+    for entry in self.emitters_pulsed:
+      if index > self.max_rendered_emitters_pulsed:
         break
 
       power_mean_dB     = 10*np.log10(entry["analysis_data"]["power_mean"])
@@ -62,7 +64,7 @@ class render_emitters:
       else:
         emitter_color = self.colors["emitter_entry_stale"]
 
-      s = "{:2} {:<8} {:5.1f}  {:3.1f} {:3.1f}  {:3.0f} {:>2.0f} {:>4} {:>3}".format(index, entry["analysis_data"]["name"], entry["analysis_data"]["freq"],
+      s = "{:2} {:<8} {:6.1f} {:3.1f} {:3.1f}  {:3.0f} {:>2.0f} {:>4} {:>3}".format(index, entry["analysis_data"]["name"], entry["analysis_data"]["freq"],
         power_mean_dB, power_max_dB, emitter_age, update_age, pulses_in_window, mod_str)
       pos_offset = [8, 16 + self.emitter_text_height * (index - 1)]
 
@@ -76,9 +78,9 @@ class render_emitters:
       text_rect.bottom = self.rect_frame_pulsed[1] + entry["pos_offset"][1]
       self.surface.blit(text_data, text_rect)
 
-    if len(self.emitters) > 0:
+    if len(self.emitters_pulsed) > 0:
       sel_x = self.rect_frame_pulsed[0] + 2
-      sel_y = self.rect_frame_pulsed[1] + 8 + self.emitter_text_height * self.selected_emitter
+      sel_y = self.rect_frame_pulsed[1] + 8 + self.emitter_text_height * self.selected_emitter_pulsed
       sel_wh = 8
 
       sel_points = [(sel_x,             sel_y - sel_wh/2),
@@ -90,10 +92,10 @@ class render_emitters:
     pygame.draw.rect(self.surface, self.colors["border"], self.rect_frame_pulsed_details, 1)
     pygame.draw.rect(self.surface, self.colors["frame_elements"], self.rect_frame_pulsed_plot_frame, 1)
 
-    if len(self.emitters) < (self.selected_emitter + 1):
+    if len(self.emitters_pulsed) < (self.selected_emitter_pulsed + 1):
       return
 
-    emitter = self.emitters[self.selected_emitter]
+    emitter = self.emitters_pulsed[self.selected_emitter_pulsed]
     hist_image, max_pri = emitter["histogram_pri"]
 
     surf = pygame.surfarray.make_surface(hist_image)
@@ -140,13 +142,63 @@ class render_emitters:
       text_rect.bottom = entry["y_pos"]
       self.surface.blit(text_data, text_rect)
 
-  def _clamp_selected_emitter(self):
-    if self.selected_emitter >= self.max_rendered_emitters:
-      self.selected_emitter = self.max_rendered_emitters - 1
-    if self.selected_emitter >= len(self.emitters):
-      self.selected_emitter = len(self.emitters) - 1
-    if self.selected_emitter < 0:
-      self.selected_emitter = 0
+  def _render_cw_emitter_list(self):
+    emitter_entries = []
+    index = 1
+    for entry in self.emitters_cw:
+      if index > self.max_rendered_emitters_cw:
+        break
+
+      threshold_dB  = 10*np.log10(entry["analysis_data"]["power_threshold"])
+      power_mean_dB = 10*np.log10(entry["analysis_data"]["power_mean"])
+      power_max_dB  = 10*np.log10(entry["analysis_data"]["power_max"])
+      emitter_age   = min(999, round(entry["emitter_age"]))
+      update_age    = min(99, round(entry["update_age"]))
+      num_dwells    = min(99, entry["analysis_data"]["num_dwells"])
+
+      if entry["update_age"] < self.emitter_stale_threshold:
+        emitter_color = self.colors["emitter_entry_active"]
+      else:
+        emitter_color = self.colors["emitter_entry_stale"]
+
+      s = "{:2} {:6.1f}  {:5.1f}  {:5.1f}  {:3.1f}  {:3.0f} {:>2.0f} {:>3}".format(index, entry["analysis_data"]["freq"],
+        threshold_dB, power_mean_dB, power_max_dB, emitter_age, update_age, num_dwells)
+      pos_offset = [8, 16 + self.emitter_text_height * (index - 1)]
+
+      emitter_entries.append({"str": s, "pos_offset": pos_offset, "color": emitter_color})
+      index += 1
+
+    for entry in emitter_entries:
+      text_data = self.font_main.render(entry["str"], True, entry["color"])
+      text_rect = text_data.get_rect()
+      text_rect.left = self.rect_frame_cw[0] + entry["pos_offset"][0]
+      text_rect.bottom = self.rect_frame_cw[1] + entry["pos_offset"][1]
+      self.surface.blit(text_data, text_rect)
+
+    #if len(self.emitters_cw) > 0:
+    #  sel_x = self.rect_frame_cw[0] + 2
+    #  sel_y = self.rect_frame_cw[1] + 8 + self.emitter_text_height * self.selected_emitter_cw
+    #  sel_wh = 8
+    #
+    #  sel_points = [(sel_x,             sel_y - sel_wh/2),
+    #                (sel_x + sel_wh/2,  sel_y),
+    #                (sel_x,             sel_y + sel_wh/2)]
+    #  pygame.draw.polygon(self.surface, self.colors["emitter_marker"], sel_points)
+
+  def _clamp_selected_emitters(self):
+    if self.selected_emitter_pulsed >= self.max_rendered_emitters_pulsed:
+      self.selected_emitter_pulsed = self.max_rendered_emitters_pulsed - 1
+    if self.selected_emitter_pulsed >= len(self.emitters_pulsed):
+      self.selected_emitter_pulsed = len(self.emitters_pulsed) - 1
+    if self.selected_emitter_pulsed < 0:
+      self.selected_emitter_pulsed = 0
+
+    #if self.selected_emitter_cw >= self.max_rendered_emitters_cw:
+    #  self.selected_emitter_cw = self.max_rendered_emitters_cw - 1
+    #if self.selected_emitter_cw >= len(self.emitters_cw):
+    #  self.selected_emitter_cw = len(self.emitters_cw) - 1
+    #if self.selected_emitter_cw < 0:
+    #  self.selected_emitter_cw = 0
 
   def render(self):
     pygame.draw.rect(self.surface, self.colors["border"], self.rect_frame_pulsed, 1)
@@ -155,6 +207,8 @@ class render_emitters:
     self._render_pulsed_emitter_list()
     self._render_pulsed_emitter_details()
 
+    self._render_cw_emitter_list()
+
   def update(self):
     if len(self.analysis_thread.output_data_to_render) == 0:
       return
@@ -162,32 +216,40 @@ class render_emitters:
     now = time.time()
 
     for entry in self.analysis_thread.output_data_to_render:
-      if "pulsed_emitters" not in entry:
-        continue
+      if "pulsed_emitters" in entry:
+        self.emitters_pulsed = []
+        for analysis_data in entry["pulsed_emitters"]:
+          emitter = {}
+          emitter["analysis_data"]  = analysis_data
+          emitter["emitter_age"]    = now - analysis_data["pdw_time_initial"]
+          emitter["update_age"]     = now - analysis_data["pdw_time_final"]
+          self.emitters_pulsed.append(emitter)
 
-      self.emitters = []
-      for analysis_data in entry["pulsed_emitters"]:
-        emitter = {}
-        emitter["analysis_data"]  = analysis_data
-        emitter["emitter_age"]    = now - analysis_data["pdw_time_initial"]
-        emitter["update_age"]     = now - analysis_data["pdw_time_final"]
-        self.emitters.append(emitter)
+      if "cw_emitters" in entry:
+        self.emitters_cw = []
+        for analysis_data in entry["cw_emitters"]:
+          emitter = {}
+          emitter["analysis_data"]  = analysis_data
+          emitter["emitter_age"]    = now - analysis_data["time_initial"]
+          emitter["update_age"]     = now - analysis_data["time_final"]
+          self.emitters_cw.append(emitter)
 
     self.analysis_thread.output_data_to_render = []
-    self.emitters.sort(key=lambda entry: entry["analysis_data"]["power_mean"], reverse=True)
+    self.emitters_pulsed.sort(key=lambda entry: entry["analysis_data"]["power_mean"], reverse=True)
+    self.emitters_cw.sort(key=lambda entry: entry["analysis_data"]["power_mean"], reverse=True)
 
-    for emitter in self.emitters:
+    for emitter in self.emitters_pulsed:
       emitter["histogram_pri"] = self.pri_plot.get_pri_plot(emitter["analysis_data"]["sorted_pulse_pri"], self.colors["emitter_histogram"])
 
-    self._clamp_selected_emitter()
+    self._clamp_selected_emitters()
 
   def process_keydown(self, key):
     if key not in (pygame.K_PAGEUP, pygame.K_PAGEDOWN):
       return
 
     if key == pygame.K_PAGEUP:
-      self.selected_emitter -= 1
+      self.selected_emitter_pulsed -= 1
     elif key == pygame.K_PAGEDOWN:
-      self.selected_emitter += 1
+      self.selected_emitter_pulsed += 1
 
-    self._clamp_selected_emitter()
+    self._clamp_selected_emitters()

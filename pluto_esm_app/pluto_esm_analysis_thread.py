@@ -16,9 +16,13 @@ class pluto_esm_analysis_thread:
     self.logger.log(self.logger.LL_INFO, "init: queues={}/{}, current_process={}".format(self.input_queue, self.output_queue, multiprocessing.current_process()))
 
   def _send_tracked_emitters(self):
-    if len(self.processor.confirmed_emitters_to_render) > 0:
-      self.output_queue.put({"pulsed_emitters": self.processor.confirmed_emitters_to_render})
-      self.processor.confirmed_emitters_to_render = []
+    if len(self.processor.confirmed_pulsed_signals_to_render) > 0:
+      self.output_queue.put({"pulsed_emitters": self.processor.confirmed_pulsed_signals_to_render})
+      self.processor.confirmed_pulsed_signals_to_render = []
+
+    if len(self.processor.confirmed_cw_signals_to_render) > 0:
+      self.output_queue.put({"cw_emitters": self.processor.confirmed_cw_signals_to_render})
+      self.processor.confirmed_cw_signals_to_render = []
 
   def run(self):
     running = True

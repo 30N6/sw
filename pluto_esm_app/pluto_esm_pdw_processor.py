@@ -25,7 +25,7 @@ class pluto_esm_pdw_processor:
     now = time.time()
 
     pdws              = combined_dwell_data["pdw_pulse_reports"]
-    dwell_num_samples = combined_dwell_data["dwell_num_samples_for_pdw"]
+    dwell_num_samples = combined_dwell_data["dwell_num_samples_pdw"]
 
     dwell_freqs = np.unique([p["channel_frequency"] for p in pdws])
     for channel_freq in dwell_freqs:
