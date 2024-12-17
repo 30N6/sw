@@ -11,6 +11,8 @@ class render_emitters:
     self.sw_config        = sw_config
     self.analysis_thread  = analysis_thread
 
+    self.channel_spacing  = (ADC_CLOCK_FREQUENCY / ESM_NUM_CHANNELS_NARROW) / 1e6
+
     self.colors = {}
     self.colors["border"]               = (0, 0, 255)
     self.colors["frame_elements"]       = (0, 128, 128)
@@ -161,8 +163,10 @@ class render_emitters:
       else:
         emitter_color = self.colors["emitter_entry_stale"]
 
-      s = "{:2} {:6.1f}  {:5.1f}  {:5.1f}  {:3.1f}  {:3.0f} {:>2.0f} {:>3}".format(index, entry["analysis_data"]["freq"],
-        threshold_dB, power_mean_dB, power_max_dB, emitter_age, update_age, num_dwells)
+      name = self._get_cw_signal_name(entry["analysis_data"]["freq"])
+
+      s = "{:2} {:6.1f} {:5.1f} {:5.1f} {:3.1f} {:3.0f} {:>2.0f} {:>2} {:<8}".format(index, entry["analysis_data"]["freq"],
+        threshold_dB, power_mean_dB, power_max_dB, emitter_age, update_age, num_dwells, name)
       pos_offset = [8, 16 + self.emitter_text_height * (index - 1)]
 
       emitter_entries.append({"str": s, "pos_offset": pos_offset, "color": emitter_color})
@@ -184,6 +188,24 @@ class render_emitters:
     #                (sel_x + sel_wh/2,  sel_y),
     #                (sel_x,             sel_y + sel_wh/2)]
     #  pygame.draw.polygon(self.surface, self.colors["emitter_marker"], sel_points)
+
+  def _get_cw_signal_name(self, freq):
+    current_entry = None
+    for entry in self.sw_config.config["emitter_config"]["cw_emitters"]:
+      if (freq < (entry["freq_range"][0] - self.channel_spacing)) or (freq > (entry["freq_range"][1] + self.channel_spacing)):
+        continue
+
+      if current_entry is None:
+        current_entry = entry
+        continue
+
+      if (entry["priority"] > current_entry["priority"]) or ((entry["freq_range"][1] - entry["freq_range"][0]) < (current_entry["freq_range"][1] - current_entry["freq_range"][0])):
+        current_entry = entry
+
+    if current_entry is None:
+      return ""
+    else:
+      return current_entry["name"]
 
   def _clamp_selected_emitters(self):
     if self.selected_emitter_pulsed >= self.max_rendered_emitters_pulsed:
