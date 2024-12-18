@@ -264,6 +264,9 @@ class pluto_esm_hw_interface:
 
     self.initial_ad9361_setup()
     self.hw_cfg.send_reset()
+    self.hw_cfg.send_enables(0, 0, 1)
+
+  def enable_hw(self):
     self.hw_cfg.send_enables(3, 3, 1)
 
   def initial_ad9361_setup(self):

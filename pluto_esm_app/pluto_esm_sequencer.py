@@ -60,7 +60,9 @@ class pluto_esm_sequencer:
     self.pdw_reporter                   = pluto_esm_hw_pdw_reporter.pluto_esm_hw_pdw_reporter(logger)
     self.hw_stats                       = pluto_esm_hw_stats.pluto_esm_hw_stats(logger)
 
-    self.state                          = "IDLE"
+    self.state                          = "FLUSH"
+    self.flush_start_time               = time.time()
+    self.flush_delay                    = 1.5
 
     self.fast_lock_recal_interval       = sw_config.fast_lock_recal_interval
     self.fast_lock_recal_pause          = sw_config.fast_lock_recal_pause
@@ -181,7 +183,15 @@ class pluto_esm_sequencer:
     self.hw_stats.submit_report(report)
 
   def _update_data_from_hw(self):
-    if self.state == "IDLE":
+    if self.state == "FLUSH":
+      while len(self.hw_interface.hwdr.output_data_dwell) > 0:
+        self.logger.log(self.logger.LL_INFO, "[sequencer] _update_data_from_hw: [FLUSH] dropped dwell data".format(freq))
+        self.hw_interface.hwdr.output_data_dwell.pop(0)
+      while len(self.hw_interface.hwdr.output_data_pdw) > 0:
+        self.logger.log(self.logger.LL_INFO, "[sequencer] _update_data_from_hw: [FLUSH] dropped PDW data".format(freq))
+        self.hw_interface.hwdr.output_data_pdw.pop(0)
+      return
+    elif self.state == "IDLE":
       return
 
     if self.sim_enabled:
@@ -189,10 +199,6 @@ class pluto_esm_sequencer:
     else:
       self._process_dwell_reports_from_hw()
       self._process_pdw_reports_from_hw()
-
-    #self.output_data_pdw.append(full_data)
-    #self.output_data_dwell.append(full_data)
-    pass
 
   #TODO: cal stuff into separate class
   def _get_oldest_cal_freq(self):
@@ -206,7 +212,7 @@ class pluto_esm_sequencer:
     return oldest_freq
 
   def _update_fast_lock_cal(self):
-    if self.state in ("IDLE", "SIM"):
+    if self.state in ("FLUSH", "IDLE", "SIM"):
       return
 
     now = time.time()
@@ -455,7 +461,12 @@ class pluto_esm_sequencer:
     cycles_per_update = 5
 
     for i in range(cycles_per_update):
-      if self.state == "IDLE":
+      if self.state == "FLUSH":
+        if (time.time() - self.flush_start_time) > self.flush_delay:
+          self.state = "IDLE"
+          self.hw_interface.enable_hw()
+
+      elif self.state == "IDLE":
         if self.sim_enabled:
           self.state = "SIM"
         else:

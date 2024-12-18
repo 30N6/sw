@@ -12,7 +12,6 @@
     "scan_config": {
       "randomize_scan_order": 0,
       "include_freqs": [
-          {"freq_range": [120, 3850], "dwell_time": 0.010, "comment": "full span"},
           {"freq_range": [1250, 1255], "dwell_time": 0.100, "comment": "ARSR-4"},
           {"freq_range": [1334, 1338], "dwell_time": 0.100, "comment": "ARSR-4"}
       ],
