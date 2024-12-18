@@ -144,5 +144,12 @@ class pluto_esm_dwell_processor:
         entry["power_mean_threshold"] = det_data["power_threshold"]
 
   def update(self):
-    pass
+    now = time.time()
+
+    valid_signals = []
+    for entry in self.combined_data:
+      if (now - entry["time_final"]) < self.max_signal_age:
+        valid_signals.append(entry)
+    self.combined_data = valid_signals
+
     #self._scrub_history()

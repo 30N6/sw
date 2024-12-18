@@ -152,6 +152,7 @@ class render_emitters:
         break
 
       freq          = entry["analysis_data"]["power_mean_freq"]
+      bandwidth     = max(entry["analysis_data"]["freq_set"]) - min(entry["analysis_data"]["freq_set"])
       threshold_dB  = 10*np.log10(entry["analysis_data"]["power_mean_threshold"])
       power_mean_dB = 10*np.log10(entry["analysis_data"]["power_mean_value"])
       power_max_dB  = 10*np.log10(entry["analysis_data"]["power_max"])
@@ -166,7 +167,7 @@ class render_emitters:
 
       name = self._get_cw_signal_name(freq)
 
-      s = "{:2} {:6.1f} {:5.1f} {:5.1f} {:3.1f} {:3.0f} {:>2.0f} {:>2} {:<8}".format(index, freq,
+      s = "{:2} {:6.1f} {:4.1f}  {:3.0f} {:3.0f} {:3.0f} {:3.0f} {:>2.0f} {:>2} {:<8}".format(index, freq, bandwidth,
         threshold_dB, power_mean_dB, power_max_dB, emitter_age, update_age, num_dwells, name)
       pos_offset = [8, 16 + self.emitter_text_height * (index - 1)]
 
