@@ -10,6 +10,7 @@ class pluto_esm_dwell_processor:
     self.channel_data_summary = {}
     self.threshold_data       = {}
     self.detection_data       = {}
+    self.combined_data        = []
 
     self.max_dwell_age        = 300 #TODO: config?
     self.max_signal_age       = 30
@@ -42,6 +43,8 @@ class pluto_esm_dwell_processor:
       self._update_threshold(freq)
       self._update_detection(freq, new_entry)
 
+    self._merge_signals(list(combined_dwell_data["dwell_channel_data"].keys()))
+
       #self.logger.log(self.logger.LL_INFO, "[dwell_processor] freq={} summary: mean={} accum={} -- threshold={}/{}".format(freq, new_entry["accum_normalized"], self.channel_data_summary[freq]["accum_mean"],
       #  self.threshold_data[freq]["threshold_0_data"], self.threshold_data[freq]["threshold_1_data"]))
 
@@ -72,7 +75,7 @@ class pluto_esm_dwell_processor:
 
     if detection_level > 0:
       if freq not in self.detection_data:
-        self.detection_data[freq] = {"power": 0, "num_dwells": 0, "detection_level": 0, "time_initial": now, "time_final": 0}
+        self.detection_data[freq] = {"num_dwells": 0, "detection_level": 0, "time_initial": now, "time_final": 0}
         self.logger.log(self.logger.LL_INFO, "[dwell_processor] new signal: freq={:.2f} detection_level={} power={:.3f} -- thresholds={:.3f}/{:.3f}".format(freq, detection_level, dwell_entry["accum_normalized"],
           self.threshold_data[freq]["threshold_0_data"], self.threshold_data[freq]["threshold_1_data"]))
 
@@ -88,8 +91,58 @@ class pluto_esm_dwell_processor:
         self.detection_data.pop(freq, None)
         self.logger.log(self.logger.LL_INFO, "[dwell_processor] stale signal removed: freq={}".format(freq))
 
-  def _scrub_history(self):
-    now = time.time()
+  def _merge_signals(self, freqs):
+    detection_valid = [f in self.detection_data for f in freqs]
+
+    combined_freqs = []
+    current_freqs = []
+    active = False
+    for i in range(len(freqs)):
+      if detection_valid[i]:
+        active = True
+        current_freqs.append(freqs[i])
+      elif active:
+        active = False
+        combined_freqs.append(current_freqs)
+        current_freqs = []
+
+    if active:
+      combined_freqs.append(current_freqs)
+
+    for freq_list in combined_freqs:
+      found = False
+      for entry in self.combined_data:
+        if not entry["freq_set"].isdisjoint(freq_list):
+          found = True
+          break
+
+      if found:
+        entry["freq_set"].update(freq_list)
+      else:
+        entry = {"freq_set": set(freq_list), "detection_data": {}, "power_mean_value": 0, "power_mean_freq": 0, "power_mean_threshold": 0, "power_max": 0, "num_dwells": 0, "time_initial": np.inf, "time_final": 0}
+        self.combined_data.append(entry)
+
+      for freq in freq_list:
+        entry["detection_data"][freq] = self.detection_data[freq]
+      self._update_combined_data(entry)
+
+  def _update_combined_data(self, entry):
+    for freq in entry["freq_set"]:
+      if freq not in self.detection_data:
+        continue
+
+      det_data = self.detection_data[freq]
+
+      entry["time_initial"] = min(entry["time_initial"],  det_data["time_initial"])
+      entry["time_final"]   = max(entry["time_final"],    det_data["time_final"])
+      entry["num_dwells"]   = max(entry["num_dwells"],    det_data["num_dwells"])
+      entry["power_max"]    = max(entry["power_max"],     det_data["power_max"])
+
+      if det_data["power_mean"] > entry["power_mean_value"]:
+        entry["power_mean_freq"]      = freq
+        entry["power_mean_value"]     = det_data["power_mean"]
+        entry["power_mean_threshold"] = det_data["power_threshold"]
 
   def update(self):
-    self._scrub_history()
+    pass
+    #self._scrub_history()

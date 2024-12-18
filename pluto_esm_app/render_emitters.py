@@ -151,8 +151,9 @@ class render_emitters:
       if index > self.max_rendered_emitters_cw:
         break
 
-      threshold_dB  = 10*np.log10(entry["analysis_data"]["power_threshold"])
-      power_mean_dB = 10*np.log10(entry["analysis_data"]["power_mean"])
+      freq          = entry["analysis_data"]["power_mean_freq"]
+      threshold_dB  = 10*np.log10(entry["analysis_data"]["power_mean_threshold"])
+      power_mean_dB = 10*np.log10(entry["analysis_data"]["power_mean_value"])
       power_max_dB  = 10*np.log10(entry["analysis_data"]["power_max"])
       emitter_age   = min(999, round(entry["emitter_age"]))
       update_age    = min(99, round(entry["update_age"]))
@@ -163,9 +164,9 @@ class render_emitters:
       else:
         emitter_color = self.colors["emitter_entry_stale"]
 
-      name = self._get_cw_signal_name(entry["analysis_data"]["freq"])
+      name = self._get_cw_signal_name(freq)
 
-      s = "{:2} {:6.1f} {:5.1f} {:5.1f} {:3.1f} {:3.0f} {:>2.0f} {:>2} {:<8}".format(index, entry["analysis_data"]["freq"],
+      s = "{:2} {:6.1f} {:5.1f} {:5.1f} {:3.1f} {:3.0f} {:>2.0f} {:>2} {:<8}".format(index, freq,
         threshold_dB, power_mean_dB, power_max_dB, emitter_age, update_age, num_dwells, name)
       pos_offset = [8, 16 + self.emitter_text_height * (index - 1)]
 
@@ -258,7 +259,7 @@ class render_emitters:
 
     self.analysis_thread.output_data_to_render = []
     self.emitters_pulsed.sort(key=lambda entry: entry["analysis_data"]["power_mean"], reverse=True)
-    self.emitters_cw.sort(key=lambda entry: entry["analysis_data"]["power_mean"], reverse=True)
+    self.emitters_cw.sort(key=lambda entry: entry["analysis_data"]["power_mean_value"], reverse=True)
 
     for emitter in self.emitters_pulsed:
       emitter["histogram_pri"] = self.pri_plot.get_pri_plot(emitter["analysis_data"]["sorted_pulse_pri"], self.colors["emitter_histogram"])

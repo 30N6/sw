@@ -117,14 +117,7 @@ class pluto_esm_analysis_processor:
     self.last_emitter_update_time = now
 
     self.confirmed_pulsed_signals_to_render = self.pulsed_tracker.confirmed_emitters.copy()
-
-    self.confirmed_cw_signals_to_render = []
-    for freq in self.dwell_processor.detection_data:
-      old_entry = self.dwell_processor.detection_data[freq]
-      new_entry = {"freq": freq}
-      for key in old_entry:
-        new_entry[key] = old_entry[key]
-      self.confirmed_cw_signals_to_render.append(new_entry)
+    self.confirmed_cw_signals_to_render = self.dwell_processor.combined_data.copy()
 
   def submit_report(self, report):
     if "pdw_pulse_report" in report:
