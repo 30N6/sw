@@ -124,7 +124,11 @@ class pluto_esm_sequencer:
       if r is not None:
         expected_dwell_entry  = self.dwell_active[0]
         expected_dwell_data   = expected_dwell_entry["dwell"]
+
+        if (r["frequency"] != int(round(expected_dwell_data.frequency))):
+          self.logger.log(self.logger.LL_WARN, "[sequencer] _process_dwell_reports_from_hw: dwell frequency mismatch: received={} expected={}".format(r["frequency"], int(round(expected_dwell_data.frequency))))
         assert (r["frequency"] == int(round(expected_dwell_data.frequency)))
+
         self.logger.log(self.logger.LL_INFO, "[sequencer] _process_dwell_reports_from_hw: combined report received for frequency={} dwell_seq={}".format(expected_dwell_data.frequency, r["dwell_seq_num"]))
         report = {"dwell_data": expected_dwell_data, "dwell_report": r, "first_in_sequence": expected_dwell_entry["first"], "last_in_sequence": expected_dwell_entry["last"]}
         self.recorder.log({"dwell_report": report})
@@ -340,9 +344,7 @@ class pluto_esm_sequencer:
     assert (len(self.dwell_active) > 0)
     dwell_instructions  = []
     next_instruction_index = 0
-    #TODO: randomize dwell order
     for entry in self.dwell_active:
-      #TODO: don't skip PLL checks
       dwell = entry["dwell"]
       next_instruction_index += 1
       dwell_instructions.append(pluto_esm_hw_dwell.esm_dwell_instruction(1, 0, 0, 0, 0, 1, 0, dwell.hw_dwell_entry.entry_index, next_instruction_index))
@@ -404,18 +406,34 @@ class pluto_esm_sequencer:
       self._activate_next_dwells()
       self.dwell_state = "LOAD_PROFILES"
 
+      self.load_profiles_counter = 60
       #TODO: figure out if dwell entries need to be updated
       #TODO: send dwell program immediately, or wait for ack?
 
     if self.dwell_state == "LOAD_PROFILES":
+      self.load_profiles_counter -= 1
+      if self.load_profiles_counter > 0:
+        return
+
       assert (len(self.dwell_active) > 0)
       if len(self.fast_lock_load_pending) == 0:
+
+        self.send_program_counter = 0
+
         self.dwell_state = "SEND_PROGRAM"
         dwell_program = self._compute_next_dwell_program()
+
+        for i in range(len(dwell_program.instructions)):
+          self.logger.log(self.logger.LL_DEBUG, "[sequencer] _update_scan_dwells [LOAD_PROFILES]: new dwell program instructions[{}]={}".format(i, dwell_program.instructions[i].pack()))
+
         self._send_hw_dwell_program(dwell_program)
         self.logger.log(self.logger.LL_INFO, "[sequencer] _update_scan_dwells [LOAD_PROFILES]: profiles loaded, sending dwell program")
 
     if self.dwell_state == "SEND_PROGRAM":
+      self.send_program_counter -= 1
+      if self.send_program_counter > 0:
+        return
+
       if len(self.hw_dwell_program_pending) == 0:
         self.logger.log(self.logger.LL_INFO, "[sequencer] _update_scan_dwells [SEND_PROGRAM]: dwell program sent, going active")
         self.dwell_state = "HW_ACTIVE"

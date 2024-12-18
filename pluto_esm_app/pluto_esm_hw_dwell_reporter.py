@@ -48,12 +48,17 @@ class pluto_esm_hw_dwell_reporter:
     report["ts_dwell_start"]          = (unpacked_header[16] << 32) | unpacked_header[17]
     report["ts_dwell_end"]            = (unpacked_header[18] << 32) | unpacked_header[19]
 
+    self.logger.log(self.logger.LL_DEBUG, "[hw_dwell_reporter] process_message: report={}".format(report))
+
     report_starting_channel = unpacked_header[8]
 
     if self.partial_dwell_report is None:
       assert (len(self.partial_dwell_channels) == 0)
       self.partial_dwell_report = report
     else:
+      if (self.partial_dwell_report != report):
+        self.logger.log(self.logger.LL_WARN, "[hw_dwell_reporter] mismatch: partial_dwell_report={}".format(self.partial_dwell_report))
+        self.logger.log(self.logger.LL_WARN, "[hw_dwell_reporter] mismatch:               report={}".format(report))
       assert (self.partial_dwell_report == report)
 
     computed_duration = report["ts_dwell_end"] - report["ts_dwell_start"]

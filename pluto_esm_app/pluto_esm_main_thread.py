@@ -40,7 +40,7 @@ class pluto_esm_main_thread:
     pygame.display.set_caption("pluto_esm")
     self.clock = pygame.time.Clock()
 
-    self.logger       = pluto_esm_logger.pluto_esm_logger(self.log_dir, "pluto_esm_main_thread", pluto_esm_logger.pluto_esm_logger.LL_INFO)
+    self.logger       = pluto_esm_logger.pluto_esm_logger(self.log_dir, "pluto_esm_main_thread", pluto_esm_logger.pluto_esm_logger.LL_DEBUG)
     self.recorder     = pluto_esm_data_recorder.pluto_esm_data_recorder(self.log_dir, "recorded_data", self.sw_config.enable_recording)
     if self.sw_config.sim_enabled:
       self.sim_loader = pluto_esm_data_loader.pluto_esm_data_loader(self.logger, self.sw_config.sim_filename)
