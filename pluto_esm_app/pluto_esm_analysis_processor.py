@@ -6,6 +6,7 @@ import pluto_esm_pdw_modulation_analysis
 from pluto_esm_hw_pkg import *
 import time
 import numpy as np
+import copy
 
 class pluto_esm_analysis_processor:
   def __init__(self, logger, log_dir, config):
@@ -116,8 +117,8 @@ class pluto_esm_analysis_processor:
       return
     self.last_emitter_update_time = now
 
-    self.confirmed_pulsed_signals_to_render = self.pulsed_tracker.confirmed_emitters.copy()
-    self.confirmed_cw_signals_to_render = self.dwell_processor.combined_data.copy()
+    self.confirmed_pulsed_signals_to_render = copy.deepcopy(self.pulsed_tracker.confirmed_emitters)
+    self.confirmed_cw_signals_to_render = copy.deepcopy(self.dwell_processor.combined_data)
 
   def submit_report(self, report):
     if "pdw_pulse_report" in report:

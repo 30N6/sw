@@ -1,6 +1,7 @@
 import sys, os
 import pluto_esm_main_thread
 import multiprocessing
+import traceback
 
 main_thread = []
 
@@ -17,6 +18,7 @@ if __name__ == "__main__":
     main_thread.shutdown()
   except Exception as e:
     print("Exception: {}".format(e))
+    print(traceback.format_exc())
 
   processes = multiprocessing.active_children()
   for child in processes:

@@ -148,6 +148,20 @@ class pluto_esm_dwell_processor:
 
     valid_signals = []
     for entry in self.combined_data:
+      freqs = list(entry["detection_data"].keys())
+      for freq in freqs:
+        if (now - entry["detection_data"][freq]["time_final"]) > self.max_signal_age:
+          entry["detection_data"].pop(freq)
+          entry["freq_set"].remove(freq)
+
+      if len(entry["freq_set"]) > 0:
+        self._update_combined_data(entry)
+        valid_signals.append(entry)
+
+    self.combined_data = valid_signals
+
+    valid_signals = []
+    for entry in self.combined_data:
       if (now - entry["time_final"]) < self.max_signal_age:
         valid_signals.append(entry)
     self.combined_data = valid_signals
