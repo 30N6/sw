@@ -8,13 +8,15 @@ import multiprocessing
 from multiprocessing import Process, Queue
 
 class hw_command:
-  CMD_WRITE_ATTR_PHY    = 0
-  CMD_WRITE_ATTR_RX_LO  = 1
-  CMD_WRITE_ATTR_DBG    = 2
-  CMD_READ_ATTR_PHY     = 3
-  CMD_READ_ATTR_RX_LO   = 4
-  CMD_WRITE_DMA_H2D     = 5
-  CMD_STOP              = 6
+  CMD_WRITE_ATTR_PHY      = 0
+  CMD_WRITE_ATTR_RX_LO    = 1
+  CMD_WRITE_ATTR_DBG      = 2
+  CMD_READ_ATTR_PHY       = 3
+  CMD_READ_ATTR_RX_LO     = 4
+  CMD_WRITE_DMA_H2D       = 5
+  CMD_READ_ATTR_9361_TEMP = 6
+  CMD_READ_ATTR_FPGA_TEMP = 7
+  CMD_STOP                = 99
 
   @staticmethod
   def gen_write_attr_phy(unique_key, attr, data):
@@ -40,6 +42,14 @@ class hw_command:
   @staticmethod
   def gen_write_dma(unique_key, data):
     return {"unique_key": unique_key, "command_type": hw_command.CMD_WRITE_DMA_H2D, "attr": None, "data": data}
+
+  @staticmethod
+  def gen_read_attr_9361_temp(unique_key, attr):
+    return {"unique_key": unique_key, "command_type": hw_command.CMD_READ_ATTR_9361_TEMP, "attr": attr, "data": None}
+
+  @staticmethod
+  def gen_read_attr_fpga_temp(unique_key, attr):
+    return {"unique_key": unique_key, "command_type": hw_command.CMD_READ_ATTR_FPGA_TEMP, "attr": attr, "data": None}
 
   @staticmethod
   def gen_stop():
@@ -69,9 +79,12 @@ class pluto_esm_hw_command_processor_thread:
     self.context            = iio.Context(arg["pluto_uri"])
     self.dev_h2d            = self.context.find_device("axi-iio-dma-h2d")
     self.dev_ad9361         = self.context.find_device("ad9361-phy")
+    self.dev_xadc           = self.context.find_device("xadc")
     self.chan_dma_h2d       = self.dev_h2d.find_channel("voltage0", True)
     self.chan_ad9361_phy    = self.dev_ad9361.find_channel("voltage0", False)
     self.chan_ad9361_rx_lo  = self.dev_ad9361.find_channel("altvoltage0", True)
+    self.chan_ad9361_temp   = self.dev_ad9361.find_channel("temp0", False)
+    self.chan_xadc_temp     = self.dev_xadc.find_channel("temp0", False)
 
     self.chan_dma_h2d.enabled = True
     self.context.set_timeout(1000)
@@ -116,6 +129,16 @@ class pluto_esm_hw_command_processor_thread:
         self.dma_writer.write(cmd["data"])
         self.result_queue.put({"unique_key": cmd["unique_key"], "data": None}, block=False)
         self.logger.log(self.logger.LL_DEBUG, "write dma: uk={}".format(cmd["unique_key"]))
+
+      elif cmd["command_type"] == hw_command.CMD_READ_ATTR_9361_TEMP:
+        data = self.chan_ad9361_temp.attrs[cmd["attr"]].value
+        self.result_queue.put({"unique_key": cmd["unique_key"], "data": data}, block=False)
+        self.logger.log(self.logger.LL_DEBUG, "read chan_ad9361_temp[{}]={}: uk={}".format(cmd["attr"], data, cmd["unique_key"]))
+
+      elif cmd["command_type"] == hw_command.CMD_READ_ATTR_FPGA_TEMP:
+        data = self.chan_xadc_temp.attrs[cmd["attr"]].value
+        self.result_queue.put({"unique_key": cmd["unique_key"], "data": data}, block=False)
+        self.logger.log(self.logger.LL_DEBUG, "read chan_xadc_temp[{}]={}: uk={}".format(cmd["attr"], data, cmd["unique_key"]))
 
       elif cmd["command_type"] == hw_command.CMD_STOP:
         self.logger.log(self.logger.LL_DEBUG, "CMD_STOP")
@@ -266,16 +289,20 @@ class pluto_esm_hw_interface:
 
     self.logger.log(self.logger.LL_INFO, "[hwi] init done, hwcp={} hwdr={}".format(self.hwcp, self.hwdr))
 
-    self.fast_lock_cal_pending = []
+    self.fast_lock_cal_pending  = []
 
-    self.initial_ad9361_setup()
+    self.temp_update_interval   = 1.0
+    self.temp_last_update_time  = 0
+    self.temp_commands_pending  = {}
+    self.temp_command_results   = {}
+    self.temp_9361              = 0
+    self.temp_fpga              = 0
+
+    self._initial_ad9361_setup()
     self.hw_cfg.send_reset()
     self.hw_cfg.send_enables(0, 0, 1)
 
-  def enable_hw(self):
-    self.hw_cfg.send_enables(3, 3, 1)
-
-  def initial_ad9361_setup(self):
+  def _initial_ad9361_setup(self):
     attributes_phy      = [("bb_dc_offset_tracking_en",  "1"),
                            ("filter_fir_en",             "0"),
                            ("gain_control_mode",         "manual"),
@@ -294,6 +321,47 @@ class pluto_esm_hw_interface:
     for entry in attributes_dev_dbg:
       cmd = hw_command.gen_write_attr_dbg(self.hwcp.get_next_unique_key(), entry[0], entry[1])
       self.hwcp.send_command(cmd, False)
+
+  def _send_temp_read(self):
+    assert (not self.temp_commands_pending)
+    self.temp_commands_pending["9361_input"]   = hw_command.gen_read_attr_9361_temp(self.hwcp.get_next_unique_key(), "input")
+    self.temp_commands_pending["fpga_offset"]  = hw_command.gen_read_attr_fpga_temp(self.hwcp.get_next_unique_key(), "offset")
+    self.temp_commands_pending["fpga_raw"]     = hw_command.gen_read_attr_fpga_temp(self.hwcp.get_next_unique_key(), "raw")
+    self.temp_commands_pending["fpga_scale"]   = hw_command.gen_read_attr_fpga_temp(self.hwcp.get_next_unique_key(), "scale")
+
+    for entry in self.temp_commands_pending.values():
+      self.hwcp.send_command(entry, True)
+
+  def _check_temp_results(self):
+    pending_names = list(self.temp_commands_pending.keys())
+    for name in pending_names:
+      cmd_key = self.temp_commands_pending[name]["unique_key"]
+      cmd_result = self.hwcp.try_get_result(cmd_key)
+      if cmd_result is not None:
+        assert (cmd_result["unique_key"] == cmd_key)
+        self.temp_command_results[name] = cmd_result["data"]
+        self.temp_commands_pending.pop(name)
+
+  def _update_temp(self):
+    now = time.time()
+    if (now - self.temp_last_update_time) > self.temp_update_interval:
+      self.temp_last_update_time = now
+      self._send_temp_read()
+
+    if self.temp_commands_pending:
+      self._check_temp_results()
+
+      if "9361_input" in self.temp_command_results:
+        self.temp_9361 = float(self.temp_command_results.pop("9361_input")) / 1000
+        self.logger.log(self.logger.LL_INFO, "[hwi] temp_9361={:.2f}".format(self.temp_9361))
+
+      fpga_names = ["fpga_offset", "fpga_raw", "fpga_scale"]
+      if all([entry in self.temp_command_results for entry in fpga_names]):
+        self.temp_fpga = (float(self.temp_command_results.pop("fpga_raw")) + float(self.temp_command_results.pop("fpga_offset"))) * float(self.temp_command_results.pop("fpga_scale")) / 1000
+        self.logger.log(self.logger.LL_INFO, "[hwi] temp_fpga={:.2f}".format(self.temp_fpga))
+
+  def enable_hw(self):
+    self.hw_cfg.send_enables(3, 3, 1)
 
   #TODO: move this to the sequencer? at least move the cal pending stuff
   def send_fast_lock_cal_cmd(self, frequency):
@@ -333,6 +401,7 @@ class pluto_esm_hw_interface:
     return self.hwcp.send_command(cmd, True)
 
   def update(self):
+    self._update_temp()
     self.hwcp.update()
     self.hwdr.update()
     self.status_reporter.update()

@@ -154,7 +154,7 @@ class pluto_esm_hw_dma_reader_runner_thread:
       raise RuntimeError("unsupported OS: {}".format(os_type))
 
     self.logger.log(self.logger.LL_INFO, "killing old dma reader instances, command={}".format(command_list))
-    r = subprocess.run(command_list, input="n", text=True)
+    r = subprocess.run(command_list, input="n", text=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     self.logger.log(self.logger.LL_INFO, "killing old dma reader instances, returncode={}".format(r.returncode))
     self.logger.flush()
 
@@ -168,7 +168,7 @@ class pluto_esm_hw_dma_reader_runner_thread:
       raise RuntimeError("unsupported OS: {}".format(os_type))
 
     self.logger.log(self.logger.LL_INFO, "transferring dma reader, command={}".format(command_list))
-    r = subprocess.run(command_list, input="n", text=True)
+    r = subprocess.run(command_list, input="n", text=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     self.logger.log(self.logger.LL_INFO, "transferring dma reader, returncode={}".format(r.returncode))
     assert (r.returncode == 0)
     self.logger.flush()
@@ -191,7 +191,7 @@ class pluto_esm_hw_dma_reader_runner_thread:
       return
 
     self.logger.log(self.logger.LL_INFO, "starting dma reader, command={}".format(command_list))
-    self.dma_reader_process = subprocess.Popen(command_list, text=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+    self.dma_reader_process = subprocess.Popen(command_list, text=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
     self.dma_reader_process.stdin.write("n\n")
     self.dma_reader_process.stdin.flush()
     self.logger.log(self.logger.LL_INFO, "starting dma reader, p={}".format(self.dma_reader_process))

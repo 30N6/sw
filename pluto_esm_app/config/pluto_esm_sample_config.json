@@ -2,7 +2,7 @@
     "sim_mode": {"enable": 0, "filename": "./log/recorded_data-20241125-174304.log"},
     "enable_recording": 0,
     "analysis_config": {
-      "enable_pdw_recording": 1,
+      "enable_pdw_recording": 0,
       "modulation_threshold": 0.25,
       "pulsed_emitter_search": {"expected_pulse_count": 0.1, "PW_range_scaling": [0.25, 1.25], "PRI_range_scaling": [0.75, 1.25]},
       "modulation_analysis": {"FM_threshold_residual": 0.05, "FM_threshold_r_squared": 0.5, "FM_threshold_slope": 1000, "FM_min_samples": 8}

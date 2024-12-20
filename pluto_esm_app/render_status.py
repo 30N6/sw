@@ -63,6 +63,8 @@ class render_status:
                   {"format": "HW DMA writes     : {}",     "value": self.sequencer.hw_interface.hwcp.num_dma_writes,      "pos_offset": [8, 304]},
                   {"format": "HW DMA reads      : {}",     "value": self.sequencer.hw_interface.hwdr.num_dma_reads,       "pos_offset": [8, 320]},
                   {"format": "HW status reports : {}",     "value": self.sequencer.hw_interface.hwdr.num_status_reports,  "pos_offset": [8, 336]},
+                  {"format": "HW temp AD9361    : {:.1f}", "value": self.sequencer.hw_interface.temp_9361,                "pos_offset": [8, 352]},
+                  {"format": "HW temp FPGA      : {:.1f}", "value": self.sequencer.hw_interface.temp_fpga,                "pos_offset": [8, 368]},
                   ]
 
     for entry in stats_desc:
