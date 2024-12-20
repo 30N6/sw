@@ -3,9 +3,10 @@ import time
 import numpy as np
 
 class render_status:
-  def __init__(self, surface, sw_config, sequencer):
+  def __init__(self, surface, sw_config, sequencer, version):
     self.surface    = surface
     self.sequencer  = sequencer
+    self.version    = version
 
     self.colors = {}
     self.colors["border"] = (0, 0, 255)
@@ -29,29 +30,39 @@ class render_status:
     text_rect.bottom = 792
     self.surface.blit(text_data, text_rect)
 
+    text_data = self.font.render(self.version, True, (0, 192, 192))
+    text_rect = text_data.get_rect()
+    text_rect.left = 1150
+    text_rect.bottom = 792
+    self.surface.blit(text_data, text_rect)
+
   def _render_status_window(self):
     status_rect = [1024, 0, 256, 768]
     pygame.draw.rect(self.surface, self.colors["border"], status_rect, 1)
 
     hw_stats = self.sequencer.hw_stats.stats
 
-    stats_desc = [{"format": "Dwell/sec         : {:.1f}", "value": hw_stats["dwells_per_sec"],             "pos_offset": [8, 16] },
-                  {"format": "Scan time         : {:.1f}", "value": hw_stats["scan_time"],                  "pos_offset": [8, 32] },
-                  {"format": "PPS total         : {}",     "value": hw_stats["pps_total"],                  "pos_offset": [8, 48] },
-                  {"format": "PPS drops         : {}",     "value": hw_stats["pps_dropped"],                "pos_offset": [8, 64] },
-                  {"format": "Scan pulse total  : {}",     "value": hw_stats["scan_pulses_total"],          "pos_offset": [8, 80] },
-                  {"format": "Scan pulse drops  : {}",     "value": hw_stats["scan_pulses_dropped"],        "pos_offset": [8, 96] },
-                  {"format": "Tot pulses        : {}",     "value": hw_stats["pulses_total"],               "pos_offset": [8, 112]},
-                  {"format": "Tot pulses dropped: {}",     "value": hw_stats["pulses_dropped"],             "pos_offset": [8, 128]},
-                  {"format": "Tot pulses accpted: {}",     "value": hw_stats["pulses_accepted"],            "pos_offset": [8, 144]},
-                  {"format": "Scan ack dly rpt  : {:.3f}", "value": hw_stats["scan_ack_delay_report"],      "pos_offset": [8, 160]},
-                  {"format": "Scan ack dly sp   : {:.3f}", "value": hw_stats["scan_ack_delay_sample_proc"], "pos_offset": [8, 176]},
-                  {"format": "Dwell covrg fine  : {:.6f}", "value": hw_stats["dwell_coverage_fine"],        "pos_offset": [8, 192]},
-                  {"format": "PDW covrg fine    : {:.6f}", "value": hw_stats["pdw_coverage_fine"],          "pos_offset": [8, 208]},
-                  {"format": "Dwell covrg coarse: {:.2f}", "value": hw_stats["dwell_coverage_coarse"],      "pos_offset": [8, 224]},
-                  {"format": "PDW covrg coarse  : {:.2f}", "value": hw_stats["pdw_coverage_coarse"],        "pos_offset": [8, 240]},
-                  {"format": "PDW IQ rcrd covrg : {:.2f}", "value": hw_stats["pdw_recording_coverage"],     "pos_offset": [8, 256]},
-                  {"format": "PDW dwells missing: {}",     "value": hw_stats["pdw_dwells_missing"],         "pos_offset": [8, 272]},
+    stats_desc = [{"format": "Dwell/sec         : {:.1f}", "value": hw_stats["dwells_per_sec"],                           "pos_offset": [8, 16] },
+                  {"format": "Scan time         : {:.1f}", "value": hw_stats["scan_time"],                                "pos_offset": [8, 32] },
+                  {"format": "PPS total         : {}",     "value": hw_stats["pps_total"],                                "pos_offset": [8, 48] },
+                  {"format": "PPS drops         : {}",     "value": hw_stats["pps_dropped"],                              "pos_offset": [8, 64] },
+                  {"format": "Scan pulse total  : {}",     "value": hw_stats["scan_pulses_total"],                        "pos_offset": [8, 80] },
+                  {"format": "Scan pulse drops  : {}",     "value": hw_stats["scan_pulses_dropped"],                      "pos_offset": [8, 96] },
+                  {"format": "Tot pulses        : {}",     "value": hw_stats["pulses_total"],                             "pos_offset": [8, 112]},
+                  {"format": "Tot pulses dropped: {}",     "value": hw_stats["pulses_dropped"],                           "pos_offset": [8, 128]},
+                  {"format": "Tot pulses accpted: {}",     "value": hw_stats["pulses_accepted"],                          "pos_offset": [8, 144]},
+                  {"format": "Scan ack dly rpt  : {:.3f}", "value": hw_stats["scan_ack_delay_report"],                    "pos_offset": [8, 160]},
+                  {"format": "Scan ack dly sp   : {:.3f}", "value": hw_stats["scan_ack_delay_sample_proc"],               "pos_offset": [8, 176]},
+                  {"format": "Dwell covrg fine  : {:.6f}", "value": hw_stats["dwell_coverage_fine"],                      "pos_offset": [8, 192]},
+                  {"format": "PDW covrg fine    : {:.6f}", "value": hw_stats["pdw_coverage_fine"],                        "pos_offset": [8, 208]},
+                  {"format": "Dwell covrg coarse: {:.2f}", "value": hw_stats["dwell_coverage_coarse"],                    "pos_offset": [8, 224]},
+                  {"format": "PDW covrg coarse  : {:.2f}", "value": hw_stats["pdw_coverage_coarse"],                      "pos_offset": [8, 240]},
+                  {"format": "PDW IQ rcrd covrg : {:.2f}", "value": hw_stats["pdw_recording_coverage"],                   "pos_offset": [8, 256]},
+                  {"format": "PDW dwells missing: {}",     "value": hw_stats["pdw_dwells_missing"],                       "pos_offset": [8, 272]},
+                  {"format": "HW commands sent  : {}",     "value": self.sequencer.hw_interface.hwcp.num_commands,        "pos_offset": [8, 288]},
+                  {"format": "HW DMA writes     : {}",     "value": self.sequencer.hw_interface.hwcp.num_dma_writes,      "pos_offset": [8, 304]},
+                  {"format": "HW DMA reads      : {}",     "value": self.sequencer.hw_interface.hwdr.num_dma_reads,       "pos_offset": [8, 320]},
+                  {"format": "HW status reports : {}",     "value": self.sequencer.hw_interface.hwdr.num_status_reports,  "pos_offset": [8, 336]},
                   ]
 
     for entry in stats_desc:

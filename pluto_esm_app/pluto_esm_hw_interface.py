@@ -150,6 +150,8 @@ class pluto_esm_hw_command_processor:
     self.request_queue = Queue()
     self.result_queue = Queue()
     self.running = True
+    self.num_commands = 0
+    self.num_dma_writes = 0
 
     self.hwc_process = Process(target=pluto_esm_hw_command_processor_thread_func, args=({"pluto_uri": pluto_uri, "request_queue": self.request_queue, "result_queue": self.result_queue, "log_dir": logger.path}, ))
     self.hwc_process.start()
@@ -165,6 +167,10 @@ class pluto_esm_hw_command_processor:
         self.received_data[data["unique_key"]] = data
 
   def send_command(self, cmd, expect_ack):
+    self.num_commands += 1
+    if cmd["command_type"] == hw_command.CMD_WRITE_DMA_H2D:
+      self.num_dma_writes += 1
+
     if self.running:
       self.logger.log(self.logger.LL_DEBUG, "[hwcp] send_command: {} expect_ack={}".format(cmd, expect_ack))
       if not expect_ack:

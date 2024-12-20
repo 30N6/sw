@@ -242,6 +242,8 @@ class pluto_esm_hw_dma_reader:
     self.hwdr_result_queue = Queue()
     self.runner_request_queue = Queue()
     self.running = True
+    self.num_dma_reads = 0
+    self.num_status_reports = 0
 
     self.output_data_dwell = []
     self.output_data_pdw = []
@@ -267,6 +269,7 @@ class pluto_esm_hw_dma_reader:
   def _update_receive_queue(self):
     while not self.hwdr_result_queue.empty():
       data = self.hwdr_result_queue.get(block=False)
+      self.num_dma_reads += 1
       self.received_data.append(data)
       self.logger.log(self.logger.LL_DEBUG, "[hwdr] _update_receive_queue: received data: len={} uk={} udp_seq_num={}".format(len(data), data["unique_key"], data["udp_seq_num"]))
 
@@ -296,6 +299,7 @@ class pluto_esm_hw_dma_reader:
       return
 
     if msg_type == ESM_REPORT_MESSAGE_TYPE_STATUS:
+      self.num_status_reports += 1
       self.logger.log(self.logger.LL_DEBUG, "[hwdr] _process_message: saving status message: hw_seq_num={} udp_seq_num={}".format(seq_num, udp_seq_num))
       self.output_data_status.append(full_data)
     elif msg_type in (ESM_REPORT_MESSAGE_TYPE_PDW_PULSE, ESM_REPORT_MESSAGE_TYPE_PDW_SUMMARY):
