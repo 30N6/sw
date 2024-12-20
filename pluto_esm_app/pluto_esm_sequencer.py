@@ -412,20 +412,12 @@ class pluto_esm_sequencer:
       self._activate_next_dwells()
       self.dwell_state = "LOAD_PROFILES"
 
-      self.load_profiles_counter = 60
       #TODO: figure out if dwell entries need to be updated
       #TODO: send dwell program immediately, or wait for ack?
 
     if self.dwell_state == "LOAD_PROFILES":
-      self.load_profiles_counter -= 1
-      if self.load_profiles_counter > 0:
-        return
-
       assert (len(self.dwell_active) > 0)
       if len(self.fast_lock_load_pending) == 0:
-
-        self.send_program_counter = 0
-
         self.dwell_state = "SEND_PROGRAM"
         dwell_program = self._compute_next_dwell_program()
 
@@ -436,10 +428,6 @@ class pluto_esm_sequencer:
         self.logger.log(self.logger.LL_INFO, "[sequencer] _update_scan_dwells [LOAD_PROFILES]: profiles loaded, sending dwell program")
 
     if self.dwell_state == "SEND_PROGRAM":
-      self.send_program_counter -= 1
-      if self.send_program_counter > 0:
-        return
-
       if len(self.hw_dwell_program_pending) == 0:
         self.logger.log(self.logger.LL_INFO, "[sequencer] _update_scan_dwells [SEND_PROGRAM]: dwell program sent, going active")
         self.dwell_state = "HW_ACTIVE"
@@ -454,8 +442,6 @@ class pluto_esm_sequencer:
         self.dwell_state = "IDLE"
       else:
         self.dwell_state = "LOAD_DWELLS"
-      #TODO: update waterfall?
-      #self.hw_interface.hw_cfg.send_reset()
 
   def update(self):
     cycles_per_update = 5
