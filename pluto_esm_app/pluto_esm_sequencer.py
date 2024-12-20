@@ -420,10 +420,6 @@ class pluto_esm_sequencer:
       if len(self.fast_lock_load_pending) == 0:
         self.dwell_state = "SEND_PROGRAM"
         dwell_program = self._compute_next_dwell_program()
-
-        for i in range(len(dwell_program.instructions)):
-          self.logger.log(self.logger.LL_DEBUG, "[sequencer] _update_scan_dwells [LOAD_PROFILES]: new dwell program instructions[{}]={}".format(i, dwell_program.instructions[i].pack()))
-
         self._send_hw_dwell_program(dwell_program)
         self.logger.log(self.logger.LL_INFO, "[sequencer] _update_scan_dwells [LOAD_PROFILES]: profiles loaded, sending dwell program")
 
