@@ -60,7 +60,9 @@ class pluto_esm_sequencer:
     self.pdw_reporter                   = pluto_esm_hw_pdw_reporter.pluto_esm_hw_pdw_reporter(logger)
     self.hw_stats                       = pluto_esm_hw_stats.pluto_esm_hw_stats(logger)
 
-    self.state                          = "IDLE"
+    self.state                          = "FLUSH"
+    self.flush_start_time               = time.time()
+    self.flush_delay                    = 1.5
 
     self.fast_lock_recal_interval       = sw_config.fast_lock_recal_interval
     self.fast_lock_recal_pause          = sw_config.fast_lock_recal_pause
@@ -124,7 +126,11 @@ class pluto_esm_sequencer:
       if r is not None:
         expected_dwell_entry  = self.dwell_active[0]
         expected_dwell_data   = expected_dwell_entry["dwell"]
+
+        if (r["frequency"] != int(round(expected_dwell_data.frequency))):
+          self.logger.log(self.logger.LL_WARN, "[sequencer] _process_dwell_reports_from_hw: dwell frequency mismatch: received={} expected={}".format(r["frequency"], int(round(expected_dwell_data.frequency))))
         assert (r["frequency"] == int(round(expected_dwell_data.frequency)))
+
         self.logger.log(self.logger.LL_INFO, "[sequencer] _process_dwell_reports_from_hw: combined report received for frequency={} dwell_seq={}".format(expected_dwell_data.frequency, r["dwell_seq_num"]))
         report = {"dwell_data": expected_dwell_data, "dwell_report": r, "first_in_sequence": expected_dwell_entry["first"], "last_in_sequence": expected_dwell_entry["last"]}
         self.recorder.log({"dwell_report": report})
@@ -177,7 +183,15 @@ class pluto_esm_sequencer:
     self.hw_stats.submit_report(report)
 
   def _update_data_from_hw(self):
-    if self.state == "IDLE":
+    if self.state == "FLUSH":
+      while len(self.hw_interface.hwdr.output_data_dwell) > 0:
+        self.logger.log(self.logger.LL_INFO, "[sequencer] _update_data_from_hw: [FLUSH] dropped dwell data".format(freq))
+        self.hw_interface.hwdr.output_data_dwell.pop(0)
+      while len(self.hw_interface.hwdr.output_data_pdw) > 0:
+        self.logger.log(self.logger.LL_INFO, "[sequencer] _update_data_from_hw: [FLUSH] dropped PDW data".format(freq))
+        self.hw_interface.hwdr.output_data_pdw.pop(0)
+      return
+    elif self.state == "IDLE":
       return
 
     if self.sim_enabled:
@@ -185,10 +199,6 @@ class pluto_esm_sequencer:
     else:
       self._process_dwell_reports_from_hw()
       self._process_pdw_reports_from_hw()
-
-    #self.output_data_pdw.append(full_data)
-    #self.output_data_dwell.append(full_data)
-    pass
 
   #TODO: cal stuff into separate class
   def _get_oldest_cal_freq(self):
@@ -202,7 +212,7 @@ class pluto_esm_sequencer:
     return oldest_freq
 
   def _update_fast_lock_cal(self):
-    if self.state in ("IDLE", "SIM"):
+    if self.state in ("FLUSH", "IDLE", "SIM"):
       return
 
     now = time.time()
@@ -340,9 +350,7 @@ class pluto_esm_sequencer:
     assert (len(self.dwell_active) > 0)
     dwell_instructions  = []
     next_instruction_index = 0
-    #TODO: randomize dwell order
     for entry in self.dwell_active:
-      #TODO: don't skip PLL checks
       dwell = entry["dwell"]
       next_instruction_index += 1
       dwell_instructions.append(pluto_esm_hw_dwell.esm_dwell_instruction(1, 0, 0, 0, 0, 1, 0, dwell.hw_dwell_entry.entry_index, next_instruction_index))
@@ -430,14 +438,17 @@ class pluto_esm_sequencer:
         self.dwell_state = "IDLE"
       else:
         self.dwell_state = "LOAD_DWELLS"
-      #TODO: update waterfall?
-      #self.hw_interface.hw_cfg.send_reset()
 
   def update(self):
     cycles_per_update = 5
 
     for i in range(cycles_per_update):
-      if self.state == "IDLE":
+      if self.state == "FLUSH":
+        if (time.time() - self.flush_start_time) > self.flush_delay:
+          self.state = "IDLE"
+          self.hw_interface.enable_hw()
+
+      elif self.state == "IDLE":
         if self.sim_enabled:
           self.state = "SIM"
         else:

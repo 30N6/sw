@@ -1,0 +1,30 @@
+{
+    "sim_mode": {"enable": 0, "filename": "./log/recorded_data-20241125-174304.log"},
+    "enable_recording": 0,
+    "analysis_config": {
+      "enable_pdw_recording": 1,
+      "modulation_threshold": 0.25,
+      "pulsed_emitter_search": {"expected_pulse_count": 0.1, "PW_range_scaling": [0.25, 1.25], "PRI_range_scaling": [0.75, 1.25]},
+      "modulation_analysis": {"FM_threshold_residual": 0.05, "FM_threshold_r_squared": 0.5, "FM_threshold_slope": 1000, "FM_min_samples": 8}
+    },
+    "fast_lock_config": {"recalibration_interval": 600.0, "recalibration_pause": 2.0},
+    "dwell_config": {"freq_start": 96.0, "freq_step": 48.0, "channel_step": 0.96},
+    "scan_config": {
+      "randomize_scan_order": 0,
+      "include_freqs": [
+          {"freq_range": [1250, 1255], "dwell_time": 0.31415926, "comment": "ARSR-4"},
+          {"freq_range": [1334, 1338], "dwell_time": 0.31415926, "comment": "ARSR-4"}
+      ],
+      "exclude_freqs": []
+    },
+    "emitter_config": {
+        "pulsed_emitters": [
+            {"name": "ARSR-4",  "freq_range": [1200, 1400], "PW_range": [60, 90],     "PRI_range": [1500, 14000], "priority": 2, "threshold_dB": 9},
+            {"name": "WSR-88D", "freq_range": [2700, 3000], "PW_range": [1.57, 4.57], "PRI_range": [760, 3150],   "priority": 2, "threshold_dB": 20}
+        ],
+        "cw_emitters": []
+    },
+    "pluto_dma_reader_path": "../pluto_dma_reader/pluto_dma_reader",
+    "pluto_credentials": {"username": "root", "password": "analog"},
+    "graphics": {"fullscreen": 0, "noframe": 0}
+}

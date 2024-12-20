@@ -47,6 +47,7 @@ class pluto_esm_hw_dma_reader_thread:
 
   def _read(self):
     data = []
+    udp_seq_num = -1
     if self.use_udp_dma_rx:
       try:
         data, addr = self.sock.recvfrom(8192)
@@ -73,17 +74,26 @@ class pluto_esm_hw_dma_reader_thread:
       except Exception as e:
         self.logger.log(self.logger.LL_WARN, "exception: {}".format(e))
 
-    return data
+    return udp_seq_num, data
 
   def run(self):
     running = True
     unique_key = 0
+    startup_flush = True
 
     while running:
-      data = self._read()
+      seq_num, data = self._read()
       if len(data) > 0:
-        self.result_queue.put({"unique_key": unique_key, "data": data}, block=False)
-        self.logger.log(self.logger.LL_DEBUG, "read {} bytes from buffer - uk={}".format(len(data), unique_key))
+        if startup_flush:
+          if seq_num == 0:
+            startup_flush = False
+            self.logger.log(self.logger.LL_INFO, "[startup] seq={} received - flush complete".format(seq_num))
+          else:
+            self.logger.log(self.logger.LL_INFO, "[startup] dropping data: seq={} - read {} bytes from buffer".format(seq_num, len(data)))
+            continue
+
+        self.result_queue.put({"unique_key": unique_key, "data": data, "udp_seq_num": seq_num}, block=False)
+        self.logger.log(self.logger.LL_DEBUG, "seq={} - read {} bytes from buffer - uk={}".format(seq_num, len(data), unique_key))
         unique_key += 1
 
       if not self.request_queue.empty():
@@ -257,21 +267,23 @@ class pluto_esm_hw_dma_reader:
   def _update_receive_queue(self):
     while not self.hwdr_result_queue.empty():
       data = self.hwdr_result_queue.get(block=False)
-      self.received_data.append(data["data"])
-      self.logger.log(self.logger.LL_DEBUG, "[hwdr] _update_receive_queue: received data: len={} uk={}".format(len(data), data["unique_key"]))
+      self.received_data.append(data)
+      self.logger.log(self.logger.LL_DEBUG, "[hwdr] _update_receive_queue: received data: len={} uk={} udp_seq_num={}".format(len(data), data["unique_key"], data["udp_seq_num"]))
 
   def _update_output_queues(self):
     while len(self.received_data) > 0:
-      data = self.received_data.pop(0)
+      full_data = self.received_data.pop(0)
+      udp_seq_num = full_data["udp_seq_num"]
+      data = full_data["data"]
 
       assert ((len(data) % TRANSFER_SIZE) == 0)
       num_transfers = len(data) // TRANSFER_SIZE
       for i_xfer in range(num_transfers):
         xfer_data = data[i_xfer*TRANSFER_SIZE : (i_xfer+1)*TRANSFER_SIZE]
         unpacked_header = PACKED_ESM_REPORT_COMMON_HEADER.unpack(xfer_data[:PACKED_ESM_REPORT_COMMON_HEADER.size])
-        self._process_message(unpacked_header, xfer_data)
+        self._process_message(unpacked_header, xfer_data, udp_seq_num)
 
-  def _process_message(self, header, full_data):
+  def _process_message(self, header, full_data, udp_seq_num):
     magic_num = header[0]
     seq_num   = header[1]
     msg_type  = header[2]
@@ -284,13 +296,13 @@ class pluto_esm_hw_dma_reader:
       return
 
     if msg_type == ESM_REPORT_MESSAGE_TYPE_STATUS:
-      self.logger.log(self.logger.LL_DEBUG, "[hwdr] _process_message: saving status message: seq_num={}".format(seq_num))
+      self.logger.log(self.logger.LL_DEBUG, "[hwdr] _process_message: saving status message: hw_seq_num={} udp_seq_num={}".format(seq_num, udp_seq_num))
       self.output_data_status.append(full_data)
     elif msg_type in (ESM_REPORT_MESSAGE_TYPE_PDW_PULSE, ESM_REPORT_MESSAGE_TYPE_PDW_SUMMARY):
-      self.logger.log(self.logger.LL_DEBUG, "[hwdr] _process_message: saving PDW message: seq_num={}".format(seq_num))
+      self.logger.log(self.logger.LL_DEBUG, "[hwdr] _process_message: saving PDW message: hw_seq_num={} udp_seq_num={}".format(seq_num, udp_seq_num))
       self.output_data_pdw.append(full_data)
     elif msg_type == ESM_REPORT_MESSAGE_TYPE_DWELL_STATS:
-      self.logger.log(self.logger.LL_DEBUG, "[hwdr] _process_message: saving dwell message: seq_num={}".format(seq_num))
+      self.logger.log(self.logger.LL_DEBUG, "[hwdr] _process_message: saving dwell message: hw_seq_num={} udp_seq_num={}".format(seq_num, udp_seq_num))
       self.output_data_dwell.append(full_data)
     else:
       raise RuntimeError("unknown message type: {}".format(msg_type))
