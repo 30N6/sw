@@ -90,12 +90,10 @@ class pluto_esm_hw_dma_reader_thread:
             self.logger.log(self.logger.LL_INFO, "[startup] seq={} received - flush complete".format(seq_num))
           else:
             self.logger.log(self.logger.LL_INFO, "[startup] dropping data: seq={} - read {} bytes from buffer".format(seq_num, len(data)))
-            self.logger.flush() #TODO: remove
             continue
 
         self.result_queue.put({"unique_key": unique_key, "data": data, "udp_seq_num": seq_num}, block=False)
         self.logger.log(self.logger.LL_DEBUG, "seq={} - read {} bytes from buffer - uk={}".format(seq_num, len(data), unique_key))
-        self.logger.flush() #TODO: remove
         unique_key += 1
 
       if not self.request_queue.empty():
