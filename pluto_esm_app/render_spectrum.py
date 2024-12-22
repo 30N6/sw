@@ -18,7 +18,7 @@ class render_spectrum:
     self.surface              = surface
     self.sw_config            = sw_config
     self.sequencer            = sequencer
-    self.spectrogram          = pluto_esm_spectrogram.pluto_esm_spectrogram(self.sw_config, self.rect_spectrum_display_primary[2:4]) #[self.sequencer.dwell_buffer.buffer_width, 320])
+    self.spectrogram          = pluto_esm_spectrogram.pluto_esm_spectrogram(self.sw_config, self.rect_spectrum_display_primary[2:4], self.sequencer.dwell_buffer.buffer_width)
     self.max_freq             = sw_config.max_freq
     self.dwell_bw             = sw_config.config["dwell_config"]["freq_step"]
     self.channel_step         = sw_config.config["dwell_config"]["channel_step"]
@@ -84,8 +84,6 @@ class render_spectrum:
       dwell = self.sequencer.scan_dwells[dwell_freq]
       x = dwell_freq / mhz_per_px + self.rect_dwell_display[0]
       dwell_rect = [x - px_per_dwell/2, self.rect_dwell_display[1], px_per_dwell, self.rect_dwell_display[3] * self.dwell_cal_height]
-      #print("x={} rect={}".format(x, dwell_rect))
-      #break
 
       if not dwell.fast_lock_profile_valid:
         dwell_color = self.colors["cal_old"]
@@ -114,9 +112,7 @@ class render_spectrum:
     pygame.draw.rect(self.surface, self.colors["frame_elements"], self.rect_dwell_display, 1)
 
   def _render_spectrum_display(self):
-    #t0 = time.time()
-
-    data_p = self.spectrogram.get_spectrogram(False, True)
+    data_p = self.spectrogram.get_spectrogram(False)
     data_s = self.spectrogram.get_spectrum_trace()
 
     spec_mhz_per_px = self.max_freq / self.spectrogram.output_width
@@ -229,8 +225,13 @@ class render_spectrum:
     else:
       return
 
-    self.freq_zoom_range[0] = max(0, zoom_center - zoom_width/2)
-    self.freq_zoom_range[1] = min(self.max_freq, zoom_center + zoom_width/2)
+    new_freq_zoom_range = [0, 0]
+    new_freq_zoom_range[0] = max(0, zoom_center - zoom_width/2)
+    new_freq_zoom_range[1] = min(self.max_freq, zoom_center + zoom_width/2)
+
+    if (new_freq_zoom_range != self.freq_zoom_range):
+      self.spectrogram.update_zoom(new_freq_zoom_range)
+      self.freq_zoom_range = new_freq_zoom_range
 
     if (self.freq_zoom_range[0] == 0) and (self.freq_zoom_range[1] == self.max_freq):
       self.freq_zoom_active = False

@@ -66,12 +66,12 @@ end
 
 pdw_counts_by_freq = [pdw_freqs, pdw_counts];
 
-%freq = 1336.32;    %LFM
+freq = 1336.32;    %LFM
 %freq = 1213.44;
 %freq = 1218.24;
 %freq = 1253.76;
 
-freq = 1213.44;
+%freq = 1213.44;
 %freq = 1227.84;
 
 %freq = 1204.8;

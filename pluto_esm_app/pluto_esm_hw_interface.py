@@ -291,7 +291,7 @@ class pluto_esm_hw_interface:
 
     self.fast_lock_cal_pending  = []
 
-    self.temp_update_interval   = 1.0
+    self.temp_update_interval   = 5.0
     self.temp_last_update_time  = 0
     self.temp_commands_pending  = {}
     self.temp_command_results   = {}

@@ -12,10 +12,10 @@
     "scan_config": {
       "randomize_scan_order": 0,
       "include_freqs": [
-          {"freq_range": [120,  5999], "dwell_time": 0.010, "comment": "full span"},
+          {"freq_range": [130,  5999], "dwell_time": 0.010, "comment": "full span"},
           {"freq_range": [1200, 1400], "dwell_time": 0.100, "comment": "ARSR-4"},
           {"freq_range": [2700, 3000], "dwell_time": 0.100, "comment": "WSR-88D"},
-          {"freq_range": [118, 154],   "dwell_time": 0.100, "comment": "comms-VHF"},
+          {"freq_range": [130, 154],   "dwell_time": 0.100, "comment": "comms-VHF"},
           {"freq_range": [450, 470],   "dwell_time": 0.100, "comment": "comms-UHF"},
           {"freq_range": [433, 435],   "dwell_time": 0.100, "comment": "ISM-434"},
           {"freq_range": [902, 915],   "dwell_time": 0.100, "comment": "ISM-915"},
@@ -23,6 +23,7 @@
           {"freq_range": [5150, 5950], "dwell_time": 0.100, "comment": "ISM-5.0"}
       ],
       "exclude_freqs": [
+          {"freq_range": [174, 216], "comment": "TV-VHF"},
           {"freq_range": [470, 700], "comment": "TV-UHF"}
       ]
     },
