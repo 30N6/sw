@@ -1,8 +1,8 @@
 {
-    "sim_mode": {"enable": 0, "filename": "./log/recorded_data-20241125-174304.log", "speed": 1.0},
+    "sim_mode": {"enable": 0, "filename": "./log/recorded_data-20241225-161037.log", "speed": 1.0},
     "enable_recording": 0,
     "analysis_config": {
-      "enable_pdw_recording": 1,
+      "enable_pdw_recording": 0,
       "pulsed_emitter_config": {
         "expected_pulse_count_factor" : 0.1,
         "min_matched_pulses"          : 40,
@@ -20,7 +20,7 @@
     "scan_config": {
       "randomize_scan_order": 0,
       "include_freqs": [
-          {"freq_range": [2700, 3000], "dwell_time": 0.100, "comment": "WSR-88D"}
+          {"freq_range": [2890, 2895], "dwell_time": 0.200, "comment": "WSR-88D"}
       ],
       "exclude_freqs": [
       ]
@@ -34,6 +34,6 @@
     },
     "pluto_dma_reader_path": "../pluto_dma_reader/pluto_dma_reader",
     "pluto_credentials": {"username": "root", "password": "analog"},
-    "graphics": {"fullscreen": 1, "noframe": 1},
+    "graphics": {"fullscreen": 0, "noframe": 0},
     "debug_log": 0
 }

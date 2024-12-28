@@ -38,8 +38,12 @@ class render_emitters:
 
     self.emitters_pulsed          = []
     self.emitters_cw              = []
+    self.last_update_time_pulsed  = 0
+    self.last_update_time_cw      = 0
     self.selected_emitter_pulsed  = 0
     self.selected_emitter_cw      = 0
+
+    self.emitter_update_timeout   = 1.0
 
     self.pri_plot = pluto_esm_pulsed_emitter_plotter.pluto_esm_pulsed_emitter_plotter(self.rect_frame_pulsed_plot_image[2:4])
 
@@ -241,6 +245,7 @@ class render_emitters:
 
     for entry in self.analysis_thread.output_data_to_render:
       if "pulsed_emitters" in entry:
+        self.last_update_time_pulsed = now
         self.emitters_pulsed = []
         for analysis_data in entry["pulsed_emitters"]:
           emitter = {}
@@ -250,6 +255,7 @@ class render_emitters:
           self.emitters_pulsed.append(emitter)
 
       if "cw_emitters" in entry:
+        self.last_update_time_cw = now
         self.emitters_cw = []
         for analysis_data in entry["cw_emitters"]:
           emitter = {}
@@ -257,6 +263,11 @@ class render_emitters:
           emitter["emitter_age"]    = now - analysis_data["time_initial"]
           emitter["update_age"]     = now - analysis_data["time_final"]
           self.emitters_cw.append(emitter)
+
+    if (now - self.last_update_time_pulsed) > self.emitter_update_timeout:
+      self.emitters_pulsed = []
+    if (now - self.last_update_time_cw) > self.emitter_update_timeout:
+      self.emitters_cw = []
 
     self.analysis_thread.output_data_to_render = []
     self.emitters_pulsed.sort(key=lambda entry: entry["analysis_data"]["power_mean"], reverse=True)

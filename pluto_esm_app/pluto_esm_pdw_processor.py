@@ -90,22 +90,34 @@ class histogram_1d:
     self.data_count = {}
 
   def add_dwell_pdws(self, freq, data):
+    if len(data) == 0:
+      return
+
     if freq not in self.hist_count:
       self.hist_count[freq] = np.zeros(self.bin_count, dtype=np.uint32)
       self.data_count[freq] = 0
 
     data_index = data.astype(np.uint32)
     data_index[data_index >= self.bin_count] = self.bin_count - 1
-    self.hist_count[freq][data_index] += 1
+    #for i in range(len(data_index)):
+    #  index = data_index[i]
+    for index in np.nditer(data_index):
+      self.hist_count[freq][index] += 1
     self.data_count[freq] += len(data)
 
   def remove_dwell_pdws(self, freq, data):
+    if len(data) == 0:
+      return
+
     data_index = data.astype(np.uint32)
     data_index[data_index >= self.bin_count] = self.bin_count - 1
     self.hist_count[freq][data_index] -= 1
     self.data_count[freq] -= len(data)
 
   def get_count_in_range(self, freq, hist_range):
+    if freq not in self.hist_count:
+      return 0
+
     i_start = int(min(hist_range[0], self.bin_count - 1))
     i_end   = int(min(hist_range[1], self.bin_count))
     assert (i_end > i_start)

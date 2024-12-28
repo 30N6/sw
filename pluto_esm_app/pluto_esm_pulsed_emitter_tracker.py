@@ -8,18 +8,17 @@ class pluto_esm_pulsed_emitter_tracker:
     self.pdw_processor = pdw_processor
 
     self.pulsed_emitter_config        = config["emitter_config"]["pulsed_emitters"]
-    self.modulation_threshold         = config["analysis_config"]["modulation_threshold"]
-    self.pd_range_scaling             = config["analysis_config"]["pulsed_emitter_search"]["PW_range_scaling"]
-    self.pri_range_scaling            = config["analysis_config"]["pulsed_emitter_search"]["PRI_range_scaling"]
-    self.expected_pulse_count_factor  = config["analysis_config"]["pulsed_emitter_search"]["expected_pulse_count"]
-
+    self.modulation_threshold         = config["analysis_config"]["pulsed_emitter_config"]["modulation_threshold"]
+    self.pd_range_scaling             = config["analysis_config"]["pulsed_emitter_config"]["PW_range_scaling"]
+    self.pri_range_scaling            = config["analysis_config"]["pulsed_emitter_config"]["PRI_range_scaling"]
+    self.expected_pulse_count_factor  = config["analysis_config"]["pulsed_emitter_config"]["expected_pulse_count_factor"]
+    self.min_matched_pulses           = config["analysis_config"]["pulsed_emitter_config"]["min_matched_pulses"]
+    self.max_emitter_age              = config["analysis_config"]["pulsed_emitter_config"]["max_emitter_age"]
+    self.max_pdw_age_to_confirm       = config["analysis_config"]["pulsed_emitter_config"]["max_pdw_age_to_confirm"]
+    self.emitter_update_interval      = config["analysis_config"]["pulsed_emitter_config"]["emitter_update_interval"]
     self.last_update_time = 0
 
     #TODO: config?
-    self.emitter_update_interval = 0.5
-    self.min_matched_pulses       = 40
-    self.max_emitter_age          = 30
-    self.max_pdw_age_to_confirm   = 20
 
     self.confirmed_emitters = []
 
@@ -127,8 +126,15 @@ class pluto_esm_pulsed_emitter_tracker:
         #TODO: skip the histogram and check the pulses directly?
         num_matching_pd   = self.pdw_processor.hist_pd.get_count_in_range(freq, expected_pd_range)
         num_matching_pri  = self.pdw_processor.hist_pri.get_count_in_range(freq, expected_pri_range)
+        #if freq == 2893.44:
+        #  print(expected_pri_range)
+        #  print("data_count={} sum={}".format(self.pdw_processor.hist_pri.data_count[freq], np.sum(self.pdw_processor.hist_pri.hist_count[freq])))
+        #  for i in range(len(self.pdw_processor.hist_pri.hist_count[freq])):
+        #    if self.pdw_processor.hist_pri.hist_count[freq][i]:
+        #      print("hist_count[{}]={}".format(i, self.pdw_processor.hist_pri.hist_count[freq][i]))
 
-        #print("freq={} expected_pulse_count={} num_matching_pd={}-{} num_matching_pri={}-{}".format(freq, expected_pulse_count, num_matching_pd, (num_matching_pd > expected_pulse_count), num_matching_pri, (num_matching_pri > expected_pulse_count)))
+        self.logger.log(self.logger.LL_DEBUG, "[pulsed_tracker] _search_emitters: freq={} expected_pulse_count={} num_matching_pd={}/{} num_matching_pri={}/{}".format(freq,
+          expected_pulse_count, num_matching_pd, (num_matching_pd > expected_pulse_count), num_matching_pri, (num_matching_pri > expected_pulse_count)))
 
         if (num_matching_pd > expected_pulse_count) and (num_matching_pri > expected_pulse_count):
           self.logger.log(self.logger.LL_INFO, "[pulsed_tracker] _search_emitters: initial candidate - name={} freq={} dt_accum={:.3f} exp_pulses={:.1f} hist_count={} match_pd={} match_pri={}".format(emitter["name"],
@@ -144,6 +150,7 @@ class pluto_esm_pulsed_emitter_tracker:
     for entry in self.confirmed_emitters:
       if (now - entry["pdw_time_final"]) < self.max_emitter_age:
         emitters_to_keep.append(entry)
+        #self.logger.log(self.logger.LL_INFO, "[pulsed_tracker] _scrub_emitters: keeping emitter {}".format(entry))
       else:
         self.logger.log(self.logger.LL_INFO, "[pulsed_tracker] _scrub_emitters: confirmed emitter timeout - {}".format(entry))
 

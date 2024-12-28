@@ -41,14 +41,19 @@ class pluto_esm_main_thread:
     pygame.display.set_caption("pluto_esm")
     self.clock = pygame.time.Clock()
 
-    self.logger       = pluto_esm_logger.pluto_esm_logger(self.log_dir, "pluto_esm_main_thread", pluto_esm_logger.pluto_esm_logger.LL_INFO)
+    if self.sw_config.debug_log:
+      log_level = pluto_esm_logger.pluto_esm_logger.LL_DEBUG
+    else:
+      log_level = pluto_esm_logger.pluto_esm_logger.LL_INFO
+
+    self.logger       = pluto_esm_logger.pluto_esm_logger(self.log_dir, "pluto_esm_main_thread", log_level)
     self.recorder     = pluto_esm_data_recorder.pluto_esm_data_recorder(self.log_dir, "recorded_data", self.sw_config.enable_recording)
     if self.sw_config.sim_enabled:
-      self.sim_loader = pluto_esm_data_loader.pluto_esm_data_loader(self.logger, self.sw_config.sim_filename)
+      self.sim_loader = pluto_esm_data_loader.pluto_esm_data_loader(self.logger, self.sw_config.sim_filename, self.sw_config.sim_speed)
     else:
       self.sim_loader = None
 
-    self.hw_interface     = pluto_esm_hw_interface.pluto_esm_hw_interface(self.logger, self.pluto_uri, self.local_ip, self.sw_config.pluto_dma_reader_path, self.sw_config.pluto_credentials)
+    self.hw_interface     = pluto_esm_hw_interface.pluto_esm_hw_interface(self.logger, self.pluto_uri, self.local_ip, self.sw_config.pluto_dma_reader_path, self.sw_config.pluto_credentials, self.sw_config.sim_enabled)
     self.analysis_thread  = pluto_esm_analysis_thread.pluto_esm_analysis_runner(self.logger, self.sw_config)
     self.sequencer        = pluto_esm_sequencer.pluto_esm_sequencer(self.logger, self.recorder, self.sw_config,
                                                                     self.hw_interface, self.analysis_thread, self.sim_loader)
