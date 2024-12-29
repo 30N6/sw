@@ -20,9 +20,13 @@ class pluto_esm_analysis_thread:
       self.output_queue.put({"pulsed_emitters": self.processor.confirmed_pulsed_signals_to_render})
       self.processor.confirmed_pulsed_signals_to_render = []
 
-    if len(self.processor.confirmed_cw_signals_to_render) > 0:
-      self.output_queue.put({"cw_emitters": self.processor.confirmed_cw_signals_to_render})
-      self.processor.confirmed_cw_signals_to_render = []
+    if len(self.processor.confirmed_cw_primary_signals_to_render) > 0:
+      self.output_queue.put({"cw_emitters_primary": self.processor.confirmed_cw_primary_signals_to_render})
+      self.processor.confirmed_cw_primary_signals_to_render = []
+
+    if len(self.processor.confirmed_cw_secondary_signals_to_render) > 0:
+      self.output_queue.put({"cw_emitters_secondary": self.processor.confirmed_cw_secondary_signals_to_render})
+      self.processor.confirmed_cw_secondary_signals_to_render = []
 
   def run(self):
     running = True

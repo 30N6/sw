@@ -15,12 +15,12 @@ class pluto_esm_analysis_processor:
     self.config   = config
 
     self.pdw_processor        = pluto_esm_pdw_processor.pluto_esm_pdw_processor(logger)
-    self.dwell_processor      = pluto_esm_dwell_processor.pluto_esm_dwell_processor(logger)
+    self.dwell_processor      = pluto_esm_dwell_processor.pluto_esm_dwell_processor(logger, config)
     self.pulsed_tracker       = pluto_esm_pulsed_emitter_tracker.pluto_esm_pulsed_emitter_tracker(logger, self.pdw_processor, config)
     self.modulation_analyzer  = pluto_esm_pdw_modulation_analysis.pluto_esm_pdw_modulation_analysis(config["analysis_config"]["modulation_analysis"])
 
-    self.confirmed_pulsed_signals_to_render = []
-    self.confirmed_cw_signals_to_render     = []
+    self.confirmed_pulsed_signals_to_render     = []
+    self.confirmed_cw_primary_signals_to_render = []
 
     self.pending_dwell_reports        = []
     self.pending_pdw_summary_reports  = []
@@ -117,8 +117,9 @@ class pluto_esm_analysis_processor:
       return
     self.last_emitter_update_time = now
 
-    self.confirmed_pulsed_signals_to_render = copy.deepcopy(self.pulsed_tracker.confirmed_emitters)
-    self.confirmed_cw_signals_to_render = copy.deepcopy(self.dwell_processor.combined_data)
+    self.confirmed_pulsed_signals_to_render       = copy.deepcopy(self.pulsed_tracker.confirmed_emitters)
+    self.confirmed_cw_primary_signals_to_render   = copy.deepcopy(self.dwell_processor.combined_data_primary)
+    self.confirmed_cw_secondary_signals_to_render = copy.deepcopy(self.dwell_processor.combined_data_secondary)
 
   def submit_report(self, report):
     if "pdw_pulse_report" in report:

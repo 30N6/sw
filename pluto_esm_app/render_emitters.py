@@ -22,28 +22,31 @@ class render_emitters:
     self.colors["emitter_entry_stale"]  = (64, 128, 64)
     self.colors["emitter_histogram"]    = (192, 255, 0)
 
-    self.font_main    = pygame.font.SysFont('Consolas', 14)
-    self.font_detail  = pygame.font.SysFont('Consolas', 12)
+    self.font_main                      = pygame.font.SysFont('Consolas', 14)
+    self.font_detail                    = pygame.font.SysFont('Consolas', 12)
 
-    self.rect_frame_pulsed            = [640, 0,   384, 384]
-    self.rect_frame_cw                = [640, 384, 384, 384]
-    self.rect_frame_pulsed_details    = [640, 192, 384, 192]
-    self.rect_frame_pulsed_plot_frame = [648, 200, 368, 96]
-    self.rect_frame_pulsed_plot_image = [649, 201, 366, 94]
+    self.rect_frame_pulsed              = [640, 0,   384, 384]
+    self.rect_frame_cw_primary          = [640, 384, 384, 384]
+    self.rect_frame_cw_secondary        = [1024,384, 256, 384]
+    self.rect_frame_pulsed_details      = [640, 192, 384, 192]
+    self.rect_frame_pulsed_plot_frame   = [648, 200, 368, 96]
+    self.rect_frame_pulsed_plot_image   = [649, 201, 366, 94]
 
-    self.emitter_text_height          = 16
-    self.emitter_stale_threshold      = 10
-    self.max_rendered_emitters_pulsed = 12
-    self.max_rendered_emitters_cw     = 24
+    self.emitter_text_height            = 16
+    self.emitter_stale_threshold        = 10
+    self.max_rendered_emitters_pulsed   = 12
+    self.max_rendered_emitters_cw       = 24
 
-    self.emitters_pulsed          = []
-    self.emitters_cw              = []
-    self.last_update_time_pulsed  = 0
-    self.last_update_time_cw      = 0
-    self.selected_emitter_pulsed  = 0
-    self.selected_emitter_cw      = 0
+    self.emitters_pulsed                = []
+    self.emitters_cw_primary            = []
+    self.emitters_cw_secondary          = []
+    self.last_update_time_pulsed        = 0
+    self.last_update_time_cw_primary    = 0
+    self.last_update_time_cw_secondary  = 0
+    self.selected_emitter_pulsed        = 0
+    self.selected_emitter_cw            = 0
 
-    self.emitter_update_timeout   = 1.0
+    self.emitter_update_timeout         = 1.0
 
     self.pri_plot = pluto_esm_pulsed_emitter_plotter.pluto_esm_pulsed_emitter_plotter(self.rect_frame_pulsed_plot_image[2:4])
 
@@ -148,10 +151,10 @@ class render_emitters:
       text_rect.bottom = entry["y_pos"]
       self.surface.blit(text_data, text_rect)
 
-  def _render_cw_emitter_list(self):
+  def _render_cw_primary_emitter_list(self):
     emitter_entries = []
     index = 1
-    for entry in self.emitters_cw:
+    for entry in self.emitters_cw_primary:
       if index > self.max_rendered_emitters_cw:
         break
 
@@ -181,19 +184,54 @@ class render_emitters:
     for entry in emitter_entries:
       text_data = self.font_main.render(entry["str"], True, entry["color"])
       text_rect = text_data.get_rect()
-      text_rect.left = self.rect_frame_cw[0] + entry["pos_offset"][0]
-      text_rect.bottom = self.rect_frame_cw[1] + entry["pos_offset"][1]
+      text_rect.left = self.rect_frame_cw_primary[0] + entry["pos_offset"][0]
+      text_rect.bottom = self.rect_frame_cw_primary[1] + entry["pos_offset"][1]
       self.surface.blit(text_data, text_rect)
 
-    #if len(self.emitters_cw) > 0:
-    #  sel_x = self.rect_frame_cw[0] + 2
-    #  sel_y = self.rect_frame_cw[1] + 8 + self.emitter_text_height * self.selected_emitter_cw
+    #if len(self.emitters_cw_primary) > 0:
+    #  sel_x = self.rect_frame_cw_primary[0] + 2
+    #  sel_y = self.rect_frame_cw_primary[1] + 8 + self.emitter_text_height * self.selected_emitter_cw
     #  sel_wh = 8
     #
     #  sel_points = [(sel_x,             sel_y - sel_wh/2),
     #                (sel_x + sel_wh/2,  sel_y),
     #                (sel_x,             sel_y + sel_wh/2)]
     #  pygame.draw.polygon(self.surface, self.colors["emitter_marker"], sel_points)
+
+  def _render_cw_secondary_emitter_list(self):
+    emitter_entries = []
+    index = 1
+    for entry in self.emitters_cw_secondary:
+      if index > self.max_rendered_emitters_cw:
+        break
+
+      freq          = entry["analysis_data"]["power_mean_freq"]
+      #bandwidth     = max(entry["analysis_data"]["freq_set"]) - min(entry["analysis_data"]["freq_set"])
+      #threshold_dB  = 10*np.log10(entry["analysis_data"]["power_mean_threshold"])
+      power_mean_dB = 10*np.log10(entry["analysis_data"]["power_mean_value"])
+      power_max_dB  = 10*np.log10(entry["analysis_data"]["power_max"])
+      emitter_age   = min(99, round(entry["emitter_age"]))
+      update_age    = min(99, round(entry["update_age"]))
+
+      if entry["update_age"] < self.emitter_stale_threshold:
+        emitter_color = self.colors["emitter_entry_active"]
+      else:
+        emitter_color = self.colors["emitter_entry_stale"]
+
+      name = self._get_cw_signal_name(freq)
+
+      s = "{:2} {:6.1f} {:2.0f} {:2.0f} {:>2.0f} {:>2.0f} {:<8}".format(index, freq, power_mean_dB, power_max_dB, emitter_age, update_age, name)
+      pos_offset = [8, 16 + self.emitter_text_height * (index - 1)]
+
+      emitter_entries.append({"str": s, "pos_offset": pos_offset, "color": emitter_color})
+      index += 1
+
+    for entry in emitter_entries:
+      text_data = self.font_main.render(entry["str"], True, entry["color"])
+      text_rect = text_data.get_rect()
+      text_rect.left = self.rect_frame_cw_secondary[0] + entry["pos_offset"][0]
+      text_rect.bottom = self.rect_frame_cw_secondary[1] + entry["pos_offset"][1]
+      self.surface.blit(text_data, text_rect)
 
   def _get_cw_signal_name(self, freq):
     current_entry = None
@@ -223,19 +261,20 @@ class render_emitters:
 
     #if self.selected_emitter_cw >= self.max_rendered_emitters_cw:
     #  self.selected_emitter_cw = self.max_rendered_emitters_cw - 1
-    #if self.selected_emitter_cw >= len(self.emitters_cw):
-    #  self.selected_emitter_cw = len(self.emitters_cw) - 1
+    #if self.selected_emitter_cw >= len(self.emitters_cw_primary):
+    #  self.selected_emitter_cw = len(self.emitters_cw_primary) - 1
     #if self.selected_emitter_cw < 0:
     #  self.selected_emitter_cw = 0
 
   def render(self):
     pygame.draw.rect(self.surface, self.colors["border"], self.rect_frame_pulsed, 1)
-    pygame.draw.rect(self.surface, self.colors["border"], self.rect_frame_cw, 1)
+    pygame.draw.rect(self.surface, self.colors["border"], self.rect_frame_cw_primary, 1)
+    pygame.draw.rect(self.surface, self.colors["border"], self.rect_frame_cw_secondary, 1)
 
     self._render_pulsed_emitter_list()
     self._render_pulsed_emitter_details()
-
-    self._render_cw_emitter_list()
+    self._render_cw_primary_emitter_list()
+    self._render_cw_secondary_emitter_list()
 
   def update(self):
     if len(self.analysis_thread.output_data_to_render) == 0:
@@ -254,24 +293,37 @@ class render_emitters:
           emitter["update_age"]     = now - analysis_data["pdw_time_final"]
           self.emitters_pulsed.append(emitter)
 
-      if "cw_emitters" in entry:
-        self.last_update_time_cw = now
-        self.emitters_cw = []
-        for analysis_data in entry["cw_emitters"]:
+      if "cw_emitters_primary" in entry:
+        self.last_update_time_cw_primary = now
+        self.emitters_cw_primary = []
+        for analysis_data in entry["cw_emitters_primary"]:
           emitter = {}
           emitter["analysis_data"]  = analysis_data
           emitter["emitter_age"]    = now - analysis_data["time_initial"]
           emitter["update_age"]     = now - analysis_data["time_final"]
-          self.emitters_cw.append(emitter)
+          self.emitters_cw_primary.append(emitter)
+
+      if "cw_emitters_secondary" in entry:
+        self.last_update_time_cw_secondary = now
+        self.emitters_cw_secondary = []
+        for analysis_data in entry["cw_emitters_secondary"]:
+          emitter = {}
+          emitter["analysis_data"]  = analysis_data
+          emitter["emitter_age"]    = now - analysis_data["time_initial"]
+          emitter["update_age"]     = now - analysis_data["time_final"]
+          self.emitters_cw_secondary.append(emitter)
 
     if (now - self.last_update_time_pulsed) > self.emitter_update_timeout:
       self.emitters_pulsed = []
-    if (now - self.last_update_time_cw) > self.emitter_update_timeout:
-      self.emitters_cw = []
+    if (now - self.last_update_time_cw_primary) > self.emitter_update_timeout:
+      self.emitters_cw_primary = []
+    if (now - self.last_update_time_cw_secondary) > self.emitter_update_timeout:
+      self.emitters_cw_secondary = []
 
     self.analysis_thread.output_data_to_render = []
     self.emitters_pulsed.sort(key=lambda entry: entry["analysis_data"]["power_mean"], reverse=True)
-    self.emitters_cw.sort(key=lambda entry: entry["analysis_data"]["power_mean_value"], reverse=True)
+    self.emitters_cw_primary.sort(key=lambda entry: entry["analysis_data"]["power_mean_value"], reverse=True)
+    self.emitters_cw_secondary.sort(key=lambda entry: entry["analysis_data"]["power_mean_value"], reverse=True)
 
     for emitter in self.emitters_pulsed:
       emitter["histogram_pri"] = self.pri_plot.get_pri_plot(emitter["analysis_data"]["sorted_pulse_pri"], self.colors["emitter_histogram"])
