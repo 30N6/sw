@@ -14,7 +14,7 @@ import render_emitters
 class pluto_esm_main_thread:
   SCREEN_SIZE = (1280, 800)
   FPS = 60
-  VERSION = "v0.9 2024-12-19"
+  VERSION = "v0.91 2024-12-28"
 
   def __init__(self):
     if len(sys.argv) < 5:

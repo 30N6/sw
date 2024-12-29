@@ -32,7 +32,7 @@ class render_status:
 
     text_data = self.font.render(self.version, True, (0, 192, 192))
     text_rect = text_data.get_rect()
-    text_rect.left = 1150
+    text_rect.left = 1140
     text_rect.bottom = 792
     self.surface.blit(text_data, text_rect)
 
