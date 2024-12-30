@@ -17,7 +17,7 @@ class pluto_esm_pdw_modulation_analysis:
 
     pulse_iq = np.asarray(pulse_iq_samples[ESM_PDW_BUFFERED_IQ_DELAY_SAMPLES:valid_duration])
 
-    phase_wrapped   = np.arctan2(pulse_iq[:, 1], pulse_iq[:, 0])
+    phase_wrapped   = np.arctan2(pulse_iq[:, 0], pulse_iq[:, 1])
     phase_unwrapped = np.unwrap(phase_wrapped)
 
     y_freq = (1/(2*np.pi)) * np.diff(phase_unwrapped) / self.dt
