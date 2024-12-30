@@ -80,7 +80,7 @@ class pluto_esm_sequencer:
     self.current_fast_lock_profiles     = {}
 
     self.dwell_state                    = "IDLE"
-    self.dwell_active                   = []  #TODO: rename
+    self.dwell_active                   = []
     self.dwell_active_first             = []
     self.dwell_active_last              = []
     self.dwell_history                  = {}
@@ -99,7 +99,6 @@ class pluto_esm_sequencer:
       self.logger.log(self.logger.LL_DEBUG, "[sequencer] scan_dwells[{}]=[{}]".format(freq, self.scan_dwells[freq]))
 
     self.sim_enabled = sw_config.sim_enabled
-    #TODO: open file
 
     self.logger.log(self.logger.LL_INFO, "[sequencer] init done; sim_enabled={}; scan_total_time={}".format(self.sim_enabled, self.scan_total_time))
 
@@ -401,7 +400,6 @@ class pluto_esm_sequencer:
     self._check_pending_hw_dwell_programs()
 
     if self.dwell_state == "IDLE":
-      #TODO: check enable
       self.dwell_state = "LOAD_SEQUENCE"
 
     if self.dwell_state == "LOAD_SEQUENCE":

@@ -8,8 +8,6 @@ class pluto_esm_spectrogram:
   def __init__(self, sw_config, main_spec_dimensions, full_buffer_width):
     self.sw_config              = sw_config
 
-    #TODO: take from sw config
-    self.center_clear_ratio_threshold = 4
     self.output_row_height            = 4
     self.filter_depth                 = 16
     self.full_width                   = full_buffer_width

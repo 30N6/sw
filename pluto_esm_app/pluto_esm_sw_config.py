@@ -7,7 +7,9 @@ class pluto_esm_sw_config:
     self.config = json.load(fd)
     fd.close()
 
-    self.scan_dwells = self._compute_scan_dwells(self.config)
+    self._check_ranges()
+
+    self.scan_dwells = self._compute_scan_dwells()
     self.randomize_scan_order = self.config["scan_config"]["randomize_scan_order"]
     self.min_freq = min(list(self.scan_dwells.keys())) - self.config["dwell_config"]["freq_step"] / 2
     self.max_freq = max(list(self.scan_dwells.keys())) + self.config["dwell_config"]["freq_step"] / 2
@@ -25,24 +27,35 @@ class pluto_esm_sw_config:
 
     self.enable_recording = self.config["enable_recording"]
 
-    #TODO: assertions for emitter entries - min/max of ranges, etc.
+  def _check_ranges(self):
+    assert (self.config["analysis_config"]["pulsed_emitter_config"]["PW_range_scaling"][0]  <= self.config["analysis_config"]["pulsed_emitter_config"]["PW_range_scaling"][1])
+    assert (self.config["analysis_config"]["pulsed_emitter_config"]["PRI_range_scaling"][0] <= self.config["analysis_config"]["pulsed_emitter_config"]["PRI_range_scaling"][1])
 
-  def _compute_scan_dwells(self, config):
+    for entry in self.config["scan_config"]["include_freqs"]:
+      assert (entry["freq_range"][0] <= entry["freq_range"][1])
+    for entry in self.config["scan_config"]["exclude_freqs"]:
+      assert (entry["freq_range"][0] <= entry["freq_range"][1])
+
+    for entry in self.config["emitter_config"]["pulsed_emitters"]:
+      assert (entry["freq_range"][0]  <= entry["freq_range"][1])
+      assert (entry["PW_range"][0]    <= entry["PW_range"][1])
+      assert (entry["PRI_range"][0]   <= entry["PRI_range"][1])
+
+    for entry in self.config["emitter_config"]["cw_emitters"]:
+      assert (entry["freq_range"][0]  <= entry["freq_range"][1])
+
+  def _compute_scan_dwells(self):
     max_freq = 0
     min_freq = 99999
-    scan_config = config["scan_config"]
+    scan_config = self.config["scan_config"]
     for entry in scan_config["include_freqs"]:
-      assert (entry["freq_range"][0] <= entry["freq_range"][1])
       max_freq = max(max_freq, entry["freq_range"][0], entry["freq_range"][1])
       min_freq = min(min_freq, entry["freq_range"][0], entry["freq_range"][1])
 
-    for entry in scan_config["exclude_freqs"]:
-      assert (entry["freq_range"][0] <= entry["freq_range"][1])
-
-    channel_step = config["dwell_config"]["channel_step"]
-    freq_step = config["dwell_config"]["freq_step"]
+    channel_step = self.config["dwell_config"]["channel_step"]
+    freq_step = self.config["dwell_config"]["freq_step"]
     assert (freq_step % channel_step < 1e-12)
-    dwell_candidates = np.arange(config["dwell_config"]["freq_start"], max_freq + freq_step, freq_step)
+    dwell_candidates = np.arange(self.config["dwell_config"]["freq_start"], max_freq + freq_step, freq_step)
 
     dwell_by_freq = {}
     for dwell_freq in dwell_candidates:

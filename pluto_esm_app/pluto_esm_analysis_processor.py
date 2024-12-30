@@ -14,7 +14,7 @@ class pluto_esm_analysis_processor:
     self.recorder = pluto_esm_data_recorder.pluto_esm_data_recorder(log_dir, "analysis", config["analysis_config"]["enable_pdw_recording"])
     self.config   = config
 
-    self.pdw_processor        = pluto_esm_pdw_processor.pluto_esm_pdw_processor(logger)
+    self.pdw_processor        = pluto_esm_pdw_processor.pluto_esm_pdw_processor(logger, config)
     self.dwell_processor      = pluto_esm_dwell_processor.pluto_esm_dwell_processor(logger, config)
     self.pulsed_tracker       = pluto_esm_pulsed_emitter_tracker.pluto_esm_pulsed_emitter_tracker(logger, self.pdw_processor, config)
     self.modulation_analyzer  = pluto_esm_pdw_modulation_analysis.pluto_esm_pdw_modulation_analysis(config["analysis_config"]["modulation_analysis"])

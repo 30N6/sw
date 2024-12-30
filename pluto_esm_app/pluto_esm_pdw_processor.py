@@ -3,20 +3,15 @@ import time
 import numpy as np
 
 class pluto_esm_pdw_processor:
-  def __init__(self, logger):
+  def __init__(self, logger, config):
     self.logger = logger
 
-    self.dwell_history_pdw = []
-    self.dwell_history_accum = []
-    self.max_dwell_age = 60 #TODO: config?
-
-    #TODO: config?
-    #self.hist_pd  = histogram_multi_level([0, 16383], [1, 4, 16, 64])
-    #self.hist_pri = histogram_multi_level([0, 65535], [1, 8, 64, 256])
-    #self.hist_pri_pd = histogram_2d([65536, 1024])
-    self.hist_pri         = histogram_1d(65536)
-    self.hist_pd          = histogram_1d(1024)
-    self.dwell_time_accum = {}
+    self.dwell_history_pdw    = []
+    self.dwell_history_accum  = []
+    self.max_dwell_age        = config["analysis_config"]["pulsed_emitter_config"]["max_dwell_age"]
+    self.hist_pri             = histogram_1d(config["analysis_config"]["pulsed_emitter_config"]["histogram_max_pri"])
+    self.hist_pd              = histogram_1d(config["analysis_config"]["pulsed_emitter_config"]["histogram_max_pd"])
+    self.dwell_time_accum     = {}
 
     self.scale_factor_pd  = ((ESM_NUM_CHANNELS_NARROW / CHANNELIZER_OVERSAMPLING) * ADC_CLOCK_PERIOD) / 1.0e-6
     self.scale_factor_toa = FAST_CLOCK_PERIOD / 1.0e-6
