@@ -15,8 +15,7 @@ UDP_PAYLOAD_SIZE  = TRANSFER_SIZE + 4 #includes seq num
 
 class pluto_esm_hw_dma_reader_thread:
   WORD_SIZE = 4
-  #TODO: move to package
-  TRANSFERS_PER_BUFFER = 1 #8 TODO: what is the optimal size?
+  TRANSFERS_PER_BUFFER = 1 #8 #optimal size unclear -- doesn't matter now with UDP
   BUFFER_SIZE = TRANSFERS_PER_BUFFER*TRANSFER_SIZE // WORD_SIZE
 
   PACKED_UDP_HEADER = struct.Struct("<" + PACKED_UINT32)

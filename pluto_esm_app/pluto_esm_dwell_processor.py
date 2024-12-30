@@ -49,9 +49,6 @@ class pluto_esm_dwell_processor:
     self._merge_signals_primary(list(combined_dwell_data["dwell_channel_data"].keys()))
     self._merge_signals_secondary(list(combined_dwell_data["dwell_channel_data"].keys()))
 
-      #self.logger.log(self.logger.LL_INFO, "[dwell_processor] freq={} summary: mean={} accum={} -- threshold={}/{}".format(freq, new_entry["accum_normalized"], self.channel_data_summary[freq]["accum_mean"],
-      #  self.threshold_data[freq]["threshold_0_data"], self.threshold_data[freq]["threshold_1_data"]))
-
   def _try_get_manual_threshold(self, freq):
     matching_entry = None
 
@@ -219,7 +216,6 @@ class pluto_esm_dwell_processor:
 
     combined_data.clear()
     combined_data.extend(valid_signals)
-    #self.combined_data_primary = valid_signals
 
     valid_signals = []
     for entry in combined_data:

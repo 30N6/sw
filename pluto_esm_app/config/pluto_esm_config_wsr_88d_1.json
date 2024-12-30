@@ -3,6 +3,13 @@
     "enable_recording": 0,
     "analysis_config": {
       "enable_pdw_recording": 0,
+      "cw_emitter_config": {
+        "max_dwell_age"             : 300,
+        "max_signal_age"            : 30,
+        "auto_threshold_factor_dB"  : 6,
+        "auto_threshold_min_dB"     : 0,
+        "num_dwells_required"       : 5
+      },
       "pulsed_emitter_config": {
         "expected_pulse_count_factor" : 0.1,
         "min_matched_pulses"          : 40,

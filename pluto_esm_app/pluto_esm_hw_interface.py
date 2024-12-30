@@ -72,7 +72,7 @@ class pluto_esm_hw_dma_writer:
 
 class pluto_esm_hw_command_processor_thread:
   def __init__(self, arg):
-    self.logger = pluto_esm_logger.pluto_esm_logger(arg["log_dir"], "pluto_esm_hw_command_processor_thread", pluto_esm_logger.pluto_esm_logger.LL_DEBUG)  #TODO: log level via arg
+    self.logger = pluto_esm_logger.pluto_esm_logger(arg["log_dir"], "pluto_esm_hw_command_processor_thread", arg["log_level"])
 
     self.request_queue      = arg["request_queue"]
     self.result_queue       = arg["result_queue"]
@@ -176,7 +176,7 @@ class pluto_esm_hw_command_processor:
     self.num_commands = 0
     self.num_dma_writes = 0
 
-    self.hwc_process = Process(target=pluto_esm_hw_command_processor_thread_func, args=({"pluto_uri": pluto_uri, "request_queue": self.request_queue, "result_queue": self.result_queue, "log_dir": logger.path}, ))
+    self.hwc_process = Process(target=pluto_esm_hw_command_processor_thread_func, args=({"pluto_uri": pluto_uri, "request_queue": self.request_queue, "result_queue": self.result_queue, "log_dir": logger.path, "log_level": logger.min_level}, ))
     self.hwc_process.start()
 
   def _update_receive_queue(self):
@@ -280,7 +280,6 @@ class pluto_esm_hw_config:
 
 class pluto_esm_hw_interface:
   def __init__(self, logger, pluto_uri, local_ip, pluto_dma_reader_path, pluto_credentials, sim_enabled):
-    #todo: iio info
     self.logger           = logger
     self.hwcp             = pluto_esm_hw_command_processor(self.logger, pluto_uri)
     self.hwdr             = pluto_esm_hw_dma_reader.pluto_esm_hw_dma_reader(self.logger, pluto_uri, local_ip, pluto_dma_reader_path, pluto_credentials)

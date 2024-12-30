@@ -36,7 +36,7 @@ class pluto_esm_dwell_stats_buffer:
 
     assert (dwell_report["num_channels"] == self.num_channels)
     assert (len(dwell_report["channel_data"]) == self.num_channels)
-    #assert (dwell_report["frequency"] == dwell_data.frequency) #TODO: update
+    assert (dwell_report["frequency"] == dwell_data.frequency)
 
     if is_first:
       self.dwell_data_channel_accum[self.dwell_data_row_index, :]     = 0

@@ -29,7 +29,6 @@ class pluto_esm_hw_dwell_reporter:
 
   def process_message(self, data):
     self._process_common_header(data)
-    #TODO: is this dwell header scheme reasonable? seems inefficient
 
     unpacked_header = PACKED_DWELL_STATS_HEADER.unpack(data[:PACKED_DWELL_STATS_HEADER.size])
 
