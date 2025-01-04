@@ -166,6 +166,8 @@ class render_emitters:
       emitter_age   = min(999, round(entry["emitter_age"]))
       update_age    = min(99, round(entry["update_age"]))
       num_dwells    = min(99, entry["analysis_data"]["num_dwells"])
+      power_ratio   = entry["analysis_data"]["power_mean_value"] / entry["analysis_data"]["power_max"]
+      power_ratio_i = min(99, int(round(power_ratio * 100)))
 
       if entry["update_age"] < self.emitter_stale_threshold:
         emitter_color = self.colors["emitter_entry_active"]
@@ -174,8 +176,13 @@ class render_emitters:
 
       name = self._get_cw_signal_name(freq)
 
-      s = "{:2} {:6.1f} {:<5.1f}  {:3.0f} {:3.0f} {:3.0f} {:3.0f} {:>2.0f} {:>2} {:<8}".format(index, freq, bandwidth,
-        threshold_dB, power_mean_dB, power_max_dB, emitter_age, update_age, num_dwells, name)
+      if bandwidth < 10.0:
+        bandwidth_str = "{:3.1f}".format(bandwidth)
+      else:
+        bandwidth_str = "{:<3}".format(int(round(bandwidth)))
+
+      s = "{:2} {:6.1f} {:3s}  {:3.0f} {:3.0f} {:3.0f} {:2} {:3.0f} {:>2.0f} {:<8}".format(index, freq, bandwidth_str,
+        threshold_dB, power_mean_dB, power_max_dB, power_ratio_i, emitter_age, update_age, name)
       pos_offset = [8, 16 + self.emitter_text_height * (index - 1)]
 
       emitter_entries.append({"str": s, "pos_offset": pos_offset, "color": emitter_color})

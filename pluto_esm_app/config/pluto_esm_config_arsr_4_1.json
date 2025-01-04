@@ -2,7 +2,7 @@
     "sim_mode": {"enable": 0, "filename": "", "speed": 1.0},
     "enable_recording": 0,
     "analysis_config": {
-      "enable_pdw_recording": 0,
+      "enable_pdw_recording": 1,
       "cw_emitter_config": {
         "max_dwell_age"               : 300,
         "max_signal_age"              : 30,
