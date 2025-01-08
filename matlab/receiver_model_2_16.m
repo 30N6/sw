@@ -38,6 +38,7 @@ for ii = 1:length(drone_entries)
 
     iq_data = get_drone_data(filepath);
     run_model(iq_data, input_f0, input_fs, filename);
+    break;
 end
 
 function iq_data = get_drone_data(filepath)
@@ -49,9 +50,9 @@ function run_model(iq_data, input_f0, input_fs, filepath)
     plot_dir = './plot';
 
     dwell_freqs = [96.0:48.0:6000.0].' * 1e6;
-    channel_spacing = 0.96e6;
-    chan_mask = 0xFFFFFFFFFFFFFF0;
-    num_channels = 64;
+    channel_spacing = 3.84e6;
+    chan_mask = 0x7FFE;
+    num_channels = 16;
     output_fs = 61.44e6;
        
     input_freq_range = [input_f0 - input_fs/2, input_f0 + input_fs/2];
@@ -108,7 +109,7 @@ function run_model(iq_data, input_f0, input_fs, filepath)
     s = split(filepath, '.');
     file_base = s{1};
 
-    fig_fn = sprintf('%s/%s_input.png', plot_dir, file_base);
+    fig_fn = sprintf('%s/%s_input_%d.png', plot_dir, file_base, num_channels);
     saveas(f, fig_fn);    
 
     clear selected_iq
