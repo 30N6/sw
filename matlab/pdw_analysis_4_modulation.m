@@ -6,7 +6,7 @@ channel_clock_period = (32/61.44e6);
 if reload
     %filename = 'analysis-20241123-132126.log';
     %filename = 'analysis-20241129-141222.log';
-    filename = 'analysis-20241129-145039-1213.44.log';
+    filename = 'analysis-20250103-112529.log';
     lines = readlines(filename);
     pdw_reports = [];
     init_done = false;
@@ -78,7 +78,8 @@ freq = 1336.32;    %LFM
 %freq = 1230.72;
 %freq = 1278.72;
 
-matching_pdws = pdw_reports(([pdw_reports.channel_frequency] == freq) & ([pdw_reports.buffered_frame_valid] == 1));
+%matching_pdws = pdw_reports(([pdw_reports.channel_frequency] == freq) & ([pdw_reports.buffered_frame_valid] == 1));
+matching_pdws = pdw_reports(([pdw_reports.buffered_frame_valid] == 1) & ([pdw_reports.pulse_power] > 10));
 
 figure(2);
 pri = diff([matching_pdws.ts_pulse_start]);
