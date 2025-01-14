@@ -1,10 +1,10 @@
 L = 16; % subbands
 
-output_width = 12 + log2(L);
+output_width = 16 + log2(L);
 
 M = 12;         % taps per subband
 N = M*L;        % total taps
-alpha = 0.8;    %broadening factor
+alpha = 0.99;    %broadening factor
 beta = 0.8;     %shape factor
 H = kaiser(N,beta*M)' .* sinc(((-N/2:N/2-1))/(alpha*L));
 figure(1);
@@ -58,7 +58,9 @@ H_f(H_f > (2^(output_width - 1) - 1)) = 2^(output_width - 1) - 1;
 %plot(H - H_f / (2^(output_width - 1)));
 s = "";
 for ii = 1:length(H_f)
-    s = s + sprintf('%3d => \"%s\", ', ii - 1, dec2bin(H_f(ii), output_width));
+    d = bitand(typecast(int32(H_f(ii)), 'uint32'), uint32(0xFFFFF));
+
+    s = s + sprintf('%3d => \"%s\", ', ii - 1, dec2bin(d, output_width));
     if mod(ii-1, 8) == 7
         s = s + "\n";
     end
@@ -68,7 +70,9 @@ fprintf(s)
 
 s = "";
 for ii = 1:length(H_f)
-    s = s + sprintf("%3d: %d\'h%s, ", ii - 1, output_width, dec2hex(H_f(ii), ceil(output_width/4)));
+    d = bitand(typecast(int32(H_f(ii)), 'uint32'), uint32(0xFFFFF));
+
+    s = s + sprintf("%3d: %d\'h%s, ", ii - 1, output_width, dec2hex(d, ceil(output_width/4)));
     if mod(ii-1, 8) == 7
         s = s + "\n";
     end

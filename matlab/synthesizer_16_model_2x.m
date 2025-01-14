@@ -1,5 +1,5 @@
 L           = 16;
-coef_width  = 18;
+coef_width  = 20;
 data_width  = 12;
 
 fs_in           = 61.44e6;
@@ -10,8 +10,7 @@ data_length_in  = 0.5 * L * data_length_out;
 H_a = get_analysis_sub_filters(L, coef_width);
 H_s = get_synthesis_sub_filters(L, coef_width);
 
-
-filename = sprintf("./channelizer_test_data_2024_01_25_%d.txt", L);
+filename = sprintf("./channelizer_test_data_2025_01_08_%d.txt", L);
 
 for frame = 1:1
     d = gen_stim_data(data_length_in, data_width, frame, fs_in);
@@ -42,17 +41,9 @@ for frame = 1:1
         end        
     end
     
-    x_synthesis_demod = x_analysis_output;
-    for channel = 1:L
-        if mod(channel - 1, 2) == 1
-            x_synthesis_demod(channel, :) = x_analysis_output(channel, :) .* x_mod;
-        end        
-    end
-
     x_synthesis_fft = zeros(size(x_analysis_output));
     for slice = 1:size(x_synthesis_fft, 2)
-        x_synthesis_fft(:, slice) = fft(x_synthesis_demod(:, slice));
-        %x_synthesis_fft(:, slice) = fft(x_analysis_output(:, slice));
+        x_synthesis_fft(:, slice) = fft(x_analysis_output_u(:, slice));
     end
 
     x_synthesis_filtered = zeros(size(x_pp));
@@ -88,7 +79,7 @@ for frame = 1:1
     figure(12);
     plot(1:length(x_synthesis_output), 20*log10(abs(x_synthesis_output)));
 
-    %%save_test_data(filename, d);
+    save_test_data(filename, d);
     
     break;
 end
