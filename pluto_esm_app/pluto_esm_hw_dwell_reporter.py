@@ -54,8 +54,11 @@ class pluto_esm_hw_dwell_reporter:
       self.partial_dwell_report = report
     else:
       if (self.partial_dwell_report != report):
+        print("[hw_dwell_reporter] mismatch: partial_dwell_report={}".format(self.partial_dwell_report))
+        print("[hw_dwell_reporter] mismatch:               report={}".format(report))
         self.logger.log(self.logger.LL_WARN, "[hw_dwell_reporter] mismatch: partial_dwell_report={}".format(self.partial_dwell_report))
         self.logger.log(self.logger.LL_WARN, "[hw_dwell_reporter] mismatch:               report={}".format(report))
+        self.logger.flush()
       assert (self.partial_dwell_report == report)
 
     computed_duration = report["ts_dwell_end"] - report["ts_dwell_start"]

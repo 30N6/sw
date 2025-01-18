@@ -76,7 +76,14 @@ class pluto_esm_analysis_processor:
       combined_data         = self.pending_combined_data.pop(0)
       expected_pulse_count  = combined_data["pdw_summary_report"]["dwell_pulse_total_count"] - combined_data["pdw_summary_report"]["dwell_pulse_drop_count"]
       actual_pulse_count    = len(combined_data["pdw_pulse_reports"])
-      assert (expected_pulse_count == actual_pulse_count)
+      if (expected_pulse_count != actual_pulse_count):
+        self.logger.log(self.logger.LL_WARN, "_process_matched_reports: WARNING -- pulse count mismatch: {} {}".format(expected_pulse_count, actual_pulse_count))
+        self.logger.flush()
+
+        print("_process_matched_reports: WARNING -- pulse count mismatch: {} {}".format(expected_pulse_count, actual_pulse_count))
+        #print("combined_data: {}".format(combined_data))
+      #assert (expected_pulse_count == actual_pulse_count)
+
       self.logger.log(self.logger.LL_INFO, "[analysis_processor] _process_matched_reports: seq_num={} freq={} num_pulses={}".format(combined_data["pdw_summary_report"]["dwell_seq_num"],
                                                                                                                                     combined_data["dwell_report"]["dwell_data"].frequency,
                                                                                                                                     actual_pulse_count))
@@ -104,6 +111,8 @@ class pluto_esm_analysis_processor:
       if pdw_dwell_seq_num == dwell_seq_num:
         matched_pulse_reports.append(self.pending_pdw_pulse_reports.pop(0)["pdw_pulse_report"])
       else:
+        if (pdw_dwell_seq_num <= dwell_seq_num):
+          print("_match_dwell_reports: out of order seq num: pdw={} dwell={}".format(pdw_dwell_seq_num, dwell_seq_num))
         assert(pdw_dwell_seq_num > dwell_seq_num)
         break
 

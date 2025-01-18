@@ -24,9 +24,13 @@ class pluto_esm_pdw_modulation_analysis:
     x_freq = np.arange(0, y_freq.size * self.dt, self.dt)
 
     [p_freq, p_info] = np.polynomial.polynomial.Polynomial.fit(x_freq, y_freq, deg=1, full=True)
-    p_freq = p_freq.convert().coef
 
+    p_freq = p_freq.convert().coef
     y_poly = np.polynomial.polynomial.polyval(x_freq, p_freq)
+
+    if len(p_freq) < 2:
+      print("check_intrapulse_modulation: polynomial fit failed -- p_freq={} p_info={} x_freq={} y_freq={}".format(p_freq, p_info, x_freq, y_freq))
+      return None
 
     freq_initial  = p_freq[0]
     freq_slope    = p_freq[1] * 1e-6
