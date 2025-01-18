@@ -1,0 +1,83 @@
+{
+    "sim_mode": {"enable": 0, "filename": "./log/recorded_data-20241125-174304.log", "speed": 1.0},
+    "enable_recording": 0,
+    "analysis_config": {
+      "enable_pdw_recording": 1,
+      "cw_emitter_config": {
+        "max_dwell_age"               : 300,
+        "max_signal_age"              : 30,
+        "auto_threshold_factor_dB"    : 6,
+        "auto_threshold_min_dB"       : 0,
+        "num_dwells_required"         : 5
+      },
+      "pulsed_emitter_config": {
+        "expected_pulse_count_factor" : 0.1,
+        "min_matched_pulses"          : 40,
+        "max_dwell_age"               : 60,
+        "max_emitter_age"             : 30,
+        "max_pdw_age_to_confirm"      : 20,
+        "emitter_update_interval"     : 0.5,
+        "PW_range_scaling"            : [0.25, 1.25],
+        "PRI_range_scaling"           : [0.75, 1.25],
+        "modulation_threshold"        : 0.25,
+        "histogram_max_pri"           : 65536,
+        "histogram_max_pd"            : 1024
+      },
+      "modulation_analysis": {"FM_threshold_residual": 0.05, "FM_threshold_r_squared": 0.5, "FM_threshold_slope": 1000, "FM_min_samples": 8}
+    },
+    "fast_lock_config": {"recalibration_interval": 60.0, "recalibration_pause": 2.0},
+    "dwell_config": {"freq_start": 96.0, "freq_step": 48.0, "channel_step": 0.96},
+    "scan_config": {
+      "randomize_scan_order": 0,
+      "include_freqs": [
+          {"freq_range": [5600, 5700], "dwell_time": 0.100, "comment": "ISM-5.0"}
+      ],
+      "exclude_freqs": [
+      ]
+    },
+    "emitter_config": {
+        "pulsed_emitters": [
+            {"name": "vid-NTSC",  "freq_range": [5600, 5950], "PW_range": [1, 10000],   "PRI_range": [10,  1000], "priority": 2, "threshold_dB": 9}
+        ],
+        "cw_emitters": [
+            {"name": "FM-radio",  "freq_range": [88.00,   108.00],    "priority": 0 },
+            {"name": "RNAV-VHF",  "freq_range": [108.00,  117.98],    "priority": 0 },
+            {"name": "airband",   "freq_range": [118.00,  137.00],    "priority": 2, "manual_threshold_mean_dB": 20.0 },
+            {"name": "ham-2m",    "freq_range": [144.00,  148.00],    "priority": 2, "manual_threshold_mean_dB": 15.0 },
+            {"name": "MURS",      "freq_range": [151.82,  154.60],    "priority": 2, "manual_threshold_mean_dB": 35.0 },
+            {"name": "TV-VHF",    "freq_range": [174.00,  216.00],    "priority": 0 },
+            {"name": "ILS-UHF",   "freq_range": [328.60,  335.40],    "priority": 0 },
+            {"name": "ham-70cm",  "freq_range": [450.00,  470.00],    "priority": 2, "manual_threshold_mean_dB": 15.0 },
+            {"name": "GMRS",      "freq_range": [462.56,  467.73],    "priority": 2, "manual_threshold_mean_dB": 15.0 },
+            {"name": "TV-UHF1",   "freq_range": [470.00,  608.00],    "priority": 0 },
+            {"name": "TV-UHF2",   "freq_range": [614.00,  698.00],    "priority": 0 },
+            {"name": "ISM-434",   "freq_range": [433.00,  435.00],    "priority": 2, "manual_threshold_mean_dB": 15.0 },
+            {"name": "ISM-900",   "freq_range": [902.00,  928.00],    "priority": 2, "manual_threshold_mean_dB": 15.0 },
+            {"name": "ham-1.3",   "freq_range": [1240.00, 1300.00],   "priority": 2, "manual_threshold_mean_dB": 15.0 },
+            {"name": "ISM-2.4",   "freq_range": [2400.00, 2500.00],   "priority": 2, "manual_threshold_mean_dB": 25.0 },
+            {"name": "ISM-5.8",   "freq_range": [5725.00, 5875.00],   "priority": 2, "manual_threshold_mean_dB": 25.0 },
+            {"name": "Cell-up",   "freq_range": [663.00, 698.00],     "priority": 2, "manual_threshold_mean_dB": 25.0, "comment": "Band 71 uplink"      },
+            {"name": "Cell-dn",   "freq_range": [617.00, 652.00],     "priority": 1,                                   "comment": "Band 71 downlink"    },
+            {"name": "Cell-up",   "freq_range": [699.00, 716.00],     "priority": 2, "manual_threshold_mean_dB": 25.0, "comment": "Band 12/17 uplink"   },
+            {"name": "Cell-dn",   "freq_range": [729.00, 746.00],     "priority": 1,                                   "comment": "Band 12/17 downlink" },
+            {"name": "Cell-dn",   "freq_range": [717.00, 728.00],     "priority": 1,                                   "comment": "Band 29 downlink"    },
+            {"name": "Cell-up",   "freq_range": [777.00, 787.00],     "priority": 2, "manual_threshold_mean_dB": 25.0, "comment": "Band n13 uplink"     },
+            {"name": "Cell-dn",   "freq_range": [746.00, 756.00],     "priority": 1,                                   "comment": "Band n13 downlink"   },
+            {"name": "Cell-up",   "freq_range": [814.00, 849.00],     "priority": 2, "manual_threshold_mean_dB": 25.0, "comment": "Band 26/5 uplink"    },
+            {"name": "Cell-dn",   "freq_range": [859.00, 894.00],     "priority": 1,                                   "comment": "Band 26/5 downlink"  },
+            {"name": "Cell-up",   "freq_range": [1850.00, 1915.00],   "priority": 2, "manual_threshold_mean_dB": 25.0, "comment": "Band 2/25 uplink"    },
+            {"name": "Cell-dn",   "freq_range": [1930.00, 1995.00],   "priority": 1,                                   "comment": "Band 2/25 downlink"  },
+            {"name": "Cell-up",   "freq_range": [1710.00, 1780.00],   "priority": 2, "manual_threshold_mean_dB": 25.0, "comment": "Band 4/66 uplink"    },
+            {"name": "Cell-dn",   "freq_range": [2110.00, 2200.00],   "priority": 1,                                   "comment": "Band 4/66 downlink"  },
+            {"name": "Cell-up",   "freq_range": [2305.00, 2315.00],   "priority": 2, "manual_threshold_mean_dB": 25.0, "comment": "Band 30 uplink"      },
+            {"name": "Cell-dn",   "freq_range": [2350.00, 2360.00],   "priority": 1,                                   "comment": "Band 30 downlink"    },
+            {"name": "Cell-dn",   "freq_range": [2496.00, 2690.00],   "priority": 1, "manual_threshold_mean_dB": 25.0, "comment": "Band 41 up/downlink" },
+            {"name": "GPS-L1",    "freq_range": [1574.42, 1576.42],   "priority": 2, "manual_threshold_mean_dB": 15.0, "comment": "GPS L1"              },
+            {"name": "GPS-L2",    "freq_range": [1226.60, 1228.60],   "priority": 2, "manual_threshold_mean_dB": 10.0, "comment": "GPS L2C"             }
+        ]
+    },
+    "pluto_dma_reader_path": "../pluto_dma_reader/pluto_dma_reader",
+    "pluto_credentials": {"username": "root", "password": "analog"},
+    "graphics": {"fullscreen": 0, "noframe": 0},
+    "debug_log": 0
+}
