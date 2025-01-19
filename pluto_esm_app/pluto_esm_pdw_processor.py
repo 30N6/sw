@@ -24,7 +24,13 @@ class pluto_esm_pdw_processor:
 
     dwell_freqs = np.unique([p["channel_frequency"] for p in pdws])
     for channel_freq in dwell_freqs:
-      channel_pdws        = [p for p in pdws if (p["channel_frequency"] == channel_freq)]
+      if channel_freq not in dwell_num_samples:
+        print("[submit_dwell_data] WARNING -- channel_freq={} not found in dwell_num_samples".format(channel_freq))
+        self.logger.log(self.logger.LL_WARN, "[submit_dwell_data] WARNING -- channel_freq={} not found in dwell_num_samples".format(channel_freq))
+        self.logger.flush()
+        continue
+
+      channel_pdws = [p for p in pdws if (p["channel_frequency"] == channel_freq)]
       channel_num_samples = dwell_num_samples[channel_freq]
 
       pulse_duration_raw  = np.asarray([p["pulse_duration"] for p in channel_pdws])

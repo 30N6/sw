@@ -1,6 +1,6 @@
 {
     "sim_mode": {"enable": 0, "filename": "./log/recorded_data-20241125-174304.log", "speed": 1.0},
-    "enable_recording": 0,
+    "enable_recording": 1,
     "analysis_config": {
       "enable_pdw_recording": 1,
       "cw_emitter_config": {
@@ -13,7 +13,7 @@
       "pulsed_emitter_config": {
         "expected_pulse_count_factor" : 0.1,
         "min_matched_pulses"          : 40,
-        "max_dwell_age"               : 2,
+        "max_dwell_age"               : 60,
         "max_emitter_age"             : 30,
         "max_pdw_age_to_confirm"      : 20,
         "emitter_update_interval"     : 0.5,
@@ -30,14 +30,14 @@
     "scan_config": {
       "randomize_scan_order": 0,
       "include_freqs": [
-          {"freq_range": [2400, 2500], "dwell_time": 0.250, "comment": "ISM-2.4"}
+          {"freq_range": [5600, 5950], "dwell_time": 0.010, "comment": "ISM-5.0"}
       ],
       "exclude_freqs": [
       ]
     },
     "emitter_config": {
         "pulsed_emitters": [
-            {"name": "ELRS",  "freq_range": [2400, 2500], "PW_range": [1, 10000],   "PRI_range": [10,  10000], "priority": 2, "threshold_dB": 9}
+            {"name": "NTSC-5.8",  "freq_range": [5600, 5950], "PW_range": [1, 5],   "PRI_range": [50,  300], "priority": 2, "threshold_dB": 9}
         ],
         "cw_emitters": [
             {"name": "FM-radio",  "freq_range": [88.00,   108.00],    "priority": 0 },
