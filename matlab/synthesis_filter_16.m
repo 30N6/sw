@@ -2,9 +2,9 @@ L = 16; % subbands
 
 output_width = 16 + log2(L);
 
-M = 12;         % taps per subband
+M = 6;         % taps per subband
 N = M*L;        % total taps
-alpha = 0.99;    %broadening factor
+alpha = 0.95;    %broadening factor
 beta = 0.8;     %shape factor
 H = kaiser(N,beta*M)' .* sinc(((-N/2:N/2-1))/(alpha*L));
 figure(1);

@@ -1,4 +1,4 @@
-iq_width = 12;
+iq_width = 16;
 N = 1024;
 
 %f = linspace(0, pi, N);

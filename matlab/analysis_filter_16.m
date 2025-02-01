@@ -2,7 +2,7 @@ L = 16; % subbands
 
 output_width = 12 + log2(L);
 
-M = 12;         % taps per subband
+M = 8;         % taps per subband
 N = M*L;        % total taps
 alpha = 0.8;    %broadening factor
 beta = 0.8;     %shape factor
