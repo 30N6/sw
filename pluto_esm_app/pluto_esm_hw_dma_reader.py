@@ -21,7 +21,7 @@ class pluto_esm_hw_dma_reader_thread:
   PACKED_UDP_HEADER = struct.Struct("<" + PACKED_UINT32)
 
   def __init__(self, arg):
-    self.logger         = pluto_esm_logger.pluto_esm_logger(arg["log_dir"], "pluto_esm_hw_dma_reader_thread", arg["log_level"])
+    self.logger         = pluto_esm_logger.pluto_esm_logger(arg["log_dir"], "pluto_esm_hw_dma_rea4der_thread", arg["log_level"])
     self.request_queue  = arg["request_queue"]
     self.result_queue   = arg["result_queue"]
     self.use_udp_dma_rx = arg["use_udp_dma_rx"]
@@ -179,11 +179,11 @@ class pluto_esm_hw_dma_reader_runner_thread:
 
     if self.os_type == "Windows":
       command_list = ["plink", "-pw", self.credentials["password"], "{}@{}".format(self.credentials["username"], self.remote_ip),
-        "chmod +x ./{0}; ./{0} -p local: -c {1}".format(self.reader_file, self.local_ip)]
+        "chmod +x ./{0}; ./{0} -p local: -c {1} -b {2}".format(self.reader_file, self.local_ip, TRANSFER_SIZE//4)]
     elif self.os_type == "Linux":
       command_list = ["sshpass", "-p", self.credentials["password"], "ssh", "-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null",
         "{}@{}".format(self.credentials["username"], self.remote_ip),
-        "chmod +x ./{0}; ./{0} -p local: -c {1}".format(self.reader_file, self.local_ip)]
+        "chmod +x ./{0}; ./{0} -p local: -c {1} -b {2}".format(self.reader_file, self.local_ip, TRANSFER_SIZE//4)]
     else:
       self.logger.log(self.logger.LL_ERROR, "unsupported OS: {}".format(os_type))
       self.shutdown("error")

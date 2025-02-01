@@ -21,16 +21,16 @@
   } \
 }
 
-#define DMA_WORD_BYTE_SIZE    4
-#define D2H_BUFFER_WORD_SIZE  64
-#define DEVICE_NAME_D2H       "axi-iio-dma-d2h"
+#define DMA_WORD_BYTE_SIZE        4
+#define D2H_BUFFER_WORD_SIZE_MAX  128
+#define DEVICE_NAME_D2H           "axi-iio-dma-d2h"
 
 #define UDP_PORT 50055
 
 #pragma pack(push, 1)
 typedef struct {
   uint32_t seq_num;
-  uint32_t data[D2H_BUFFER_WORD_SIZE];
+  uint32_t data[D2H_BUFFER_WORD_SIZE_MAX];
 } dma_packet_t;
 #pragma pack(pop)
 
@@ -38,6 +38,7 @@ static const struct option options[] = {
   {"help",            no_argument,        0, 'h'},
   {"pluto_addr",      required_argument,  0, 'p'},
   {"client_addr",     required_argument,  0, 'c'},
+  {"buffer_size",     required_argument,  0, 'b'},
   {0, 0, 0, 0},
 };
 
@@ -45,6 +46,7 @@ static const char *options_descriptions[] = {
   "Show this help and quit.",
   "Pluto IIO device address.",
   "Client IP address.",
+  "DMA buffer size."
 };
 
 //todo: cleanup
@@ -52,7 +54,7 @@ static void usage(char *argv[])
 {
   unsigned int i;
 
-  printf("Usage:\n\t%s [-s <size>] <iio_device>\n\nOptions:\n", argv[0]);
+  printf("Usage:\n\t%s \n\nOptions:\n", argv[0]);
   for (i = 0; options[i].name; i++)
   {
     printf("\t-%c, --%s\n\t\t\t%s\n", options[i].val, options[i].name, options_descriptions[i]);
@@ -66,6 +68,8 @@ static struct iio_buffer*   dma_buffer_d2h    = NULL;
 int                         socket_desc       = 0;
 struct sockaddr_in          client_sockaddr   = {0};
 uint32_t                    dma_seq_num       = 0;
+uint32_t                    dma_buffer_size   = 0;
+uint32_t                    dma_packet_size   = 0;
 
 static bool stop = false;
 
@@ -110,9 +114,9 @@ bool process_buffer()
   dma_packet_t packet;
   packet.seq_num = dma_seq_num;
   dma_seq_num++;
-  memcpy((void*)&packet.data, p_data, D2H_BUFFER_WORD_SIZE * DMA_WORD_BYTE_SIZE);
+  memcpy((void*)&packet.data, p_data, dma_buffer_size * DMA_WORD_BYTE_SIZE);
 
-  if (sendto(socket_desc, &packet, sizeof(packet), 0, (struct sockaddr*)&client_sockaddr, sizeof(client_sockaddr)) < 0)
+  if (sendto(socket_desc, &packet, dma_packet_size, 0, (struct sockaddr*)&client_sockaddr, sizeof(client_sockaddr)) < 0)
   {
     return -3;
   }
@@ -128,12 +132,13 @@ int main (int argc, char **argv)
   struct iio_device* dev_d2h = NULL;
   char* device_addr = 0;
   char* client_addr = 0;
+  char* buffer_size = 0;
   int i = 0;
   bool timeout = false;
   int option_index = 0;
   int arg_index = 0;
 
-  while ((i = getopt_long(argc, argv, "p:c:h", options, &option_index)) != -1)
+  while ((i = getopt_long(argc, argv, "p:c:b:h", options, &option_index)) != -1)
   {
     arg_index++;
     switch (i)
@@ -144,6 +149,10 @@ int main (int argc, char **argv)
 
       case 'c':
         client_addr = optarg;
+        break;
+
+      case 'b':
+        buffer_size = optarg;
         break;
 
       case 'h':
@@ -167,6 +176,26 @@ int main (int argc, char **argv)
   else
   {
     fprintf(stderr, "Device address required.\n");
+    return EXIT_FAILURE;
+  }
+
+  if (buffer_size)
+  {
+    dma_buffer_size = atoi(buffer_size);
+    dma_packet_size = dma_buffer_size*4 + 4;
+    if ((dma_buffer_size != 64) && (dma_buffer_size != 128))
+    {
+      fprintf(stderr, "DMA buffer size must be 64 or 128.\n");
+      return EXIT_FAILURE;
+    }
+    else
+    {
+      printf("DMA buffer size: %u\n", dma_buffer_size);
+    }
+  }
+  else
+  {
+    fprintf(stderr, "DMA buffer size required.\n");
     return EXIT_FAILURE;
   }
 
@@ -196,7 +225,7 @@ int main (int argc, char **argv)
   iio_channel_enable(chan_dma_d2h);
   iio_context_set_timeout(ctx, 1000);
 
-  IIO_ENSURE((dma_buffer_d2h = iio_device_create_buffer(dev_d2h, D2H_BUFFER_WORD_SIZE, false)) && "Failed to create D2H buffer");
+  IIO_ENSURE((dma_buffer_d2h = iio_device_create_buffer(dev_d2h, dma_buffer_size, false)) && "Failed to create D2H buffer");
 
   while (!stop)
   {
