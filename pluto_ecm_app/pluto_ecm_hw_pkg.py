@@ -71,54 +71,71 @@ PACKED_ECM_CONFIG_CONTROL         = struct.Struct("<" + PACKED_UINT32 + PACKED_U
 PACKED_STATUS_REPORT = struct.Struct("<" + PACKED_UINT32 + PACKED_UINT32 + "xx" + PACKED_UINT8 + PACKED_UINT8 +
                                            PACKED_UINT32 + PACKED_UINT32 + PACKED_UINT32 + PACKED_UINT32 + PACKED_UINT32)
 
+PACKED_ECM_DWELL_PROGRAM_ENTRY = struct.Struct("<" + PACKED_UINT8 + PACKED_UINT8 + PACKED_UINT16)           #enable, initial_dwell_index, global_counter_init
 
-PACKED_ESM_MESSAGE_DWELL_ENTRY    = struct.Struct("<" + PACKED_UINT8 + "xxx" + "xxxx" +
-                                                        PACKED_UINT16 + PACKED_UINT16 +
-                                                        PACKED_UINT32 +
-                                                        PACKED_UINT8 + PACKED_UINT8 + "xx" +
-                                                        PACKED_UINT8 + PACKED_UINT8 + "xx" +
-                                                        PACKED_UINT64 +
-                                                        PACKED_UINT8 + "x" + PACKED_UINT16 +
-                                                        "xxxx")
+PACKED_ECM_DWELL_ENTRY  = struct.Struct("<" + PACKED_UINT8 + PACKED_UINT8 + PACKED_UINT8 + PACKED_UINT8 +   #flags, repeat_count, fast_lock_profile, next_dwell_index
+                                              PACKED_UINT16 + PACKED_UINT16 +                               #pre lock, post lock delay
+                                              PACKED_UINT16 + PACKED_UINT16 +                               #tag, frequency
+                                              PACKED_UINT32 +                                               #measurement_duration
+                                              PACKED_UINT32)                                                #total_duration_max
 
-PACKED_DWELL_INSTRUCTION          = struct.Struct("<" + PACKED_UINT8 + PACKED_UINT8 + PACKED_UINT8 + PACKED_UINT8)
-PACKED_DWELL_PROGRAM              = struct.Struct("<" + PACKED_UINT8 + PACKED_UINT8 + "xx" + PACKED_UINT32 + PACKED_UINT64)
+PACKED_ECM_CHANNEL_CONTROL_ENTRY_HEADER = struct.Struct("<" + PACKED_UINT8 + PACKED_UINT8 + PACKED_UINT16 + #enable, trigger_mode, trigger_duration_max_minus_one
+                                                              PACKED_UINT32 +                               #trigger_threshold
+                                                              PACKED_UINT8 + PACKED_UINT8 + PACKED_UINT16)  #trigger_hyst_shift, drfm_gain, recording_address
 
-PACKED_DWELL_STATS_HEADER = struct.Struct("<" + PACKED_UINT32 + PACKED_UINT32 + "xx" + PACKED_UINT8 + PACKED_UINT8 +
-                                                PACKED_UINT32 +
-                                                PACKED_UINT16 + PACKED_UINT16 +
-                                                PACKED_UINT32 +
-                                                PACKED_UINT8 + PACKED_UINT8 + PACKED_UINT8 + PACKED_UINT8 +
-                                                "xx" + PACKED_UINT8 + PACKED_UINT8 +
-                                                "xxxx" +
-                                                "xxxxxxxx" + "xxxx" +
-                                                PACKED_UINT32 +
-                                                PACKED_UINT32 +
-                                                PACKED_UINT32 + PACKED_UINT32 +
-                                                PACKED_UINT32 + PACKED_UINT32)
-PACKED_DWELL_STATS_CHANNEL_ENTRY = struct.Struct("<" + PACKED_UINT32 + PACKED_UINT32 + PACKED_UINT32 + PACKED_UINT32)
-NUM_DWELL_STATS_TRAILER_BYTES = DMA_TRANSFER_SIZE - PACKED_DWELL_STATS_HEADER.size
+PACKED_ECM_CHANNEL_TX_PROGRAM_ENTRY     = struct.Struct("<" + PACKED_UINT8 + PACKED_UINT8 + PACKED_UINT16 + #valid, trigger_immediate_after_min, tx_instruction_index
+                                                              PACKED_UINT16 + PACKED_UINT16)                #duration_gate_min_minus_one, duration_gate_max_minus_one
 
-PACKED_PDW_PULSE_REPORT_HEADER = struct.Struct("<" + PACKED_UINT32 + PACKED_UINT32 + "xx" + PACKED_UINT8 + PACKED_UINT8 +
-                                                     PACKED_UINT32 +
-                                                     PACKED_UINT32 +
-                                                     PACKED_UINT32 +
-                                                     PACKED_UINT32 +
-                                                     PACKED_UINT32 + PACKED_UINT32 +
-                                                     PACKED_UINT32 +
-                                                     PACKED_UINT32 +
-                                                     PACKED_UINT32 + PACKED_UINT32 +
-                                                     "xx" + PACKED_UINT8 + PACKED_UINT8)
-
-PACKED_PDW_PULSE_IQ_WORD = struct.Struct("<" + PACKED_INT16 + PACKED_INT16)
-NUM_PDW_PULSE_TRAILER_WORDS = (DMA_TRANSFER_SIZE - PACKED_PDW_PULSE_REPORT_HEADER.size) // PACKED_PDW_PULSE_IQ_WORD.size
+PACKED_ECM_TX_INSTRUCTION_HEADER              = struct.Struct("<" + PACKED_UINT16)
+PACKED_ECM_TX_INSTRUCTION_DDS_SETUP_BPSK      = struct.Struct("<" + PACKED_UINT16 + PACKED_UINT16 + "xxxx")
+PACKED_ECM_TX_INSTRUCTION_DDS_SETUP_CW_SWEEP  = struct.Struct("<" + PACKED_UINT16 + PACKED_UINT16 + PACKED_UINT16 + PACKED_UINT16)
+PACKED_ECM_TX_INSTRUCTION_DDS_SETUP_CW_STEP   = struct.Struct("<" + PACKED_UINT16 + PACKED_UINT16 + PACKED_UINT16 + PACKED_UINT16)
+PACKED_ECM_TX_INSTRUCTION_PLAYBACK            = struct.Struct("<" + PACKED_UINT16 + PACKED_UINT16 + PACKED_UINT16 + PACKED_UINT16)
+PACKED_ECM_TX_INSTRUCTION_WAIT                = struct.Struct("<" + PACKED_UINT16 + PACKED_UINT8 + PACKED_UINT8 + PACKED_UINT8 + PACKED_UINT8 + PACKED_UINT8 + PACKED_UINT8)
+PACKED_ECM_TX_INSTRUCTION_JUMP                = struct.Struct("<" + PACKED_UINT16 + PACKED_UINT16 + PACKED_UINT8 + PACKED_UINT16 + "x")
 
 
-PACKED_PDW_SUMMARY_REPORT_HEADER = struct.Struct("<" + PACKED_UINT32 + PACKED_UINT32 + "xx" + PACKED_UINT8 + PACKED_UINT8 +
-                                                       PACKED_UINT32 +
-                                                       PACKED_UINT32 + PACKED_UINT32 +
-                                                       PACKED_UINT32 +
-                                                       PACKED_UINT32 +
-                                                       PACKED_UINT32 +
-                                                       PACKED_UINT32 +
-                                                       PACKED_UINT32)
+#TODO
+#
+#PACKED_DWELL_INSTRUCTION          = struct.Struct("<" + PACKED_UINT8 + PACKED_UINT8 + PACKED_UINT16)
+#PACKED_DWELL_PROGRAM              = struct.Struct("<" + PACKED_UINT8 + PACKED_UINT8 + "xx" + PACKED_UINT32 + PACKED_UINT64)
+#
+#PACKED_DWELL_STATS_HEADER = struct.Struct("<" + PACKED_UINT32 + PACKED_UINT32 + "xx" + PACKED_UINT8 + PACKED_UINT8 +
+#                                                PACKED_UINT32 +
+#                                                PACKED_UINT16 + PACKED_UINT16 +
+#                                                PACKED_UINT32 +
+#                                                PACKED_UINT8 + PACKED_UINT8 + PACKED_UINT8 + PACKED_UINT8 +
+#                                                "xx" + PACKED_UINT8 + PACKED_UINT8 +
+#                                                "xxxx" +
+#                                                "xxxxxxxx" + "xxxx" +
+#                                                PACKED_UINT32 +
+#                                                PACKED_UINT32 +
+#                                                PACKED_UINT32 + PACKED_UINT32 +
+#                                                PACKED_UINT32 + PACKED_UINT32)
+#PACKED_DWELL_STATS_CHANNEL_ENTRY = struct.Struct("<" + PACKED_UINT32 + PACKED_UINT32 + PACKED_UINT32 + PACKED_UINT32)
+#NUM_DWELL_STATS_TRAILER_BYTES = DMA_TRANSFER_SIZE - PACKED_DWELL_STATS_HEADER.size
+#
+#PACKED_PDW_PULSE_REPORT_HEADER = struct.Struct("<" + PACKED_UINT32 + PACKED_UINT32 + "xx" + PACKED_UINT8 + PACKED_UINT8 +
+#                                                     PACKED_UINT32 +
+#                                                     PACKED_UINT32 +
+#                                                     PACKED_UINT32 +
+#                                                     PACKED_UINT32 +
+#                                                     PACKED_UINT32 + PACKED_UINT32 +
+#                                                     PACKED_UINT32 +
+#                                                     PACKED_UINT32 +
+#                                                     PACKED_UINT32 + PACKED_UINT32 +
+#                                                     "xx" + PACKED_UINT8 + PACKED_UINT8)
+#
+#PACKED_PDW_PULSE_IQ_WORD = struct.Struct("<" + PACKED_INT16 + PACKED_INT16)
+#NUM_PDW_PULSE_TRAILER_WORDS = (DMA_TRANSFER_SIZE - PACKED_PDW_PULSE_REPORT_HEADER.size) // PACKED_PDW_PULSE_IQ_WORD.size
+#
+#
+#PACKED_PDW_SUMMARY_REPORT_HEADER = struct.Struct("<" + PACKED_UINT32 + PACKED_UINT32 + "xx" + PACKED_UINT8 + PACKED_UINT8 +
+#                                                       PACKED_UINT32 +
+#                                                       PACKED_UINT32 + PACKED_UINT32 +
+#                                                       PACKED_UINT32 +
+#                                                       PACKED_UINT32 +
+#                                                       PACKED_UINT32 +
+#                                                       PACKED_UINT32 +
+#                                                       PACKED_UINT32)
+#

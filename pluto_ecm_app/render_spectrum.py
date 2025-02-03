@@ -24,7 +24,6 @@ class render_spectrum:
     #self.max_freq             = sw_config.max_freq
     #self.dwell_bw             = sw_config.config["dwell_config"]["freq_step"]
     #self.channel_step         = sw_config.config["dwell_config"]["channel_step"]
-    #self.dwell_cal_interval   = sw_config.config["fast_lock_config"]["recalibration_interval"]
     #self.dwell_scan_fade_time = 0.5
 
     self.colors = {}
@@ -36,8 +35,10 @@ class render_spectrum:
     self.colors["grid_lines"]     = (0, 128, 128)
     self.colors["zoom_marker"]    = (0, 192, 192)
 
-    self.dwell_cal_height = 0.5
-    self.dwell_scan_height = 1 - self.dwell_cal_height
+    self.dwell_cal_interval   = sw_config.config["fast_lock_config"]["recalibration_interval"]
+
+    self.dwell_cal_height     = 0.5
+    self.dwell_scan_height    = 1 - self.dwell_cal_height
 
     self.dwell_count = len(sw_config.config["dwell_config"]["dwell_entries"])
     self.dwell_freqs = [d["freq"] for d in sw_config.config["dwell_config"]["dwell_entries"]]
@@ -90,17 +91,17 @@ class render_spectrum:
     #mhz_per_px    = self.max_freq / self.rect_dwell_display[2]
     #px_per_dwell  = math.ceil(self.dwell_bw / mhz_per_px)
 
-    ## calibration status
-    #for dwell_freq in self.sequencer.scan_dwells:
-    #  dwell = self.sequencer.scan_dwells[dwell_freq]
-    #  x = dwell_freq / mhz_per_px + self.rect_dwell_display[0]
-    #  dwell_rect = [x - px_per_dwell/2, self.rect_dwell_display[1], px_per_dwell, self.rect_dwell_display[3] * self.dwell_cal_height]
-    #
-    #  if not dwell.fast_lock_profile_valid:
-    #    dwell_color = self.colors["cal_old"]
-    #  else:
-    #    dwell_color = self._color_interp(self.colors["cal_new"], self.colors["cal_old"], (now - dwell.fast_lock_profile_time) / self.dwell_cal_interval)
-    #  pygame.draw.rect(self.surface, dwell_color, dwell_rect, 0)
+    # calibration status
+    for i in range(len(self.sequencer.fast_lock_cal_state)):
+      cal_state = self.sequencer.fast_lock_cal_state[i]
+      dwell_rect = [self.freq_coords[i] - (self.rect_width/self.dwell_count)/2, self.rect_dwell_display[1], (self.rect_width/self.dwell_count), self.rect_dwell_display[3] * self.dwell_cal_height]
+
+      if not cal_state.fast_lock_profile_valid:
+        cal_color = self.colors["cal_old"]
+      else:
+        cal_color = self._color_interp(self.colors["cal_new"], self.colors["cal_old"], (now - cal_state.fast_lock_profile_time) / self.dwell_cal_interval)
+      pygame.draw.rect(self.surface, cal_color, dwell_rect, 0)
+
     #
     ## scan dwells
     #for dwell_freq in self.sequencer.dwell_history:

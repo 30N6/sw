@@ -41,8 +41,10 @@ class render_status:
     status_rect = [1024, 0, 256, 768]
     pygame.draw.rect(self.surface, self.colors["border"], status_rect, 1)
 
+    #TODO: hardware error count
+
     #hw_stats = self.sequencer.hw_stats.stats
-    
+
     stats_desc = [
                   #{"format": "Dwell/sec         : {:.1f}", "value": hw_stats["dwells_per_sec"],                           "pos_offset": [8, 16] },
                   #{"format": "Scan time         : {:.1f}", "value": hw_stats["scan_time"],                                "pos_offset": [8, 32] },
@@ -68,7 +70,7 @@ class render_status:
                   {"format": "HW temp AD9361    : {:.1f}", "value": self.hw_interface.temp_9361,                "pos_offset": [8, 352]},
                   {"format": "HW temp FPGA      : {:.1f}", "value": self.hw_interface.temp_fpga,                "pos_offset": [8, 368]},
                   ]
-    
+
     for entry in stats_desc:
       stats_str = entry["format"].format(entry["value"])
       text_data = self.font.render(stats_str, True, self.colors["stats"])
