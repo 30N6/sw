@@ -8,7 +8,7 @@ import pluto_ecm_logger
 import pluto_ecm_data_recorder
 import pluto_ecm_data_loader
 import render_status
-#import render_spectrum
+import render_spectrum
 #import render_emitters
 
 class pluto_ecm_main_thread:
@@ -59,13 +59,13 @@ class pluto_ecm_main_thread:
     self.sequencer        = pluto_ecm_sequencer.pluto_ecm_sequencer(self.logger, self.recorder, self.sw_config,
                                                                     self.hw_interface, self.analysis_thread, self.sim_loader)
     self.render_status    = render_status.render_status(self.surface, self.sw_config, self.hw_interface, self.sequencer, self.VERSION)
-    #self.render_spectrum  = render_spectrum.render_spectrum(self.surface, self.sw_config, self.sequencer)
+    self.render_spectrum  = render_spectrum.render_spectrum(self.surface, self.sw_config, self.sequencer)
     #self.render_emitters  = render_emitters.render_emitters(self.surface, self.sw_config, self.analysis_thread)
 
   def run(self):
-    key_handlers = [] #key_handlers = [self.render_spectrum, self.render_emitters]
-    update_calls = [self.hw_interface, self.sequencer, self.render_status] #update_calls = [self.hw_interface, self.analysis_thread, self.sequencer, self.render_status, self.render_spectrum, self.render_emitters]
-    render_calls = [self.render_status] #render_calls = [self.render_status, self.render_spectrum, self.render_emitters]
+    key_handlers = [self.render_spectrum] #key_handlers = [self.render_spectrum, self.render_emitters]
+    update_calls = [self.hw_interface, self.sequencer, self.render_status, self.render_spectrum] #update_calls = [self.hw_interface, self.analysis_thread, self.sequencer, self.render_status, self.render_spectrum, self.render_emitters]
+    render_calls = [self.render_status, self.render_spectrum] #render_calls = [self.render_status, self.render_spectrum, self.render_emitters]
 
     running = True
     while (running):
