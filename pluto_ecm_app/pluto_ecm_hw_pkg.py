@@ -26,6 +26,9 @@ ECM_REPORT_MESSAGE_TYPE_DRFM_SUMMARY            = 0x21
 ECM_REPORT_MESSAGE_TYPE_STATUS                  = 0x30
 
 ECM_NUM_CHANNELS                                = 16
+ECM_NUM_CHANNELS_ACTIVE                         = 13  # remove split channel + two edge channels
+ECM_CHANNEL_MASK                                = 0x7FFC
+
 ECM_NUM_TX_INSTRUCTIONS                         = 512
 
 ECM_TX_INSTRUCTION_TYPE_NOP                     = 0
@@ -71,7 +74,7 @@ PACKED_ECM_CONFIG_CONTROL         = struct.Struct("<" + PACKED_UINT32 + PACKED_U
 PACKED_STATUS_REPORT = struct.Struct("<" + PACKED_UINT32 + PACKED_UINT32 + "xx" + PACKED_UINT8 + PACKED_UINT8 +
                                            PACKED_UINT32 + PACKED_UINT32 + PACKED_UINT32 + PACKED_UINT32 + PACKED_UINT32)
 
-PACKED_ECM_DWELL_PROGRAM_ENTRY = struct.Struct("<" + PACKED_UINT8 + PACKED_UINT8 + PACKED_UINT16)           #enable, initial_dwell_index, global_counter_init
+PACKED_ECM_DWELL_PROGRAM_ENTRY = struct.Struct("<" + PACKED_UINT8 + PACKED_UINT8 + PACKED_UINT16 + "xxxx")  #enable, initial_dwell_index, global_counter_init, padding
 
 PACKED_ECM_DWELL_ENTRY  = struct.Struct("<" + PACKED_UINT8 + PACKED_UINT8 + PACKED_UINT8 + PACKED_UINT8 +   #flags, repeat_count, fast_lock_profile, next_dwell_index
                                               PACKED_UINT16 + PACKED_UINT16 +                               #pre lock, post lock delay
@@ -97,25 +100,21 @@ PACKED_ECM_TX_INSTRUCTION_WAIT                = struct.Struct("<" + PACKED_UINT1
 PACKED_ECM_TX_INSTRUCTION_JUMP                = struct.Struct("<" + PACKED_UINT16 + PACKED_UINT16 + PACKED_UINT8 + PACKED_UINT16 + "x")
 
 
+PACKED_DWELL_STATS_HEADER = struct.Struct("<" + PACKED_UINT32 + PACKED_UINT32 + "xx" + PACKED_UINT8 + PACKED_UINT8 +    #common report header
+                                                PACKED_UINT8 + PACKED_UINT8 + PACKED_UINT8 + PACKED_UINT8 +             #dwell_entry: packed flags, repeat_count, fast_lock_profile, next_dwell_index
+                                                PACKED_UINT16 + PACKED_UINT16 +                                         #dwell_entry: pll_pre_lock_delay, pll_post_lock_delay
+                                                PACKED_UINT16 + PACKED_UINT16 +                                         #dwell_entry: tag, frequency
+                                                PACKED_UINT32 +                                                         #dwell_entry: measurement_duration
+                                                PACKED_UINT32 +                                                         #dwell_entry: total_duration_max
+                                                PACKED_UINT32 +                                                         #dwell_seq_num
+                                                PACKED_UINT32 +                                                         #global counter
+                                                PACKED_UINT32 +                                                         #actual_measurement_duration
+                                                PACKED_UINT32 +                                                         #actual_total_duration
+                                                PACKED_UINT32 + PACKED_UINT32)                                          #ts_dwell_start
+
+PACKED_DWELL_STATS_CHANNEL_ENTRY = struct.Struct("<" + PACKED_UINT32 + PACKED_UINT32 + PACKED_UINT32 + PACKED_UINT32)
+
 #TODO
-#
-#PACKED_DWELL_INSTRUCTION          = struct.Struct("<" + PACKED_UINT8 + PACKED_UINT8 + PACKED_UINT16)
-#PACKED_DWELL_PROGRAM              = struct.Struct("<" + PACKED_UINT8 + PACKED_UINT8 + "xx" + PACKED_UINT32 + PACKED_UINT64)
-#
-#PACKED_DWELL_STATS_HEADER = struct.Struct("<" + PACKED_UINT32 + PACKED_UINT32 + "xx" + PACKED_UINT8 + PACKED_UINT8 +
-#                                                PACKED_UINT32 +
-#                                                PACKED_UINT16 + PACKED_UINT16 +
-#                                                PACKED_UINT32 +
-#                                                PACKED_UINT8 + PACKED_UINT8 + PACKED_UINT8 + PACKED_UINT8 +
-#                                                "xx" + PACKED_UINT8 + PACKED_UINT8 +
-#                                                "xxxx" +
-#                                                "xxxxxxxx" + "xxxx" +
-#                                                PACKED_UINT32 +
-#                                                PACKED_UINT32 +
-#                                                PACKED_UINT32 + PACKED_UINT32 +
-#                                                PACKED_UINT32 + PACKED_UINT32)
-#PACKED_DWELL_STATS_CHANNEL_ENTRY = struct.Struct("<" + PACKED_UINT32 + PACKED_UINT32 + PACKED_UINT32 + PACKED_UINT32)
-#NUM_DWELL_STATS_TRAILER_BYTES = DMA_TRANSFER_SIZE - PACKED_DWELL_STATS_HEADER.size
 #
 #PACKED_PDW_PULSE_REPORT_HEADER = struct.Struct("<" + PACKED_UINT32 + PACKED_UINT32 + "xx" + PACKED_UINT8 + PACKED_UINT8 +
 #                                                     PACKED_UINT32 +

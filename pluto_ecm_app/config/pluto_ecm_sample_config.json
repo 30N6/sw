@@ -2,7 +2,7 @@
   "simulation": {"recording_enable": 0, "playback_enable": 0, "playback_filename": "./log/recorded_data-20241125-174304.log", "playback_speed": 1.0},
   "fast_lock_config": {"recalibration_interval": 60.0, "recalibration_pause": 5.0},
   "dwell_config": {
-    "dwell_entries": [
+    "dwell_freqs": [
       {"index": 0, "freq": 2425.0, "dwell_measurement_time": 0.000500, "dwell_total_time_max": 0.0020000, "tx_enabled": 1},
       {"index": 1, "freq": 2475.0, "dwell_measurement_time": 0.000500, "dwell_total_time_max": 0.0020000, "tx_enabled": 1},
       {"index": 2, "freq": 5665.0, "dwell_measurement_time": 0.000250, "dwell_total_time_max": 0.0020000, "tx_enabled": 0},

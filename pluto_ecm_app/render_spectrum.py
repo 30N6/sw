@@ -40,8 +40,8 @@ class render_spectrum:
     self.dwell_cal_height     = 0.5
     self.dwell_scan_height    = 1 - self.dwell_cal_height
 
-    self.dwell_count = len(sw_config.config["dwell_config"]["dwell_entries"])
-    self.dwell_freqs = [d["freq"] for d in sw_config.config["dwell_config"]["dwell_entries"]]
+    self.dwell_count = len(sw_config.config["dwell_config"]["dwell_freqs"])
+    self.dwell_freqs = [d["freq"] for d in sw_config.config["dwell_config"]["dwell_freqs"]]
     if self.dwell_count > 1:
       self.div_coords = [self.rect_left + (self.rect_width/self.dwell_count) * i for i in range(1, self.dwell_count)]
     else:

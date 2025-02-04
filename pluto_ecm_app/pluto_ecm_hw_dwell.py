@@ -36,12 +36,18 @@ class ecm_dwell_program_entry:
     assert (initial_dwell_index < ECM_NUM_DWELL_ENTRIES)
     assert (global_counter_init <= 0xFFFF)
 
-    self.enable               = enable
-    self.initial_dwell_index  = initial_dwell_index
-    self.global_counter_init  = global_counter_init
+    self.fields                         = {}
+    self.fields["enable"]               = enable
+    self.fields["initial_dwell_index"]  = initial_dwell_index
+    self.fields["global_counter_init"]  = global_counter_init
 
   def pack(self):
-    return PACKED_ECM_DWELL_PROGRAM_ENTRY.pack(self.enable, self.initial_dwell_index, self.global_counter_init)
+    return PACKED_ECM_DWELL_PROGRAM_ENTRY.pack(self.fields["enable"], self.fields["initial_dwell_index"], self.fields["global_counter_init"])
+
+  def __str__(self):
+    return "[dwell_program: fields={}]".format(self.fields)
+  def __repr__(self):
+    return self.__str__()
 
 class ecm_dwell_entry:
   def __init__(self, valid, next_index, fast_lock_profile, tag, freq, duration_meas, duration_max):
@@ -53,8 +59,7 @@ class ecm_dwell_entry:
     assert (duration_meas <= 0x0FFFFFFF)
     assert (duration_max <= 0x0FFFFFFF)
 
-    self.fields = {}
-
+    self.fields                           = {}
     self.fields["valid"]                  = valid
     self.fields["global_counter_check"]   = 1
     self.fields["global_counter_dec"]     = 1
@@ -72,7 +77,7 @@ class ecm_dwell_entry:
     self.fields["total_duration_max"]     = duration_max
 
   def __str__(self):
-    return "dwell_entry: fields={}".format(self.fields)
+    return "[dwell_entry: fields={}]".format(self.fields)
   def __repr__(self):
     return self.__str__()
 
@@ -90,10 +95,10 @@ class ecm_dwell_entry:
                                        self.fields["measurement_duration"],
                                        self.fields["total_duration_max"])
 
-  @staticmethod
-  def default_dwell():
-    return ecm_dwell_entry(0, 0, 0, 0, 0, 0, 0)
-
+  #@staticmethod
+  #def default_dwell():
+  #  return ecm_dwell_entry(0, 0, 0, 0, 0, 0, 0)
+  #
   #TODO: remove?
   #@staticmethod
   #def default_scan_dwell(entry_index, tag, freq, duration, fast_lock_profile):
@@ -106,6 +111,11 @@ class ecm_dwell_entry:
   #  return ecm_dwell_entry(d["valid"], d["next_index"], )
 
 
+def ecm_channel_index_hw_to_sw(hw_index):
+  return (hw_index - ECM_NUM_CHANNELS//2) % ECM_NUM_CHANNELS
+def ecm_channel_index_sw_to_hw(sw_index):
+  return (sw_index + ECM_NUM_CHANNELS//2) % ECM_NUM_CHANNELS
+
 class ecm_channel_control_entry:
   def __init__(self, enable, trigger_mode, trigger_duration_max_minus_one, trigger_threshold, trigger_hyst_shift, drfm_gain, recording_addr, program_entries):
     assert (enable <= 1)
@@ -117,21 +127,34 @@ class ecm_channel_control_entry:
     assert (recording_addr <= 0x7FFF)
     assert (len(program_entries) == ECM_NUM_CHANNEL_TX_PROGRAM_ENTRIES)
 
-    self.enable                         = enable
-    self.trigger_mode                   = trigger_mode
-    self.trigger_duration_max_minus_one = trigger_duration_max_minus_one
-    self.trigger_threshold              = trigger_threshold
-    self.trigger_hyst_shift             = trigger_hyst_shift
-    self.drfm_gain                      = drfm_gain
-    self.recording_addr                 = recording_addr
-    self.program_entries                = program_entries
+    self.fields                                   = {}
+    self.fields["enable"]                         = enable
+    self.fields["trigger_mode"]                   = trigger_mode
+    self.fields["trigger_duration_max_minus_one"] = trigger_duration_max_minus_one
+    self.fields["trigger_threshold"]              = trigger_threshold
+    self.fields["trigger_hyst_shift"]             = trigger_hyst_shift
+    self.fields["drfm_gain"]                      = drfm_gain
+    self.fields["recording_addr"]                 = recording_addr
+    self.fields["program_entries"]                = program_entries
 
   def pack(self):
-    packed_data = PACKED_ECM_CHANNEL_CONTROL_ENTRY_HEADER.pack(self.enable, self.trigger_mode, self.trigger_duration_max_minus_one,
-                                                               self.trigger_threshold,
-                                                               self.trigger_hyst_shift, self.drfm_gain, self.recording_addr)
-    for i in range(len(self.program_entries)):
-      packed_data += self.program_entries[i].pack()
+    packed_data = PACKED_ECM_CHANNEL_CONTROL_ENTRY_HEADER.pack(self.fields["enable"], self.fields["trigger_mode"], self.fields["trigger_duration_max_minus_one"],
+                                                               self.fields["trigger_threshold"],
+                                                               self.fields["trigger_hyst_shift"], self.fields["drfm_gain"], self.fields["recording_addr"])
+    for i in range(ECM_NUM_CHANNEL_TX_PROGRAM_ENTRIES):
+      packed_data += self.fields["program_entries"][i].pack()
+    return packed_data
+
+  def __str__(self):
+    return "[channel_entry: fields={}]".format(self.fields)
+  def __repr__(self):
+    return self.__str__()
+
+  @staticmethod
+  def default_channel_entry(channel_index):
+    enable = (ECM_CHANNEL_MASK & (1 << channel_index)) != 0
+    program_entries = [ecm_channel_tx_program_entry(0, 0, 0, 0, 0) for i in range(ECM_NUM_CHANNEL_TX_PROGRAM_ENTRIES)]
+    return ecm_channel_control_entry(enable, 0, 0, 0xFFFFFFFF, 1, 0, (ECM_DRFM_MEM_DEPTH // ECM_NUM_CHANNELS_ACTIVE) * channel_index, program_entries)
 
 
 class ecm_channel_tx_program_entry:
@@ -142,14 +165,21 @@ class ecm_channel_tx_program_entry:
     assert (duration_gate_min_minus_one <= 0x0FFF)
     assert (duration_gate_max_minus_one <= 0x0FFF)
 
-    self.valid                        = valid
-    self.trigger_immediate_after_min  = trigger_immediate_after_min
-    self.tx_instruction_index         = tx_instruction_index
-    self.duration_gate_min_minus_one  = duration_gate_min_minus_one
-    self.duration_gate_max_minus_one  = duration_gate_max_minus_one
+    self.fields                                 = {}
+    self.fields["valid"]                        = valid
+    self.fields["trigger_immediate_after_min"]  = trigger_immediate_after_min
+    self.fields["tx_instruction_index"]         = tx_instruction_index
+    self.fields["duration_gate_min_minus_one"]  = duration_gate_min_minus_one
+    self.fields["duration_gate_max_minus_one"]  = duration_gate_max_minus_one
 
   def pack(self):
-    return PACKED_ECM_CHANNEL_TX_PROGRAM_ENTRY.pack(self.valid, self.trigger_immediate_after_min, self.tx_instruction_index, self.duration_gate_min_minus_one, self.duration_gate_max_minus_one)
+    return PACKED_ECM_CHANNEL_TX_PROGRAM_ENTRY.pack(self.fields["valid"], self.fields["trigger_immediate_after_min"], self.fields["tx_instruction_index"],
+                                                    self.fields["duration_gate_min_minus_one"], self.fields["duration_gate_max_minus_one"])
+
+  def __str__(self):
+    return "[tx_program_entry: fields={}]".format(self.fields)
+  def __repr__(self):
+    return self.__str__()
 
 
 class ecm_dwell_controller:
@@ -170,6 +200,6 @@ class ecm_dwell_controller:
     self.dwells_by_tag[dwell_entry.fields["tag"]] = {"index": dwell_index, "entry": dwell_entry}
     return self.config_writer.send_module_data(ECM_MODULE_ID_DWELL_CONTROLLER, ECM_CONTROL_MESSAGE_TYPE_DWELL_ENTRY, dwell_index, dwell_entry.pack(), True)
 
-  def send_channel_entry(self, channel_index, channel_entry):
-    self.channel_entries_by_index[channel_index] = channel_entry
-    return self.config_writer.send_module_data(ECM_MODULE_ID_DWELL_CONTROLLER, ECM_CONTROL_MESSAGE_TYPE_DWELL_CHANNEL_CONTROL, channel_index, channel_entry.pack(), True)
+  def send_channel_entry(self, full_channel_index, channel_entry):
+    self.channel_entries_by_index[full_channel_index] = channel_entry
+    return self.config_writer.send_module_data(ECM_MODULE_ID_DWELL_CONTROLLER, ECM_CONTROL_MESSAGE_TYPE_DWELL_CHANNEL_CONTROL, full_channel_index, channel_entry.pack(), True)

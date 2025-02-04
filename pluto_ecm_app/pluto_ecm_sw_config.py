@@ -20,7 +20,7 @@ class pluto_ecm_sw_config:
 
     dwell_index = 0
     prior_freq = -1
-    for entry in self.config["dwell_config"]["dwell_entries"]:
+    for entry in self.config["dwell_config"]["dwell_freqs"]:
       assert (entry["index"] == dwell_index)
       assert (entry["freq"] > prior_freq)
       assert (entry["dwell_total_time_max"] >= entry["dwell_measurement_time"])
