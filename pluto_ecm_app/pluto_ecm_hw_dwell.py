@@ -1,33 +1,33 @@
 import struct
 from pluto_ecm_hw_pkg import *
 
-
-def populate_dwell_entry(config, entry_index, center_freq, dwell_time, fast_lock_profile):
-  channel_spacing_MHz       = (ADC_CLOCK_FREQUENCY / ECM_NUM_CHANNELS) / 1e6
-  channel_sampling_freq_Mhz = channel_spacing_MHz * CHANNELIZER_OVERSAMPLING
-  channel_sampling_time_us  = 1 / channel_sampling_freq_Mhz
-
-  for i in range(ESM_NUM_CHANNELS_NARROW):
-    if (channel_mask_initial & (1 << i)) == 0:
-      continue
-    channel_freq = center_freq + (i - center_index)
-    for emitter in config["emitter_config"]["pulsed_emitters"]:
-      if (channel_freq >= emitter["freq_range"][0]) and (channel_freq <= emitter["freq_range"][1]):
-        channel_mask_final  = channel_mask_final | (1 << i)
-        min_threshold_dB    = min(min_threshold_dB, emitter["threshold_dB"])
-        PW_range[0]         = min(PW_range[0], emitter["PW_range"][0])
-        PW_range[1]         = max(PW_range[1], emitter["PW_range"][1])
-
-  min_threshold_linear = 10 ** (min_threshold_dB / 10)
-  threshold_shift = 0
-  while ((1 << threshold_shift) < min_threshold_linear):
-    threshold_shift += 1
-  assert (threshold_shift < 31)
-
-  duration_in_cycles = int(dwell_time / FAST_CLOCK_PERIOD)
-  min_pd = int((0.5 * PW_range[0]) // channel_sampling_time_us)
-
-  return ecm_dwell_entry(entry_index, entry_index, center_freq, duration_in_cycles, 0, fast_lock_profile, threshold_shift, 31, channel_mask_final, 0xFF, min_pd)
+#TODO
+#def populate_dwell_entry(config, entry_index, center_freq, dwell_time, fast_lock_profile):
+#  channel_spacing_MHz       = (ADC_CLOCK_FREQUENCY / ECM_NUM_CHANNELS) / 1e6
+#  channel_sampling_freq_Mhz = channel_spacing_MHz * CHANNELIZER_OVERSAMPLING
+#  channel_sampling_time_us  = 1 / channel_sampling_freq_Mhz
+#
+#  for i in range(ESM_NUM_CHANNELS_NARROW):
+#    if (channel_mask_initial & (1 << i)) == 0:
+#      continue
+#    channel_freq = center_freq + (i - center_index)
+#    for emitter in config["emitter_config"]["pulsed_emitters"]:
+#      if (channel_freq >= emitter["freq_range"][0]) and (channel_freq <= emitter["freq_range"][1]):
+#        channel_mask_final  = channel_mask_final | (1 << i)
+#        min_threshold_dB    = min(min_threshold_dB, emitter["threshold_dB"])
+#        PW_range[0]         = min(PW_range[0], emitter["PW_range"][0])
+#        PW_range[1]         = max(PW_range[1], emitter["PW_range"][1])
+#
+#  min_threshold_linear = 10 ** (min_threshold_dB / 10)
+#  threshold_shift = 0
+#  while ((1 << threshold_shift) < min_threshold_linear):
+#    threshold_shift += 1
+#  assert (threshold_shift < 31)
+#
+#  duration_in_cycles = int(dwell_time / FAST_CLOCK_PERIOD)
+#  min_pd = int((0.5 * PW_range[0]) // channel_sampling_time_us)
+#
+#  return ecm_dwell_entry(entry_index, entry_index, center_freq, duration_in_cycles, 0, fast_lock_profile, threshold_shift, 31, channel_mask_final, 0xFF, min_pd)
 
 
 class ecm_dwell_program_entry:
@@ -163,13 +163,13 @@ class ecm_dwell_controller:
 
   def send_dwell_program(self, dwell_program):
     self.current_dwell_program = dwell_program
-    return self.config_writer.send_module_data(ECM_MODULE_ID_DWELL_CONTROLLER, ECM_CONTROL_MESSAGE_TYPE_DWELL_PROGRAM, dwell_program.pack(), True)
+    return self.config_writer.send_module_data(ECM_MODULE_ID_DWELL_CONTROLLER, ECM_CONTROL_MESSAGE_TYPE_DWELL_PROGRAM, 0, dwell_program.pack(), True)
 
   def send_dwell_entry(self, dwell_index, dwell_entry):
     self.dwells_by_index[dwell_index] = dwell_entry
-    self.dwells_by_tag[dwell_entry.tag] = {"index": dwell_index, "entry": dwell_entry}
-    return self.config_writer.send_module_data(ECM_MODULE_ID_DWELL_CONTROLLER, ECM_CONTROL_MESSAGE_TYPE_DWELL_ENTRY, dwell_entry.pack(), True)
+    self.dwells_by_tag[dwell_entry.fields["tag"]] = {"index": dwell_index, "entry": dwell_entry}
+    return self.config_writer.send_module_data(ECM_MODULE_ID_DWELL_CONTROLLER, ECM_CONTROL_MESSAGE_TYPE_DWELL_ENTRY, dwell_index, dwell_entry.pack(), True)
 
   def send_channel_entry(self, channel_index, channel_entry):
     self.channel_entries_by_index[channel_index] = channel_entry
-    return self.config_writer.send_module_data(ECM_MODULE_ID_DWELL_CONTROLLER, ECM_CONTROL_MESSAGE_TYPE_DWELL_CHANNEL_CONTROL, channel_entry.pack(), True)
+    return self.config_writer.send_module_data(ECM_MODULE_ID_DWELL_CONTROLLER, ECM_CONTROL_MESSAGE_TYPE_DWELL_CHANNEL_CONTROL, channel_index, channel_entry.pack(), True)

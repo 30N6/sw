@@ -77,11 +77,13 @@ PACKED_ECM_DWELL_ENTRY  = struct.Struct("<" + PACKED_UINT8 + PACKED_UINT8 + PACK
                                               PACKED_UINT16 + PACKED_UINT16 +                               #pre lock, post lock delay
                                               PACKED_UINT16 + PACKED_UINT16 +                               #tag, frequency
                                               PACKED_UINT32 +                                               #measurement_duration
-                                              PACKED_UINT32)                                                #total_duration_max
+                                              PACKED_UINT32 +                                               #total_duration_max
+                                              "xxxx")                                                       #padding
 
 PACKED_ECM_CHANNEL_CONTROL_ENTRY_HEADER = struct.Struct("<" + PACKED_UINT8 + PACKED_UINT8 + PACKED_UINT16 + #enable, trigger_mode, trigger_duration_max_minus_one
                                                               PACKED_UINT32 +                               #trigger_threshold
-                                                              PACKED_UINT8 + PACKED_UINT8 + PACKED_UINT16)  #trigger_hyst_shift, drfm_gain, recording_address
+                                                              PACKED_UINT8 + PACKED_UINT8 + PACKED_UINT16 + #trigger_hyst_shift, drfm_gain, recording_address
+                                                              "xxxx")
 
 PACKED_ECM_CHANNEL_TX_PROGRAM_ENTRY     = struct.Struct("<" + PACKED_UINT8 + PACKED_UINT8 + PACKED_UINT16 + #valid, trigger_immediate_after_min, tx_instruction_index
                                                               PACKED_UINT16 + PACKED_UINT16)                #duration_gate_min_minus_one, duration_gate_max_minus_one
