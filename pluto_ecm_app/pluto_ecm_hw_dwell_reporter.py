@@ -56,7 +56,7 @@ class pluto_ecm_hw_dwell_reporter:
     report["global_counter"]                      = unpacked_header[15]
     report["actual_measurement_duration"]         = unpacked_header[16]
     report["actual_total_duration"]               = unpacked_header[17]
-    report["ts_dwell_start"]                      = (unpacked_header[19] << 32) | unpacked_header[18]
+    report["ts_dwell_start"]                      = (unpacked_header[18] << 32) | unpacked_header[19]
 
     report["channel_data"] = []
     for channel_index in range(ECM_NUM_CHANNELS):
