@@ -1,5 +1,5 @@
 {
-  "simulation": {"recording_enable": 0, "playback_enable": 0, "playback_filename": "./log/recorded_data-20241125-174304.log", "playback_speed": 1.0},
+  "simulation": {"recording_enable": 1, "playback_enable": 0, "playback_filename": "./log/recorded_data-20241125-174304.log", "playback_speed": 1.0},
   "fast_lock_config": {"recalibration_interval": 60.0, "recalibration_pause": 5.0},
   "dwell_config": {
     "dwell_freqs": [

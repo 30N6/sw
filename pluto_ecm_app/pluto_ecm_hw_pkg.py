@@ -114,6 +114,22 @@ PACKED_DWELL_STATS_HEADER = struct.Struct("<" + PACKED_UINT32 + PACKED_UINT32 + 
 
 PACKED_DWELL_STATS_CHANNEL_ENTRY = struct.Struct("<" + PACKED_UINT32 + PACKED_UINT32 + PACKED_UINT32 + PACKED_UINT32)
 
+PACKED_DRFM_SUMMARY_REPORT_HEADER = struct.Struct("<" + PACKED_UINT32 + PACKED_UINT32 + "xx" + PACKED_UINT8 + PACKED_UINT8 +    #common report header
+                                                        PACKED_UINT32 +                                                         #dwell_seq_num
+                                                        PACKED_UINT16 + PACKED_UINT16 +                                         #channel_was_written, channel_was_read
+                                                        PACKED_UINT32 +                                                         #report_delay_channel_write
+                                                        PACKED_UINT32 +                                                         #report_delay_summary_write
+                                                        PACKED_UINT32)                                                          #report_delay_summary_start
+
+PACKED_DRFM_CHANNEL_REPORT_HEADER = struct.Struct("<" + PACKED_UINT32 + PACKED_UINT32 + "xx" + PACKED_UINT8 + PACKED_UINT8 +    #common report header
+                                                        PACKED_UINT32 +                                                         #dwell_seq_num
+                                                        "xx" + PACKED_UINT8 + PACKED_UINT8 +                                    #padding, channel_index, max_iq_bits
+                                                        PACKED_UINT32 +                                                         #segment_seq_num
+                                                        PACKED_UINT32 + PACKED_UINT32 +                                         #segment_timestamp
+                                                        PACKED_UINT16 + PACKED_UINT16 +                                         #segment_addr_first, segment_addr_last
+                                                        PACKED_UINT16 + PACKED_UINT16)                                          #slice_addr, slice_length
+PACKED_DRFM_IQ_WORD = struct.Struct("<" + PACKED_INT16 + PACKED_INT16)
+
 #TODO
 #
 #PACKED_PDW_PULSE_REPORT_HEADER = struct.Struct("<" + PACKED_UINT32 + PACKED_UINT32 + "xx" + PACKED_UINT8 + PACKED_UINT8 +
@@ -127,7 +143,7 @@ PACKED_DWELL_STATS_CHANNEL_ENTRY = struct.Struct("<" + PACKED_UINT32 + PACKED_UI
 #                                                     PACKED_UINT32 + PACKED_UINT32 +
 #                                                     "xx" + PACKED_UINT8 + PACKED_UINT8)
 #
-#PACKED_PDW_PULSE_IQ_WORD = struct.Struct("<" + PACKED_INT16 + PACKED_INT16)
+
 #NUM_PDW_PULSE_TRAILER_WORDS = (DMA_TRANSFER_SIZE - PACKED_PDW_PULSE_REPORT_HEADER.size) // PACKED_PDW_PULSE_IQ_WORD.size
 #
 #

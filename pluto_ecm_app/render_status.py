@@ -43,25 +43,25 @@ class render_status:
 
     #TODO: hardware error count
 
-    #hw_stats = self.sequencer.hw_stats.stats
+    hw_stats = self.sequencer.hw_stats.stats
 
     stats_desc = [
-                  #{"format": "Dwell/sec         : {:.1f}", "value": hw_stats["dwells_per_sec"],                           "pos_offset": [8, 16] },
-                  #{"format": "Scan time         : {:.1f}", "value": hw_stats["scan_time"],                                "pos_offset": [8, 32] },
-                  #{"format": "PPS total         : {}",     "value": hw_stats["pps_total"],                                "pos_offset": [8, 48] },
-                  #{"format": "PPS drops         : {}",     "value": hw_stats["pps_dropped"],                              "pos_offset": [8, 64] },
-                  #{"format": "Scan pulse total  : {}",     "value": hw_stats["scan_pulses_total"],                        "pos_offset": [8, 80] },
-                  #{"format": "Scan pulse drops  : {}",     "value": hw_stats["scan_pulses_dropped"],                      "pos_offset": [8, 96] },
-                  #{"format": "Tot pulses        : {}",     "value": hw_stats["pulses_total"],                             "pos_offset": [8, 112]},
-                  #{"format": "Tot pulses dropped: {}",     "value": hw_stats["pulses_dropped"],                           "pos_offset": [8, 128]},
-                  #{"format": "Tot pulses accpted: {}",     "value": hw_stats["pulses_accepted"],                          "pos_offset": [8, 144]},
-                  #{"format": "Scan ack dly rpt  : {:.3f}", "value": hw_stats["scan_ack_delay_report"],                    "pos_offset": [8, 160]},
-                  #{"format": "Scan ack dly sp   : {:.3f}", "value": hw_stats["scan_ack_delay_sample_proc"],               "pos_offset": [8, 176]},
-                  #{"format": "Dwell covrg fine  : {:.6f}", "value": hw_stats["dwell_coverage_fine"],                      "pos_offset": [8, 192]},
-                  #{"format": "PDW covrg fine    : {:.6f}", "value": hw_stats["pdw_coverage_fine"],                        "pos_offset": [8, 208]},
-                  #{"format": "Dwell covrg coarse: {:.2f}", "value": hw_stats["dwell_coverage_coarse"],                    "pos_offset": [8, 224]},
-                  #{"format": "PDW covrg coarse  : {:.2f}", "value": hw_stats["pdw_coverage_coarse"],                      "pos_offset": [8, 240]},
-                  #{"format": "PDW IQ rcrd covrg : {:.2f}", "value": hw_stats["pdw_recording_coverage"],                   "pos_offset": [8, 256]},
+                  {"format": "Dwell/sec         : {:.1f}", "value": hw_stats["dwells_per_sec"],                           "pos_offset": [8, 16] },
+                  {"format": "Scan time         : {:.6f}", "value": hw_stats["scan_time"],                                "pos_offset": [8, 32] },
+                  {"format": "Dwell rpt total   : {}",     "value": hw_stats["dwell_report_total"],                       "pos_offset": [8, 48] },
+                  {"format": "DRFM sum rpt tot  : {}",     "value": hw_stats["drfm_summary_report_total"],                "pos_offset": [8, 64] },
+                  {"format": "DRFM chan rpt tot : {}",     "value": hw_stats["drfm_channel_report_total"],                "pos_offset": [8, 80] },
+                  {"format": "DRFM dwells w/wr  : {}",     "value": hw_stats["drfm_dwells_with_writes"],                  "pos_offset": [8, 96] },
+                  {"format": "DRFM dwells w/rd  : {}",     "value": hw_stats["drfm_dwells_with_reads"],                   "pos_offset": [8, 112]},
+                  {"format": "Dwell cv meas req : {:.3f}", "value": hw_stats["dwell_coverage_meas_req"],                  "pos_offset": [8, 128]},
+                  {"format": "Dwell cv meas act : {:.3f}", "value": hw_stats["dwell_coverage_meas_active"],               "pos_offset": [8, 144]},
+                  {"format": "Dwell cv tot meas : {:.3f}", "value": hw_stats["dwell_coverage_total_meas"],                "pos_offset": [8, 160]},
+                  {"format": "Dwell cv tot all  : {:.3f}", "value": hw_stats["dwell_coverage_total_all"],                 "pos_offset": [8, 176]},
+                  {"format": "Dwell gap frac    : {:.3f}", "value": hw_stats["dwell_gap_fraction"],                       "pos_offset": [8, 192]},
+                  {"format": "Dwell total time  : {:.1f}", "value": hw_stats["dwell_time_total_sec"],                     "pos_offset": [8, 208]},
+                  {"format": "Rpt dly chan wr   : {:.6f}",     "value": hw_stats["drfm_total_channel_write_report_delay_frac"], "pos_offset": [8, 224]},
+                  {"format": "Rpt dly sumry wr  : {:.6f}",     "value": hw_stats["drfm_total_summary_write_report_delay_frac"], "pos_offset": [8, 240]},
+                  {"format": "Rpt dly sumry st  : {:.6f}",     "value": hw_stats["drfm_total_summary_start_report_delay_frac"], "pos_offset": [8, 256]},
                   #{"format": "PDW dwells missing: {}",     "value": hw_stats["pdw_dwells_missing"],                       "pos_offset": [8, 272]},
                   {"format": "HW commands sent  : {}",     "value": self.hw_interface.hwcp.num_commands,        "pos_offset": [8, 288]},
                   {"format": "HW DMA writes     : {}",     "value": self.hw_interface.hwcp.num_dma_writes,      "pos_offset": [8, 304]},
@@ -78,8 +78,8 @@ class render_status:
       text_rect.left = status_rect[0] + entry["pos_offset"][0]
       text_rect.bottom = status_rect[1] + entry["pos_offset"][1]
       self.surface.blit(text_data, text_rect)
-
   def render(self):
+
     self._render_status_bar()
     self._render_status_window()
 

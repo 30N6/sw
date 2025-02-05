@@ -6,8 +6,8 @@ import pluto_ecm_hw_stats
 import pluto_ecm_hw_interface
 import pluto_ecm_hw_dwell
 import pluto_ecm_hw_dwell_reporter
+import pluto_ecm_hw_drfm_reporter
 
-#import pluto_esm_hw_pdw_reporter
 #import pluto_esm_dwell_stats_buffer
 
 class dwell_data:
@@ -70,10 +70,10 @@ class pluto_ecm_sequencer:
     self.hw_interface                   = hw_interface
     self.dwell_ctrl_interface           = pluto_ecm_hw_dwell.ecm_dwell_controller(hw_interface.hw_cfg)
     self.dwell_reporter                 = pluto_ecm_hw_dwell_reporter.pluto_ecm_hw_dwell_reporter(logger)
+    self.drfm_reporter                  = pluto_ecm_hw_drfm_reporter.pluto_ecm_hw_drfm_reporter(logger)
     #self.analysis_thread                = analysis_thread
 
     #self.dwell_buffer                   = pluto_esm_dwell_stats_buffer.pluto_esm_dwell_stats_buffer(sw_config)
-    #self.pdw_reporter                   = pluto_esm_hw_pdw_reporter.pluto_esm_hw_pdw_reporter(logger)
     self.hw_stats                       = pluto_ecm_hw_stats.pluto_ecm_hw_stats(logger)
 
     self.state                          = "FLUSH"
@@ -165,7 +165,7 @@ class pluto_ecm_sequencer:
 #                  "first_in_sequence" : data["first_in_sequence"],
 #                  "last_in_sequence"  : data["last_in_sequence"]}
 #        self.logger.log(self.logger.LL_INFO, "[sequencer] _process_data_from_sim: simulated report received for frequency={}".format(report["dwell_data"].frequency))
-#        self._process_combined_dwell_report(report)
+#        self._process_dwell_report(report)
 #      elif "pdw_pulse_report" in entry["data"]:
 #        self._process_pdw_report(entry["data"])
 #      elif "pdw_summary_report" in entry["data"]:
@@ -177,10 +177,6 @@ class pluto_ecm_sequencer:
       r = self.dwell_reporter.process_message(packed_report)
 
       expected_dwell_data = self.dwell_active[0]
-      #expected_dwell_entry  = self.dwell_active[0]
-      #expected_dwell_data   = expected_dwell_entry["dwell"]
-
-      print(r)
 
       if (r["dwell_entry_frequency"] != int(round(expected_dwell_data.frequency))):
         self.logger.log(self.logger.LL_WARN, "[sequencer] _process_dwell_reports_from_hw: dwell frequency mismatch: received={} expected={}".format(r["dwell_entry_frequency"], int(round(expected_dwell_data.frequency))))
@@ -190,54 +186,51 @@ class pluto_ecm_sequencer:
       report = {"dwell_data": expected_dwell_data, "dwell_report": r, "first_in_sequence": expected_dwell_data.first_dwell, "last_in_sequence": expected_dwell_data.last_dwell}
       self.recorder.log({"dwell_report": report})
       self.dwell_active.pop(0)
+      self._process_dwell_report(report)
 
-      ###### TODO ######
-      #self._process_combined_dwell_report(report)
+  def _process_drfm_reports_from_hw(self):
+    while len(self.hw_interface.hwdr.output_data_drfm) > 0:
+      packed_report = self.hw_interface.hwdr.output_data_drfm.pop(0)
+      r = self.drfm_reporter.process_message(packed_report)
 
-#
-#  def _process_pdw_reports_from_hw(self):
-#    while len(self.hw_interface.hwdr.output_data_pdw) > 0:
-#      packed_report = self.hw_interface.hwdr.output_data_pdw.pop(0)
-#      r = self.pdw_reporter.process_message(packed_report)
-#
-#      if r["msg_type"] == pluto_esm_hw_pkg.ESM_REPORT_MESSAGE_TYPE_PDW_PULSE:
-#        self.logger.log(self.logger.LL_DEBUG, "[sequencer] _process_pdw_reports_from_hw: pdw pulse report: msg_seq={} dwell_seq={} pulse_seq={} chan={} pd={}".format(
-#          r["msg_seq_num"], r["dwell_seq_num"], r["pulse_seq_num"], r["pulse_channel"], r["pulse_duration"]))
-#
-#        report = {"pdw_pulse_report": r}
-#        self.recorder.log(report)
-#        self._process_pdw_report(report)
-#
-#      elif r["msg_type"] == pluto_esm_hw_pkg.ESM_REPORT_MESSAGE_TYPE_PDW_SUMMARY:
-#        self.logger.log(self.logger.LL_INFO, "[sequencer] _process_pdw_reports_from_hw: pdw summary: msg_seq={} dwell_seq={} pulse_total_count={} pulse_drop_count={} ack_delay={}/{}".format(
-#          r["msg_seq_num"], r["dwell_seq_num"], r["dwell_pulse_total_count"], r["dwell_pulse_drop_count"], r["ack_delay_report"], r["ack_delay_sample_processor"]))
-#
-#        report = {"pdw_summary_report": r}
-#        self.recorder.log(report)
-#        self._process_pdw_report(report)
-#
-#      else:
-#        raise RuntimeError("invalid message type")
-#
-#
-#  def _process_combined_dwell_report(self, report):
-#    #data for rendering the dwell indicator
-#    if report["first_in_sequence"]:
-#      self.dwell_history = {}
-#    self.dwell_history[report["dwell_data"].frequency] = time.time()
-#
-#    self.analysis_thread.submit_report(report)
-#    self.hw_stats.submit_report(report)
-#
-#    row_done = self.dwell_buffer.process_dwell_update(report)
-#    if row_done:
-#      #data for rendering the spectrogram
-#      self.dwell_rows_to_render.append(report)
-#
-#  def _process_pdw_report(self, report):
-#    self.analysis_thread.submit_report(report)
-#    self.hw_stats.submit_report(report)
-#
+      if r["msg_type"] == ECM_REPORT_MESSAGE_TYPE_DRFM_CHANNEL_DATA:
+        self.logger.log(self.logger.LL_INFO, "[sequencer] _process_drfm_reports_from_hw: drfm channel report: msg_seq={} dwell_seq={} channel={} iq_bits={} seg_seq={} slice_addr={} slice_len={}".format(
+          r["msg_seq_num"], r["dwell_seq_num"], r["channel_index"], r["max_iq_bits"], r["segment_seq_num"], r["slice_addr"], r["slice_length"]))
+
+        report = {"drfm_channel_report": r}
+        self.recorder.log(report)
+        self._process_drfm_report(report)
+
+      elif r["msg_type"] == ECM_REPORT_MESSAGE_TYPE_DRFM_SUMMARY:
+        self.logger.log(self.logger.LL_DEBUG, "[sequencer] _process_drfm_reports_from_hw: drfm summary report: msg_seq={} dwell_seq={} chan_written={:04X} chan_read={:04X} dly_chan_wr={} dly_sum_wr={} dly_sum_start={}".format(
+          r["msg_seq_num"], r["dwell_seq_num"], r["channel_was_written"], r["channel_was_read"], r["report_delay_channel_write"], r["report_delay_summary_write"], r["report_delay_summary_start"]))
+
+        report = {"drfm_summary_report": r}
+        self.recorder.log(report)
+        self._process_drfm_report(report)
+
+      else:
+        raise RuntimeError("invalid message type")
+
+  def _process_dwell_report(self, report):
+    #data for rendering the dwell indicator
+    if report["first_in_sequence"]:
+      self.dwell_history = {}
+    self.dwell_history[report["dwell_data"].frequency] = time.time()
+
+    #self.analysis_thread.submit_report(report)
+    self.hw_stats.submit_report(report)
+
+    ### TODO ###
+    #row_done = self.dwell_buffer.process_dwell_update(report)
+    #if row_done:
+    #  #data for rendering the spectrogram
+    #  self.dwell_rows_to_render.append(report)
+
+  def _process_drfm_report(self, report):
+    #self.analysis_thread.submit_report(report)
+    self.hw_stats.submit_report(report)
+
   def _update_data_from_hw(self):
     if self.state == "FLUSH":
       while len(self.hw_interface.hwdr.output_data_dwell) > 0:
@@ -254,8 +247,8 @@ class pluto_ecm_sequencer:
       #self._process_data_from_sim()
       raise RuntimeError("sim unsupported")
     else:
+      self._process_drfm_reports_from_hw()
       self._process_dwell_reports_from_hw()
-      #self._process_pdw_reports_from_hw()
 
   #TODO: cal stuff into separate class
   def _get_oldest_cal(self):
@@ -332,10 +325,9 @@ class pluto_ecm_sequencer:
       self.logger.log(self.logger.LL_INFO, "[sequencer] sending initial hw dwell: uk={} dwell_index={} hw_dwell_entry={}".format(key, entry.dwell_index, entry.hw_dwell_entry))
 
   def _send_hw_channel_entry(self, dwell_index, channel_index, channel_entry):
-    full_channel_index = dwell_index * ECM_NUM_CHANNELS + channel_index
-    key = self.dwell_ctrl_interface.send_channel_entry(full_channel_index, channel_entry)
+    key = self.dwell_ctrl_interface.send_channel_entry(dwell_index, channel_index, channel_entry)
     self.hw_channel_entry_pending.append(key)
-    self.logger.log(self.logger.LL_INFO, "[sequencer] sending hw channel entry: uk={} dwell_index={} channel_index={} -> full_channel_index={} channel_entry={}".format(key, dwell_index, channel_index, full_channel_index, channel_entry))
+    self.logger.log(self.logger.LL_INFO, "[sequencer] sending hw channel entry: uk={} dwell_index={} channel_index={} -> channel_entry={}".format(key, dwell_index, channel_index, channel_entry))
 
   def _send_hw_dwell_program(self, dwell_program):
     key = self.dwell_ctrl_interface.send_dwell_program(dwell_program)
@@ -475,10 +467,10 @@ class pluto_ecm_sequencer:
         self.dwell_state = "DWELLS_COMPLETE"
 
     if self.dwell_state == "DWELLS_COMPLETE":
-      if len(self.scan_sequence) == 0:
-        self.dwell_state = "IDLE"
-      else:
-        self.dwell_state = "LOAD_DWELLS"
+      #if len(self.scan_sequence) == 0:
+      #  self.dwell_state = "IDLE"
+      #else:
+      self.dwell_state = "LOAD_DWELLS"
 
   def update(self):
     cycles_per_update = 5

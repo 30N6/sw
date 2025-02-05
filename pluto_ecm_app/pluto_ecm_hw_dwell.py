@@ -151,10 +151,15 @@ class ecm_channel_control_entry:
     return self.__str__()
 
   @staticmethod
-  def default_channel_entry(channel_index):
-    enable = (ECM_CHANNEL_MASK & (1 << channel_index)) != 0
+  def default_channel_entry(channel_index_sw):
+    enable = (ECM_CHANNEL_MASK & (1 << channel_index_sw)) != 0
     program_entries = [ecm_channel_tx_program_entry(0, 0, 0, 0, 0) for i in range(ECM_NUM_CHANNEL_TX_PROGRAM_ENTRIES)]
-    return ecm_channel_control_entry(enable, 0, 0, 0xFFFFFFFF, 1, 0, (ECM_DRFM_MEM_DEPTH // ECM_NUM_CHANNELS_ACTIVE) * channel_index, program_entries)
+
+    #TODO: compute proper addresses accounting for mask
+
+    #return ecm_channel_control_entry(enable, 0, 0, 0xFFFFFFFF, 1, 0, (ECM_DRFM_MEM_DEPTH // ECM_NUM_CHANNELS) * channel_index, program_entries)
+
+    return ecm_channel_control_entry(enable, ECM_CHANNEL_TRIGGER_MODE_FORCE_TRIGGER, 200, 0xFFFFFFFF, 1, 0, (ECM_DRFM_MEM_DEPTH // ECM_NUM_CHANNELS) * channel_index_sw, program_entries)
 
 
 class ecm_channel_tx_program_entry:
@@ -200,6 +205,8 @@ class ecm_dwell_controller:
     self.dwells_by_tag[dwell_entry.fields["tag"]] = {"index": dwell_index, "entry": dwell_entry}
     return self.config_writer.send_module_data(ECM_MODULE_ID_DWELL_CONTROLLER, ECM_CONTROL_MESSAGE_TYPE_DWELL_ENTRY, dwell_index, dwell_entry.pack(), True)
 
-  def send_channel_entry(self, full_channel_index, channel_entry):
+  def send_channel_entry(self, dwell_index, channel_index_sw, channel_entry):
+    full_channel_index = dwell_index * ECM_NUM_CHANNELS + ecm_channel_index_sw_to_hw(channel_index_sw)
+
     self.channel_entries_by_index[full_channel_index] = channel_entry
     return self.config_writer.send_module_data(ECM_MODULE_ID_DWELL_CONTROLLER, ECM_CONTROL_MESSAGE_TYPE_DWELL_CHANNEL_CONTROL, full_channel_index, channel_entry.pack(), True)
