@@ -28,6 +28,7 @@ ECM_REPORT_MESSAGE_TYPE_STATUS                  = 0x30
 ECM_NUM_CHANNELS                                = 16
 ECM_NUM_CHANNELS_ACTIVE                         = 13  # remove split channel + two edge channels
 ECM_CHANNEL_MASK                                = 0x7FFC
+ECM_ACTIVE_CHANNEL_DRFM_SEGMENT_MAP             = [0, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 0]
 
 ECM_NUM_TX_INSTRUCTIONS                         = 512
 
@@ -109,7 +110,7 @@ PACKED_DWELL_STATS_HEADER = struct.Struct("<" + PACKED_UINT32 + PACKED_UINT32 + 
                                                 PACKED_UINT32 +                                                         #dwell_seq_num
                                                 PACKED_UINT32 +                                                         #global counter
                                                 PACKED_UINT32 +                                                         #actual_measurement_duration
-                                                PACKED_UINT32 +                                                         #actual_total_duration
+                                                PACKED_UINT32 +                                                         #tx active flag (31), actual_total_duration (30:0)
                                                 PACKED_UINT32 + PACKED_UINT32)                                          #ts_dwell_start
 
 PACKED_DWELL_STATS_CHANNEL_ENTRY = struct.Struct("<" + PACKED_UINT32 + PACKED_UINT32 + PACKED_UINT32 + PACKED_UINT32)

@@ -24,7 +24,9 @@ class render_status:
     mean_time_diff = np.mean(time_diff)
     max_time_diff = np.max(time_diff)
 
-    state_str = "{:>20} {:>16} {:>4.1f}/{:>4.1f} fps".format(self.sequencer.state, self.sequencer.dwell_state, 1.0/mean_time_diff, 1.0/max_time_diff)
+    state_str = "{:>20} {:>16}   [{} {}/{}]   {:>4.1f}/{:>4.1f} fps".format(self.sequencer.state, self.sequencer.dwell_state,
+      self.sequencer.ecm_controller.state, self.sequencer.ecm_controller.scan_forced_trigger_index, len(self.sequencer.ecm_controller.dwell_channels),
+      1.0/mean_time_diff, 1.0/max_time_diff)
     text_data = self.font.render(state_str, True, (0, 192, 192))
     text_rect = text_data.get_rect()
     text_rect.left = 16
@@ -59,9 +61,9 @@ class render_status:
                   {"format": "Dwell cv tot all  : {:.3f}", "value": hw_stats["dwell_coverage_total_all"],                 "pos_offset": [8, 176]},
                   {"format": "Dwell gap frac    : {:.3f}", "value": hw_stats["dwell_gap_fraction"],                       "pos_offset": [8, 192]},
                   {"format": "Dwell total time  : {:.1f}", "value": hw_stats["dwell_time_total_sec"],                     "pos_offset": [8, 208]},
-                  {"format": "Rpt dly chan wr   : {:.6f}",     "value": hw_stats["drfm_total_channel_write_report_delay_frac"], "pos_offset": [8, 224]},
-                  {"format": "Rpt dly sumry wr  : {:.6f}",     "value": hw_stats["drfm_total_summary_write_report_delay_frac"], "pos_offset": [8, 240]},
-                  {"format": "Rpt dly sumry st  : {:.6f}",     "value": hw_stats["drfm_total_summary_start_report_delay_frac"], "pos_offset": [8, 256]},
+                  {"format": "Rpt dly chan wr   : {}",     "value": hw_stats["drfm_total_channel_write_report_delay"], "pos_offset": [8, 224]},
+                  {"format": "Rpt dly sumry wr  : {}",     "value": hw_stats["drfm_total_summary_write_report_delay"], "pos_offset": [8, 240]},
+                  {"format": "Rpt dly sumry st  : {}",     "value": hw_stats["drfm_total_summary_start_report_delay"], "pos_offset": [8, 256]},
                   #{"format": "PDW dwells missing: {}",     "value": hw_stats["pdw_dwells_missing"],                       "pos_offset": [8, 272]},
                   {"format": "HW commands sent  : {}",     "value": self.hw_interface.hwcp.num_commands,        "pos_offset": [8, 288]},
                   {"format": "HW DMA writes     : {}",     "value": self.hw_interface.hwcp.num_dma_writes,      "pos_offset": [8, 304]},

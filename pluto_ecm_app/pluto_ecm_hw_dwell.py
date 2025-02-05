@@ -151,15 +151,19 @@ class ecm_channel_control_entry:
     return self.__str__()
 
   @staticmethod
-  def default_channel_entry(channel_index_sw):
+  def channel_entry_trigger_none(channel_index_sw):
+    enable = (ECM_CHANNEL_MASK & (1 << channel_index_sw)) != 0
+    program_entries = [ecm_channel_tx_program_entry(0, 0, 0, 0, 0) for i in range(ECM_NUM_CHANNEL_TX_PROGRAM_ENTRIES)]
+    return ecm_channel_control_entry(enable, ECM_CHANNEL_TRIGGER_MODE_NONE, 0, 0xFFFFFFFF, 1, 0, 0, program_entries)
+
+  @staticmethod
+  def channel_entry_trigger_forced(channel_index_sw):
     enable = (ECM_CHANNEL_MASK & (1 << channel_index_sw)) != 0
     program_entries = [ecm_channel_tx_program_entry(0, 0, 0, 0, 0) for i in range(ECM_NUM_CHANNEL_TX_PROGRAM_ENTRIES)]
 
-    #TODO: compute proper addresses accounting for mask
-
-    #return ecm_channel_control_entry(enable, 0, 0, 0xFFFFFFFF, 1, 0, (ECM_DRFM_MEM_DEPTH // ECM_NUM_CHANNELS) * channel_index, program_entries)
-
-    return ecm_channel_control_entry(enable, ECM_CHANNEL_TRIGGER_MODE_FORCE_TRIGGER, 200, 0xFFFFFFFF, 1, 0, (ECM_DRFM_MEM_DEPTH // ECM_NUM_CHANNELS) * channel_index_sw, program_entries)
+    recording_length = (ECM_DRFM_MEM_DEPTH // ECM_NUM_CHANNELS_ACTIVE)
+    recording_addr = recording_length * ECM_ACTIVE_CHANNEL_DRFM_SEGMENT_MAP[channel_index_sw]
+    return ecm_channel_control_entry(enable, ECM_CHANNEL_TRIGGER_MODE_FORCE_TRIGGER, recording_length - 1, 0xFFFFFFFF, 1, 0, recording_addr, program_entries)
 
 
 class ecm_channel_tx_program_entry:
