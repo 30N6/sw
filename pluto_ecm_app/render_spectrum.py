@@ -35,11 +35,6 @@ class render_spectrum:
       self.spectrogram[freq] = pluto_ecm_spectrogram.pluto_ecm_spectrogram(self.sw_config, freq, self.dwell_pane_width,
         self.rect_spectrum_display_primary[3], self.rect_spectrum_display_secondary[3])
 
-    #self.max_freq             = sw_config.max_freq
-    #self.dwell_bw             = sw_config.config["dwell_config"]["freq_step"]
-    #self.channel_step         = sw_config.config["dwell_config"]["channel_step"]
-    #self.dwell_scan_fade_time = 0.5
-
     self.colors = {}
     self.colors["cal_old"]        = (192, 0, 0)
     self.colors["cal_new"]        = (0, 192, 0)
@@ -53,10 +48,7 @@ class render_spectrum:
 
     self.dwell_cal_height     = 0.5
     self.dwell_scan_height    = 1 - self.dwell_cal_height
-
-
-    #self.freq_zoom_range = [0, self.max_freq]
-    #self.freq_zoom_active = True
+    self.dwell_scan_fade_time = 0.5
 
     self.font = pygame.font.SysFont('Consolas', 12)
 
@@ -101,7 +93,7 @@ class render_spectrum:
     # calibration status
     for i in range(len(self.sequencer.fast_lock_cal_state)):
       cal_state = self.sequencer.fast_lock_cal_state[i]
-      dwell_rect = [self.freq_coords[i] - (self.rect_width/self.dwell_count)/2, self.rect_dwell_display[1], (self.rect_width/self.dwell_count), self.rect_dwell_display[3] * self.dwell_cal_height]
+      dwell_rect = [self.freq_coords[i] - self.dwell_pane_width/2, self.rect_dwell_display[1], self.dwell_pane_width, self.rect_dwell_display[3] * self.dwell_cal_height]
 
       if not cal_state.fast_lock_profile_valid:
         cal_color = self.colors["cal_old"]
@@ -109,24 +101,16 @@ class render_spectrum:
         cal_color = self._color_interp(self.colors["cal_new"], self.colors["cal_old"], (now - cal_state.fast_lock_profile_time) / self.dwell_cal_interval)
       pygame.draw.rect(self.surface, cal_color, dwell_rect, 0)
 
-    #
-    ## scan dwells
-    #for dwell_freq in self.sequencer.dwell_history:
-    #  dwell_completion_time = self.sequencer.dwell_history[dwell_freq]
-    #  x = dwell_freq / mhz_per_px + self.rect_dwell_display[0]
-    #  dwell_rect = [x - px_per_dwell/2, self.rect_dwell_display[1] + self.rect_dwell_display[3] * (1 - self.dwell_scan_height), px_per_dwell, self.rect_dwell_display[3] * self.dwell_scan_height]
-    #  dwell_color = self._color_interp(self.colors["dwell_new"], self.colors["dwell_old"], (now - dwell_completion_time) / self.dwell_scan_fade_time)
-    #  pygame.draw.rect(self.surface, dwell_color, dwell_rect, 0)
-    #
-    #if self.freq_zoom_active:
-    #  zoom_marker_width = 8
-    #
-    #  for i in range(len(self.freq_zoom_range)):
-    #    x = self.rect_dwell_display[0] + self.freq_zoom_range[i] / mhz_per_px
-    #    points = [(x - zoom_marker_width/2, self.rect_dwell_display[1] + self.rect_dwell_display[3] + zoom_marker_width),
-    #              (x,                       self.rect_dwell_display[1] + self.rect_dwell_display[3]),
-    #              (x + zoom_marker_width/2, self.rect_dwell_display[1] + self.rect_dwell_display[3] + zoom_marker_width)]
-    #    pygame.draw.polygon(self.surface, self.colors["zoom_marker"], points)
+    # scan dwells
+    for i in range(self.dwell_count):
+      freq = self.dwell_freqs[i]
+      if freq not in self.sequencer.dwell_history:
+        continue
+
+      dwell_completion_time = self.sequencer.dwell_history[freq]
+      dwell_rect = [self.freq_coords[i] - self.dwell_pane_width/2, self.rect_dwell_display[1] + self.rect_dwell_display[3] * (1 - self.dwell_scan_height), self.dwell_pane_width, self.rect_dwell_display[3] * self.dwell_scan_height]
+      dwell_color = self._color_interp(self.colors["dwell_new"], self.colors["dwell_old"], (now - dwell_completion_time) / self.dwell_scan_fade_time)
+      pygame.draw.rect(self.surface, dwell_color, dwell_rect, 0)
 
     for i in range(self.dwell_count - 1):
       pygame.draw.line(self.surface, self.colors["frame_elements"], [self.div_coords[i], self.rect_dwell_display[1]], [self.div_coords[i], self.rect_dwell_display[1] + self.rect_dwell_display[3] - 1], 1)
@@ -134,42 +118,15 @@ class render_spectrum:
     pygame.draw.rect(self.surface, self.colors["frame_elements"], self.rect_dwell_display, 1)
 
   def _render_spectrum_display(self):
-    #data_p = self.spectrogram.get_spectrogram(False)
-    #data_s = self.spectrogram.get_spectrum_trace()
-    #
-    #spec_mhz_per_px = self.max_freq / self.spectrogram.output_width
-    #spec_zoom_i_start = round(self.freq_zoom_range[0] / spec_mhz_per_px)
-    #spec_zoom_i_stop  = round(self.freq_zoom_range[1] / spec_mhz_per_px)
-    #
-    #trace_mhz_per_px = self.max_freq / self.spectrogram.output_width_trace
-    #trace_zoom_i_start = round(self.freq_zoom_range[0] / trace_mhz_per_px)
-    #trace_zoom_i_stop  = round(self.freq_zoom_range[1] / trace_mhz_per_px)
-    #
-    #if self.freq_zoom_active or True:
-    #  data_p = data_p[spec_zoom_i_start:spec_zoom_i_stop]
-    #  surf_p = pygame.surfarray.make_surface(data_p)
-    #  surf_p = pygame.transform.scale(surf_p, self.rect_spectrum_display_primary[2:4])
-    #
-    #  data_s = data_s[trace_zoom_i_start:trace_zoom_i_stop]
-    #  surf_s = pygame.surfarray.make_surface(data_s)
-    #  surf_s = pygame.transform.scale(surf_s, self.rect_spectrum_display_secondary[2:4])
-    #else:
-    #  surf_p = pygame.surfarray.make_surface(data_p)
-    #  surf_s = pygame.surfarray.make_surface(data_s)
-    #
-    #self.surface.blit(surf_p, self.rect_spectrum_display_primary)
-    #self.surface.blit(surf_s, self.rect_spectrum_display_secondary)
-
     for i in range(self.dwell_count):
-      freq_str = "{:.1f}".format(self.dwell_freqs[i])
+      freq = self.dwell_freqs[i]
+
+      freq_str = "{:.1f}".format(freq)
       text_data = self.font.render(freq_str, True, self.colors["frame_elements"])
       text_rect = text_data.get_rect()
       text_rect.centerx = self.freq_coords[i]
       text_rect.centery = self.rect_spectrum_display_primary[1] - 12
       self.surface.blit(text_data, text_rect)
-
-    for i in range(self.dwell_count):
-      freq = self.dwell_freqs[i]
 
       data_primary = self.spectrogram[freq].get_spectrogram(False)
       surf_primary = pygame.surfarray.make_surface(data_primary)
@@ -180,7 +137,6 @@ class render_spectrum:
       surf_secondary = pygame.surfarray.make_surface(data_secondary)
       rect_secondary = [self.freq_coords[i] - data_secondary.shape[0]/2, self.rect_spectrum_display_secondary[1], data_secondary.shape[0], self.rect_spectrum_display_secondary[3]]
       self.surface.blit(surf_secondary, rect_secondary)
-
 
     for i in range(self.dwell_count - 1):
       pygame.draw.line(self.surface, self.colors["frame_elements"], [self.div_coords[i], self.rect_spectrum_display_primary[1]],   [self.div_coords[i], self.rect_spectrum_display_primary[1] + self.rect_spectrum_display_primary[3] - 1],     1)
