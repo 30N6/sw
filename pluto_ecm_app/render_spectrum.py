@@ -1,7 +1,7 @@
 import pygame
 import time
 from pluto_ecm_hw_pkg import *
-#import pluto_ecm_spectrogram
+import pluto_ecm_spectrogram
 import numpy as np
 import math
 
@@ -17,10 +17,24 @@ class render_spectrum:
     self.rect_spectrum_display_primary    = [self.rect_left, 56,  self.rect_width, 320]
     self.rect_spectrum_display_secondary  = [self.rect_left, 400, self.rect_width, 288]
 
-    self.surface              = surface
-    self.sw_config            = sw_config
-    self.sequencer            = sequencer
-    #self.spectrogram          = pluto_esm_spectrogram.pluto_esm_spectrogram(self.sw_config, self.rect_spectrum_display_primary[2:4], self.sequencer.dwell_buffer.buffer_width)
+    self.dwell_count      = len(sw_config.config["dwell_config"]["dwell_freqs"])
+    self.dwell_freqs      = [d["freq"] for d in sw_config.config["dwell_config"]["dwell_freqs"]]
+    self.dwell_pane_width = self.rect_width/self.dwell_count
+    if self.dwell_count > 1:
+      self.div_coords = [self.rect_left + self.dwell_pane_width * i for i in range(1, self.dwell_count)]
+    else:
+      self.div_coords = []
+    self.freq_coords = [self.rect_left + self.dwell_pane_width * (i + 0.5) for i in range(self.dwell_count)]
+
+    self.surface    = surface
+    self.sw_config  = sw_config
+    self.sequencer  = sequencer
+
+    self.spectrogram = {}
+    for freq in self.dwell_freqs:
+      self.spectrogram[freq] = pluto_ecm_spectrogram.pluto_ecm_spectrogram(self.sw_config, freq, self.dwell_pane_width,
+        self.rect_spectrum_display_primary[3], self.rect_spectrum_display_secondary[3])
+
     #self.max_freq             = sw_config.max_freq
     #self.dwell_bw             = sw_config.config["dwell_config"]["freq_step"]
     #self.channel_step         = sw_config.config["dwell_config"]["channel_step"]
@@ -40,13 +54,6 @@ class render_spectrum:
     self.dwell_cal_height     = 0.5
     self.dwell_scan_height    = 1 - self.dwell_cal_height
 
-    self.dwell_count = len(sw_config.config["dwell_config"]["dwell_freqs"])
-    self.dwell_freqs = [d["freq"] for d in sw_config.config["dwell_config"]["dwell_freqs"]]
-    if self.dwell_count > 1:
-      self.div_coords = [self.rect_left + (self.rect_width/self.dwell_count) * i for i in range(1, self.dwell_count)]
-    else:
-      self.div_coords = []
-    self.freq_coords = [self.rect_left + (self.rect_width/self.dwell_count) * (i + 0.5) for i in range(self.dwell_count)]
 
     #self.freq_zoom_range = [0, self.max_freq]
     #self.freq_zoom_active = True
@@ -161,6 +168,20 @@ class render_spectrum:
       text_rect.centery = self.rect_spectrum_display_primary[1] - 12
       self.surface.blit(text_data, text_rect)
 
+    for i in range(self.dwell_count):
+      freq = self.dwell_freqs[i]
+
+      data_primary = self.spectrogram[freq].get_spectrogram(False)
+      surf_primary = pygame.surfarray.make_surface(data_primary)
+      rect_primary = [self.freq_coords[i] - data_primary.shape[0]/2, self.rect_spectrum_display_primary[1], data_primary.shape[0], self.rect_spectrum_display_primary[3]]
+      self.surface.blit(surf_primary, rect_primary)
+
+      data_secondary = self.spectrogram[freq].get_spectrum_trace()
+      surf_secondary = pygame.surfarray.make_surface(data_secondary)
+      rect_secondary = [self.freq_coords[i] - data_secondary.shape[0]/2, self.rect_spectrum_display_secondary[1], data_secondary.shape[0], self.rect_spectrum_display_secondary[3]]
+      self.surface.blit(surf_secondary, rect_secondary)
+
+
     for i in range(self.dwell_count - 1):
       pygame.draw.line(self.surface, self.colors["frame_elements"], [self.div_coords[i], self.rect_spectrum_display_primary[1]],   [self.div_coords[i], self.rect_spectrum_display_primary[1] + self.rect_spectrum_display_primary[3] - 1],     1)
       pygame.draw.line(self.surface, self.colors["frame_elements"], [self.div_coords[i], self.rect_spectrum_display_secondary[1]], [self.div_coords[i], self.rect_spectrum_display_secondary[1] + self.rect_spectrum_display_secondary[3] - 1], 1)
@@ -249,7 +270,9 @@ class render_spectrum:
     while len(self.sequencer.dwell_rows_to_render) > 0:
       self.sequencer.dwell_rows_to_render.pop(0)
       #self.pr.enable()
-      self.spectrogram.process_new_row(self.sequencer.dwell_buffer)
+      for freq in self.dwell_freqs:
+        self.spectrogram[freq].process_new_row(self.sequencer.dwell_buffer)
+
       #self.pr.disable()
       #s = io.StringIO()
       #sortby = SortKey.CUMULATIVE

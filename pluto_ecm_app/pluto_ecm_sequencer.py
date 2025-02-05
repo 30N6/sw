@@ -7,8 +7,7 @@ import pluto_ecm_hw_interface
 import pluto_ecm_hw_dwell
 import pluto_ecm_hw_dwell_reporter
 import pluto_ecm_hw_drfm_reporter
-
-#import pluto_esm_dwell_stats_buffer
+import pluto_ecm_dwell_stats_buffer
 
 class dwell_data:
   def __init__(self, dwell_index, next_dwell_index, is_first, is_last, freq_entry):
@@ -71,10 +70,10 @@ class pluto_ecm_sequencer:
     self.dwell_ctrl_interface           = pluto_ecm_hw_dwell.ecm_dwell_controller(hw_interface.hw_cfg)
     self.dwell_reporter                 = pluto_ecm_hw_dwell_reporter.pluto_ecm_hw_dwell_reporter(logger)
     self.drfm_reporter                  = pluto_ecm_hw_drfm_reporter.pluto_ecm_hw_drfm_reporter(logger)
-    #self.analysis_thread                = analysis_thread
-
-    #self.dwell_buffer                   = pluto_esm_dwell_stats_buffer.pluto_esm_dwell_stats_buffer(sw_config)
+    self.dwell_buffer                   = pluto_ecm_dwell_stats_buffer.pluto_ecm_dwell_stats_buffer(sw_config)
     self.hw_stats                       = pluto_ecm_hw_stats.pluto_ecm_hw_stats(logger)
+
+    #self.analysis_thread                = analysis_thread
 
     self.state                          = "FLUSH"
     self.flush_start_time               = time.time()
@@ -221,11 +220,10 @@ class pluto_ecm_sequencer:
     #self.analysis_thread.submit_report(report)
     self.hw_stats.submit_report(report)
 
-    ### TODO ###
-    #row_done = self.dwell_buffer.process_dwell_update(report)
-    #if row_done:
-    #  #data for rendering the spectrogram
-    #  self.dwell_rows_to_render.append(report)
+    row_done = self.dwell_buffer.process_dwell_update(report)
+    if row_done:
+      #data for rendering the spectrogram
+      self.dwell_rows_to_render.append(report)
 
   def _process_drfm_report(self, report):
     #self.analysis_thread.submit_report(report)

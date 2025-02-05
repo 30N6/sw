@@ -1,4 +1,5 @@
 from pluto_ecm_hw_pkg import *
+import pluto_ecm_hw_dwell
 
 class pluto_ecm_hw_dwell_reporter:
   def __init__(self, logger):
@@ -58,13 +59,18 @@ class pluto_ecm_hw_dwell_reporter:
     report["actual_total_duration"]               = unpacked_header[17]
     report["ts_dwell_start"]                      = (unpacked_header[18] << 32) | unpacked_header[19]
 
-    report["channel_data"] = []
-    for channel_index in range(ECM_NUM_CHANNELS):
-      unpacked_channel_entry = PACKED_DWELL_STATS_CHANNEL_ENTRY.unpack(data[(PACKED_DWELL_STATS_HEADER.size + PACKED_DWELL_STATS_CHANNEL_ENTRY.size * channel_index) :
-                                                                            (PACKED_DWELL_STATS_HEADER.size + PACKED_DWELL_STATS_CHANNEL_ENTRY.size * (channel_index + 1))])
-      channel_cycles  = unpacked_channel_entry[0]
-      channel_accum   = (unpacked_channel_entry[1] << 32) | unpacked_channel_entry[2]
-      channel_max     = unpacked_channel_entry[3]
-      report["channel_data"].append({"cycles": channel_cycles, "accum": channel_accum, "max": channel_max})
+    report["channel_data"] = [{"cycles": 1, "accum": 0, "max": 0} for i in range(ECM_NUM_CHANNELS)]
+
+    for channel_index_hw in range(ECM_NUM_CHANNELS):
+      channel_index = pluto_ecm_hw_dwell.ecm_channel_index_hw_to_sw(channel_index_hw)
+
+      if (ECM_CHANNEL_MASK & (1 << channel_index)) != 0:
+        unpacked_channel_entry = PACKED_DWELL_STATS_CHANNEL_ENTRY.unpack(data[(PACKED_DWELL_STATS_HEADER.size + PACKED_DWELL_STATS_CHANNEL_ENTRY.size * channel_index_hw) :
+                                                                              (PACKED_DWELL_STATS_HEADER.size + PACKED_DWELL_STATS_CHANNEL_ENTRY.size * (channel_index_hw + 1))])
+        channel_cycles  = unpacked_channel_entry[0]
+        channel_accum   = (unpacked_channel_entry[1] << 32) | unpacked_channel_entry[2]
+        channel_max     = unpacked_channel_entry[3]
+
+        report["channel_data"][channel_index] = {"cycles": channel_cycles, "accum": channel_accum, "max": channel_max}
 
     return report

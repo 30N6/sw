@@ -1,5 +1,5 @@
 {
-  "simulation": {"recording_enable": 1, "playback_enable": 0, "playback_filename": "./log/recorded_data-20241125-174304.log", "playback_speed": 1.0},
+  "simulation": {"recording_enable": 0, "playback_enable": 0, "playback_filename": "./log/recorded_data-20241125-174304.log", "playback_speed": 1.0},
   "fast_lock_config": {"recalibration_interval": 60.0, "recalibration_pause": 5.0},
   "dwell_config": {
     "dwell_freqs": [
@@ -13,6 +13,7 @@
       {"index": 7, "freq": 5925.0, "dwell_measurement_time": 0.000250, "dwell_total_time_max": 0.0020000, "tx_enabled": 0}
     ],
     "dwell_pattern": [0, 1, 2, 3, 0, 1, 4, 5, 0, 1, 6, 7],
+    "scans_per_frame": 32,
     "exclude_freqs": [
       {"freq_range": [174, 216], "comment": ""}
     ]
