@@ -1,0 +1,28 @@
+{
+  "simulation": {"recording_enable": 1, "playback_enable": 0, "playback_filename": "./log/recorded_data-20241125-174304.log", "playback_speed": 1.0},
+  "fast_lock_config": {"recalibration_interval": 60.0, "recalibration_pause": 5.0},
+  "dwell_config": {
+    "dwell_freqs": [
+      {"index": 0, "freq": 433.0,  "dwell_measurement_time": 0.000500, "dwell_total_time_max": 0.0020000, "tx_enabled": 0},
+      {"index": 1, "freq": 915.0,  "dwell_measurement_time": 0.000500, "dwell_total_time_max": 0.0020000, "tx_enabled": 0},
+      {"index": 2, "freq": 2425.0, "dwell_measurement_time": 0.000500, "dwell_total_time_max": 0.0020000, "tx_enabled": 1},
+      {"index": 3, "freq": 2475.0, "dwell_measurement_time": 0.000500, "dwell_total_time_max": 0.0020000, "tx_enabled": 1}
+    ],
+    "dwell_pattern": [0, 1, 2, 0, 1, 3],
+    "scans_per_frame": 32,
+    "exclude_freqs": [
+      {"freq_range": [174, 216], "comment": ""}
+    ]
+  },
+  "tx_config": {
+    "signals": [
+      {"name": "DJI-RC",    "freq_range": [2400, 2500], "trigger_duration": [1024, -1], "threshold_dB": 12, "immediate_tx": 1, "trigger_modulation": "DJI-RC",  "tx_program": "tx_program_dji_rc.json"},
+      {"name": "ELRS",      "freq_range": [2400, 2500], "trigger_duration": [1024, -1], "threshold_dB": 12, "immediate_tx": 1, "trigger_modulation": "LORA",    "tx_program": "tx_program_elrs.json"},
+      {"name": "vid-NTSC",  "freq_range": [5600, 5950], "trigger_duration": [1024, -1], "threshold_dB": 12, "immediate_tx": 0, "trigger_modulation": "NTSC",    "tx_program": "tx_program_ntsc.json"}
+    ]
+  },
+  "pluto_dma_reader_path": "../pluto_dma_reader/pluto_dma_reader",
+  "pluto_credentials": {"username": "root", "password": "analog"},
+  "graphics": {"fullscreen": 0, "noframe": 0},
+  "debug_log": 1
+}

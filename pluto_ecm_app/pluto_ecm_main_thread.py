@@ -3,7 +3,7 @@ import pygame
 import pluto_ecm_sw_config
 import pluto_ecm_hw_interface
 import pluto_ecm_sequencer
-#import pluto_ecm_analysis_thread
+import pluto_ecm_analysis_thread
 import pluto_ecm_logger
 import pluto_ecm_data_recorder
 import pluto_ecm_data_loader
@@ -54,8 +54,7 @@ class pluto_ecm_main_thread:
       self.sim_loader = None
 
     self.hw_interface     = pluto_ecm_hw_interface.pluto_ecm_hw_interface(self.logger, self.pluto_uri, self.local_ip, self.sw_config.config["pluto_dma_reader_path"], self.sw_config.config["pluto_credentials"], self.sw_config.config["simulation"]["playback_enable"])
-    #self.analysis_thread  = pluto_ecm_analysis_thread.pluto_ecm_analysis_runner(self.logger, self.sw_config)
-    self.analysis_thread = 0
+    self.analysis_thread  = pluto_ecm_analysis_thread.pluto_ecm_analysis_runner(self.logger, self.sw_config)
     self.sequencer        = pluto_ecm_sequencer.pluto_ecm_sequencer(self.logger, self.recorder, self.sw_config,
                                                                     self.hw_interface, self.analysis_thread, self.sim_loader)
     self.render_status    = render_status.render_status(self.surface, self.sw_config, self.hw_interface, self.sequencer, self.VERSION)

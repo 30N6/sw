@@ -6,10 +6,11 @@ import pluto_ecm_hw_dwell
 
 class pluto_ecm_ecm_controller:
 
-  def __init__(self, logger, sw_config, sequencer):
-    self.logger     = logger
-    self.sw_config  = sw_config
-    self.sequencer  = sequencer
+  def __init__(self, logger, sw_config, sequencer, analysis_thread):
+    self.logger           = logger
+    self.sw_config        = sw_config
+    self.sequencer        = sequencer
+    self.analysis_thread  = analysis_thread
 
     self.state            = "IDLE"
     self.hardware_active  = False
@@ -48,14 +49,11 @@ class pluto_ecm_ecm_controller:
       self.prev_pending_forced_triggers.append({"dwell_index": next_dwell_index, "channel_index": next_channel_index})
       self.scan_forced_trigger_index = (self.scan_forced_trigger_index + 1) % len(self.dwell_channels)
 
-  def submit_merged_report(self, merged_report):
-    #self.logger.log(self.logger.LL_INFO, "[ecm_controller] submit_merged_report: {}".format(merged_report))
-
-    self.logger.log(self.logger.LL_INFO, "[ecm_controller] submit_merged_report: {}".format(merged_report))
+  def submit_report(self, merged_report):
+    #self.logger.log(self.logger.LL_INFO, "[ecm_controller] submit_report: {}".format(merged_report))
 
     if len(self.scan_pending_forced_triggers) == 0:
       return
-
     if merged_report["drfm_channel_reports"] is None:
       return
 
@@ -66,14 +64,22 @@ class pluto_ecm_ecm_controller:
     if merged_report["dwell"]["dwell_data"].dwell_index != expected_dwell_index:
       return
 
+    partial_match = False
+    full_match = False
     for entry in merged_report["drfm_channel_reports"]:
       if entry["channel_index"] == expected_channel_index:
         expected_trigger["expected_bytes"] -= entry["slice_length"]
+        partial_match = True
         if expected_trigger["expected_bytes"] <= 0:
           self.scan_pending_forced_triggers.pop(0)
-          self.logger.log(self.logger.LL_INFO, "[ecm_controller] all matching channel reports received for dwell_index={} channel_index={} - removing pending trigger".format(expected_dwell_index, expected_channel_index))
+          full_match = True
+          self.logger.log(self.logger.LL_INFO, "[ecm_controller] submit_report: matched dwell_index={} channel_index={}".format(expected_dwell_index, expected_channel_index))
 
-
+    assert (not partial_match or full_match)
+    if full_match:
+      self.analysis_thread.submit_report({"scan_report": merged_report})
+    else:
+      self.analysis_thread.submit_report({"tx_report": merged_report})
 
   def on_sequencer_active(self):
     self.hardware_active  = True

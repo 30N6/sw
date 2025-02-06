@@ -73,9 +73,8 @@ class pluto_ecm_sequencer:
     self.drfm_reporter                  = pluto_ecm_hw_drfm_reporter.pluto_ecm_hw_drfm_reporter(logger)
     self.dwell_buffer                   = pluto_ecm_dwell_stats_buffer.pluto_ecm_dwell_stats_buffer(sw_config)
     self.hw_stats                       = pluto_ecm_hw_stats.pluto_ecm_hw_stats(logger)
-    self.ecm_controller                 = pluto_ecm_ecm_controller.pluto_ecm_ecm_controller(logger, sw_config, self)
-
-    #self.analysis_thread                = analysis_thread
+    self.ecm_controller                 = pluto_ecm_ecm_controller.pluto_ecm_ecm_controller(logger, sw_config, self, analysis_thread)
+    self.analysis_thread                = analysis_thread
 
     self.state                          = "FLUSH"
     self.flush_start_time               = time.time()
@@ -179,7 +178,6 @@ class pluto_ecm_sequencer:
 
   def submit_channel_entry(self, dwell_index, channel_index, channel_entry):
     self.channel_entry_write_queue.append({"dwell_index": dwell_index, "channel_index": channel_index, "channel_entry": channel_entry})
-    print("channel_entry_write_queue={}".format(len(self.channel_entry_write_queue)))
 
   def _flush_channel_entry_queue(self):
     while len(self.channel_entry_write_queue) > 0:
@@ -239,10 +237,7 @@ class pluto_ecm_sequencer:
     if report["first_in_sequence"]:
       self.dwell_history = {}
     self.dwell_history[report["dwell_data"].frequency] = time.time()
-
-    #self.analysis_thread.submit_report(report) #TODO: use merged data for analysis
     self.hw_stats.submit_report(report)
-    #self.ecm_controller.submit_report(report)
 
     row_done = self.dwell_buffer.process_dwell_update(report)
     if row_done:
@@ -250,9 +245,7 @@ class pluto_ecm_sequencer:
       self.dwell_rows_to_render.append(report)
 
   def _process_drfm_report(self, report):
-    #self.analysis_thread.submit_report(report) #TODO: use merged data for analysis
     self.hw_stats.submit_report(report)
-    #self.ecm_controller.submit_report(report)
 
   def _process_merged_reports(self):
     while len(self.report_merge_queue_dwell_summary) > 0:
@@ -266,7 +259,7 @@ class pluto_ecm_sequencer:
       drfm_channel_reports  = self.report_merge_queue_drfm_channel.pop(dwell_seq_num, None)
 
       merged_report = {"dwell": dwell_summary, "drfm_summary_report": drfm_summary, "drfm_channel_reports": drfm_channel_reports}
-      self.ecm_controller.submit_merged_report(merged_report)
+      self.ecm_controller.submit_report(merged_report)
 
   def _update_data_from_hw(self):
     if self.state == "FLUSH":
