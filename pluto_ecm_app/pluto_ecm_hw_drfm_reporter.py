@@ -33,9 +33,12 @@ class pluto_ecm_hw_drfm_reporter:
     report = {}
     report["msg_seq_num"]                 = unpacked_header[1]
     report["msg_type"]                    = unpacked_header[2]
+
     report["dwell_seq_num"]               = unpacked_header[4]
-    report["channel_was_written"]         = unpacked_header[5]
-    report["channel_was_read"]            = unpacked_header[6]
+
+    report["channel_was_written"]         = unpacked_header[6]
+    report["channel_was_read"]            = unpacked_header[5]
+
     report["report_delay_channel_write"]  = unpacked_header[7]
     report["report_delay_summary_write"]  = unpacked_header[8]
     report["report_delay_summary_start"]  = unpacked_header[9]

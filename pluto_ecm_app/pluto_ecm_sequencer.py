@@ -439,9 +439,9 @@ class pluto_ecm_sequencer:
         if (len(self.hw_dwell_entry_pending) == 0) and (len(self.hw_channel_entry_pending) == 0):
           self.initial_hw_dwells_loaded = True
 
-  def _compute_next_dwell_program(self):
+  def _compute_next_dwell_program(self, tag):
     assert (len(self.dwell_active) > 0)
-    return pluto_ecm_hw_dwell.ecm_dwell_program_entry(1, 0, len(self.dwell_active))
+    return pluto_ecm_hw_dwell.ecm_dwell_program_entry(1, 0, len(self.dwell_active), tag)
 
   def _activate_next_dwells(self):
     assert (len(self.dwell_active) == 0)
@@ -485,9 +485,9 @@ class pluto_ecm_sequencer:
         #do channel entry updates -- new thresholds, etc.
         self._flush_channel_entry_queue()
 
-        dwell_program = self._compute_next_dwell_program()
+        dwell_program = self._compute_next_dwell_program(self.ecm_controller.dwell_program_tag)
         self._send_hw_dwell_program(dwell_program)
-        self.logger.log(self.logger.LL_INFO, "[sequencer] _update_scan_dwells [LOAD_PROFILES]: profiles loaded, sending dwell program")
+        self.logger.log(self.logger.LL_INFO, "[sequencer] _update_scan_dwells [LOAD_PROFILES]: profiles loaded, sending dwell program - tag={}".format(self.ecm_controller.dwell_program_tag))
 
     if self.dwell_state == "SEND_PROGRAM":
       if len(self.hw_dwell_program_pending) == 0:

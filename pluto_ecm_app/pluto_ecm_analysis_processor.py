@@ -6,16 +6,31 @@ import numpy as np
 import copy
 
 class pluto_ecm_analysis_processor:
-  def __init__(self, logger, log_dir, config):
-    self.logger   = logger
-    self.recorder = pluto_ecm_data_recorder.pluto_ecm_data_recorder(log_dir, "analysis", 1) #config["analysis_config"]["enable_pdw_recording"])
-    self.config   = config
+  def __init__(self, logger, log_dir, config, output_queue):
+    self.logger       = logger
+    self.recorder     = pluto_ecm_data_recorder.pluto_ecm_data_recorder(log_dir, "analysis", 1) #config["analysis_config"]["enable_pdw_recording"])
+    self.config       = config
+    self.output_queue = output_queue
 
     self.center_channel_index = (ECM_NUM_CHANNELS // 2)
     self.channel_spacing      = (ADC_CLOCK_FREQUENCY / ECM_NUM_CHANNELS) / 1e6
 
-    self.pending_scan_reports = []
-    self.pending_tx_reports   = []
+    self.pending_scan_reports_iq    = []
+    self.pending_scan_reports_bare  = []
+    self.pending_tx_reports         = []
+
+    self.scan_stats = {}
+    self._clear_scan_stats()
+
+  def _clear_scan_stats(self):
+    for entry in self.config["dwell_config"]["dwell_freqs"]:
+      self.scan_stats[entry["freq"]] = {"iq_power_mean"         : [0  for i in range(ECM_NUM_CHANNELS)],
+                                        "iq_power_median"       : [0  for i in range(ECM_NUM_CHANNELS)],
+                                        "iq_power_history"      : [[] for i in range(ECM_NUM_CHANNELS)],
+                                        "summary_power_mean"    : [0  for i in range(ECM_NUM_CHANNELS)],
+                                        "summary_power_median"  : [0  for i in range(ECM_NUM_CHANNELS)],
+                                        "summary_power_history" : [[] for i in range(ECM_NUM_CHANNELS)]}
+
 
     #self.pdw_processor        = pluto_esm_pdw_processor.pluto_esm_pdw_processor(logger, config)
     #self.dwell_processor      = pluto_esm_dwell_processor.pluto_esm_dwell_processor(logger, config)
@@ -130,29 +145,114 @@ class pluto_ecm_analysis_processor:
 #    self.confirmed_cw_primary_signals_to_render   = copy.deepcopy(self.dwell_processor.combined_data_primary)
 #    self.confirmed_cw_secondary_signals_to_render = copy.deepcopy(self.dwell_processor.combined_data_secondary)
 
+  def _update_scan_stats_iq(self, data):
+    dwell_freq    = data["dwell_freq"]
+    stats         = self.scan_stats[dwell_freq]
+    iq_data       = data["iq_data"]
+    channel_index = data["channel_index"]
+
+    channel_power = np.square(iq_data[:, 0]) + np.square(iq_data[:, 1])
+    stats["iq_power_history"][channel_index].append(channel_power)
+    stats["iq_power_mean"][channel_index]   = np.mean(stats["iq_power_history"][channel_index])
+    stats["iq_power_median"][channel_index] = np.median(stats["iq_power_history"][channel_index])
+
+    self.logger.log(self.logger.LL_DEBUG, "_update_scan_stats_iq: dwell_freq={} channel_index={} power_mean={:.1f} power_median={:.1f}".format(dwell_freq, channel_index,
+      stats["iq_power_mean"][channel_index], stats["iq_power_median"][channel_index]))
+
+  def _update_scan_stats_summary(self, data):
+    dwell_freq    = data["dwell"]["dwell_data"].frequency
+    channel_data  = data["dwell"]["dwell_report"]["channel_data"]
+    stats         = self.scan_stats[dwell_freq]
+
+    for channel_index in range(ECM_NUM_CHANNELS):
+      channel_entry = channel_data[channel_index]
+      channel_power = channel_entry["accum"] / channel_entry["cycles"]
+
+      stats["summary_power_history"][channel_index].append(channel_power)
+      stats["summary_power_mean"][channel_index]    = np.mean(stats["summary_power_history"][channel_index])
+      stats["summary_power_median"][channel_index]  = np.median(stats["summary_power_history"][channel_index])
+
+    self.logger.log(self.logger.LL_DEBUG, "_update_scan_stats_summary: freq={}".format(dwell_freq))
+
+  def _remove_dc_offset(self, data):
+    return data - np.mean(data, 0)
+
+  def _apply_basebanding(self, data):
+    data[0:-1:2] *= -1
+    return data
+
   def _process_scan_reports(self):
-    while len(self.pending_scan_reports) > 0:
-      d = self.pending_scan_reports.pop(0)["scan_report"]
+    while len(self.pending_scan_reports_iq) > 0:
+      report = self.pending_scan_reports_iq.pop(0)
+      d = report["scan_report_iq"]
       dwell_freq = d["dwell"]["dwell_data"].frequency
       channel_reports = d["drfm_channel_reports"]
       channel_index = channel_reports[0]["channel_index"]
+      scan_data = []
       iq_data = []
       for i in range(len(channel_reports)):
         r = channel_reports[i]
         if (r["channel_index"] != channel_index):
-          self.recorder.log({"dwell_freq": dwell_freq, "channel_index": channel_index, "iq_length": len(iq_data), "iq_data": iq_data})
+          scan_data.append({"controller_state": report["state"], "dwell_freq": dwell_freq, "channel_index": channel_index, "iq_length": len(iq_data), "iq_data": np.asarray(iq_data)})
           iq_data = []
           channel_index = r["channel_index"]
 
         iq_data.extend(r["iq_data"])
+      scan_data.append({"controller_state": report["state"], "dwell_freq": dwell_freq, "channel_index": channel_index, "iq_length": len(iq_data), "iq_data": np.asarray(iq_data)})
 
-      self.recorder.log({"dwell_freq": dwell_freq, "channel_index": channel_index, "iq_length": len(iq_data), "iq_data": iq_data})
+      for sd in scan_data:
+        sd["iq_data"] = self._remove_dc_offset(sd["iq_data"])
+        if sd["channel_index"] % 2 == 1:
+          sd["iq_data"] = self._apply_basebanding(sd["iq_data"])
 
-  def submit_report(self, report):
-    if "scan_report" in report:
-      self.pending_scan_reports.append(report)
-    elif "tx_report" in report:
-      self.pending_tx_reports.append(report)
+        if sd["controller_state"] == "SCAN":
+          self._update_scan_stats_iq(sd)
+
+        sd["iq_data"] = sd["iq_data"].tolist()
+        self.recorder.log(sd)
+
+      if report["state"] == "SCAN":
+        self._update_scan_stats_summary(d)
+
+    while len(self.pending_scan_reports_bare) > 0:
+      report = self.pending_scan_reports_bare.pop(0)
+    #  if report["state"] == "SCAN":
+    #    d = report["scan_report_bare"]
+    #    dwell_freq = d["dwell"]["dwell_data"].frequency
+    #    print("[scan] bare report: {}".format(dwell_freq))
+
+    #
+    #  scan_data.append({"controller_state": d["state"], "dwell_freq": dwell_freq, "channel_index": channel_index, "iq_length": len(iq_data), "iq_data": np.asarray(iq_data)})
+
+  def _process_command(self, data):
+    command = data["command"]
+
+    if command == "SCAN_START":
+      self._clear_scan_stats()
+    elif command == "SCAN_END":
+      for freq in self.scan_stats:
+        self.logger.log(self.logger.LL_DEBUG, "_process_command: SCAN_END: iq_power_mean[{}]        ={}".format(freq, self.scan_stats[freq]["iq_power_mean"]))
+        self.logger.log(self.logger.LL_DEBUG, "_process_command: SCAN_END: iq_power_median[{}]      ={}".format(freq, self.scan_stats[freq]["iq_power_median"]))
+        self.logger.log(self.logger.LL_DEBUG, "_process_command: SCAN_END: summary_power_mean[{}]   ={}".format(freq, self.scan_stats[freq]["summary_power_mean"]))
+        self.logger.log(self.logger.LL_DEBUG, "_process_command: SCAN_END: summary_power_median[{}] ={}".format(freq, self.scan_stats[freq]["summary_power_median"]))
+        self.output_queue.put({"scan_results": {"freq": freq,
+                                                "iq_power_mean"       : self.scan_stats[freq]["iq_power_mean"],
+                                                "iq_power_median"     : self.scan_stats[freq]["iq_power_median"],
+                                                "summary_power_mean"  : self.scan_stats[freq]["summary_power_mean"],
+                                                "summary_power_median": self.scan_stats[freq]["summary_power_median"]}})
+    else:
+      raise RuntimeError("unknown command")
+
+  def submit_data(self, data):
+    if "scan_report_iq" in data:
+      self.pending_scan_reports_iq.append(data)
+    elif "scan_report_bare" in data:
+      self.pending_scan_reports_bare.append(data)
+
+    elif "tx_report" in data:
+      self.pending_tx_reports.append(data)
+    elif "command" in data:
+      self._process_command(data)
     else:
       raise RuntimeError("invalid report")
 

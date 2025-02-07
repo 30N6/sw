@@ -75,7 +75,7 @@ PACKED_ECM_CONFIG_CONTROL         = struct.Struct("<" + PACKED_UINT32 + PACKED_U
 PACKED_STATUS_REPORT = struct.Struct("<" + PACKED_UINT32 + PACKED_UINT32 + "xx" + PACKED_UINT8 + PACKED_UINT8 +
                                            PACKED_UINT32 + PACKED_UINT32 + PACKED_UINT32 + PACKED_UINT32 + PACKED_UINT32)
 
-PACKED_ECM_DWELL_PROGRAM_ENTRY = struct.Struct("<" + PACKED_UINT8 + PACKED_UINT8 + PACKED_UINT16 + "xxxx")  #enable, initial_dwell_index, global_counter_init, padding
+PACKED_ECM_DWELL_PROGRAM_ENTRY = struct.Struct("<" + PACKED_UINT8 + PACKED_UINT8 + PACKED_UINT16 + PACKED_UINT16 + "xx")  #enable, initial_dwell_index, global_counter_init, tag, padding
 
 PACKED_ECM_DWELL_ENTRY  = struct.Struct("<" + PACKED_UINT8 + PACKED_UINT8 + PACKED_UINT8 + PACKED_UINT8 +   #flags, repeat_count, fast_lock_profile, next_dwell_index
                                               PACKED_UINT16 + PACKED_UINT16 +                               #pre lock, post lock delay
@@ -108,7 +108,7 @@ PACKED_DWELL_STATS_HEADER = struct.Struct("<" + PACKED_UINT32 + PACKED_UINT32 + 
                                                 PACKED_UINT32 +                                                         #dwell_entry: measurement_duration
                                                 PACKED_UINT32 +                                                         #dwell_entry: total_duration_max
                                                 PACKED_UINT32 +                                                         #dwell_seq_num
-                                                PACKED_UINT32 +                                                         #global counter
+                                                PACKED_UINT16 + PACKED_UINT16 +                                         #program tag, global counter
                                                 PACKED_UINT32 +                                                         #actual_measurement_duration
                                                 PACKED_UINT32 +                                                         #tx active flag (31), actual_total_duration (30:0)
                                                 PACKED_UINT32 + PACKED_UINT32)                                          #ts_dwell_start

@@ -33,7 +33,7 @@ class render_spectrum:
     self.spectrogram = {}
     for freq in self.dwell_freqs:
       self.spectrogram[freq] = pluto_ecm_spectrogram.pluto_ecm_spectrogram(self.sw_config, freq, self.dwell_pane_width,
-        self.rect_spectrum_display_primary[3], self.rect_spectrum_display_secondary[3])
+        self.rect_spectrum_display_primary[3], self.rect_spectrum_display_secondary[3], self.sequencer.analysis_thread.scan_results)
 
     self.colors = {}
     self.colors["cal_old"]        = (192, 0, 0)
@@ -145,34 +145,33 @@ class render_spectrum:
     pygame.draw.rect(self.surface, self.colors["frame_elements"], self.rect_spectrum_display_primary, 1)
     pygame.draw.rect(self.surface, self.colors["frame_elements"], self.rect_spectrum_display_secondary, 1)
 
-
-    return
-
-    graph_rects = [self.rect_spectrum_display_primary, self.rect_spectrum_display_secondary]
-
-    freq_tick_height = 6
-    freq_tick_count = 7
-    for i in range(freq_tick_count):
-      tick_frac = (i / (freq_tick_count - 1))
-      freq_str = "{}".format(round(self.freq_zoom_range[0] + tick_frac * (self.freq_zoom_range[1] - self.freq_zoom_range[0])))
-      text_data = self.font.render(freq_str, True, self.colors["frame_elements"])
-
-      for j in range(len(graph_rects)):
-        x = graph_rects[j][0] + tick_frac * (graph_rects[j][2] - 1)
-
-        pos_start = (x, graph_rects[j][1])
-        pos_end   = (x, graph_rects[j][1] - freq_tick_height)
-        pygame.draw.line(self.surface, self.colors["frame_elements"], pos_start, pos_end)
-
-        text_rect = text_data.get_rect()
-        text_rect.centerx = x
-        text_rect.bottom = graph_rects[j][1] - freq_tick_height - 1
-        self.surface.blit(text_data, text_rect)
-
+    #TODO
+    #graph_rects = [self.rect_spectrum_display_primary, self.rect_spectrum_display_secondary]
+    #
+    #freq_tick_height = 6
+    #freq_tick_count = 7
+    #for i in range(freq_tick_count):
+    #  tick_frac = (i / (freq_tick_count - 1))
+    #  freq_str = "{}".format(round(self.freq_zoom_range[0] + tick_frac * (self.freq_zoom_range[1] - self.freq_zoom_range[0])))
+    #  text_data = self.font.render(freq_str, True, self.colors["frame_elements"])
+    #
+    #  for j in range(len(graph_rects)):
+    #    x = graph_rects[j][0] + tick_frac * (graph_rects[j][2] - 1)
+    #
+    #    pos_start = (x, graph_rects[j][1])
+    #    pos_end   = (x, graph_rects[j][1] - freq_tick_height)
+    #    pygame.draw.line(self.surface, self.colors["frame_elements"], pos_start, pos_end)
+    #
+    #    text_rect = text_data.get_rect()
+    #    text_rect.centerx = x
+    #    text_rect.bottom = graph_rects[j][1] - freq_tick_height - 1
+    #    self.surface.blit(text_data, text_rect)
+    #
     power_label_count = 7
+    spec_0 = self.spectrogram[self.dwell_freqs[0]]
     for i in range(power_label_count):
       power_frac = (i / (power_label_count - 1))
-      freq_str = "{}".format(round(self.spectrogram.spec_trace_min_dB + power_frac * (self.spectrogram.spec_trace_max_dB - self.spectrogram.spec_trace_min_dB)))
+      freq_str = "{}".format(round(spec_0.spec_trace_min_dB + power_frac * (spec_0.spec_trace_max_dB - spec_0.spec_trace_min_dB)))
       text_data = self.font.render(freq_str, True, self.colors["frame_elements"])
       text_data = pygame.transform.rotate(text_data, 90)
 
@@ -180,39 +179,39 @@ class render_spectrum:
       text_rect.left = self.rect_spectrum_display_secondary[0] - 12
       text_rect.centery = self.rect_spectrum_display_secondary[1] + self.rect_spectrum_display_secondary[3] * (1 - power_frac)
       self.surface.blit(text_data, text_rect)
-
-    peaks       = [self._get_spectrum_peaks(self.spectrogram.last_buffer_avg,  3, [spec_zoom_i_start, spec_zoom_i_stop], spec_mhz_per_px, True),
-                   self._get_spectrum_peaks(self.spectrogram.last_buffer_peak, 3, [spec_zoom_i_start, spec_zoom_i_stop], spec_mhz_per_px, True)]
-    status_str  = ["[AVERAGE] peak_val_dB={:<18} peak_freq={:<24}",
-                   "[PEAK]    peak_val_dB={:<18} peak_freq={:<24}"]
-
-    for i in range(len(peaks)):
-      peak_values = "[" + " ".join(["{:4.1f}".format(v) for v in peaks[i][1]]) + "]"
-      peak_freqs = "[" + " ".join(["{:6.1f}".format(v) for v in peaks[i][0]]) + "]"
-
-      s = status_str[i].format(peak_values, peak_freqs)
-      text_data = self.font.render(s, True, self.colors["frame_elements"])
-      text_rect = text_data.get_rect()
-      text_rect.left = graph_rects[1][0]
-      text_rect.bottom = graph_rects[1][1] + graph_rects[i][3] + 16 * i
-      self.surface.blit(text_data, text_rect)
-
-    cursor_pos          = pygame.mouse.get_pos()
-    cursor_in_primary   = self._check_inside_rect(cursor_pos, self.rect_spectrum_display_primary)
-    cursor_in_secondary = self._check_inside_rect(cursor_pos, self.rect_spectrum_display_secondary)
-    if cursor_in_primary or cursor_in_secondary:
-      if cursor_in_primary:
-        x_frac = (cursor_pos[0] - self.rect_spectrum_display_primary[0]) / self.rect_spectrum_display_primary[2]
-      else:
-        x_frac = (cursor_pos[0] - self.rect_spectrum_display_secondary[0]) / self.rect_spectrum_display_secondary[2]
-
-      freq = self.freq_zoom_range[0] + x_frac * (self.freq_zoom_range[1] - self.freq_zoom_range[0])
-      s = "[CURSOR]: freq={:<.1f}".format(freq)
-      text_data = self.font.render(s, True, self.colors["frame_elements"])
-      text_rect = text_data.get_rect()
-      text_rect.left = graph_rects[1][0]
-      text_rect.bottom = graph_rects[1][1] + graph_rects[i][3] + 16 * 3
-      self.surface.blit(text_data, text_rect)
+    #
+    #peaks       = [self._get_spectrum_peaks(self.spectrogram.last_buffer_avg,  3, [spec_zoom_i_start, spec_zoom_i_stop], spec_mhz_per_px, True),
+    #               self._get_spectrum_peaks(self.spectrogram.last_buffer_peak, 3, [spec_zoom_i_start, spec_zoom_i_stop], spec_mhz_per_px, True)]
+    #status_str  = ["[AVERAGE] peak_val_dB={:<18} peak_freq={:<24}",
+    #               "[PEAK]    peak_val_dB={:<18} peak_freq={:<24}"]
+    #
+    #for i in range(len(peaks)):
+    #  peak_values = "[" + " ".join(["{:4.1f}".format(v) for v in peaks[i][1]]) + "]"
+    #  peak_freqs = "[" + " ".join(["{:6.1f}".format(v) for v in peaks[i][0]]) + "]"
+    #
+    #  s = status_str[i].format(peak_values, peak_freqs)
+    #  text_data = self.font.render(s, True, self.colors["frame_elements"])
+    #  text_rect = text_data.get_rect()
+    #  text_rect.left = graph_rects[1][0]
+    #  text_rect.bottom = graph_rects[1][1] + graph_rects[i][3] + 16 * i
+    #  self.surface.blit(text_data, text_rect)
+    #
+    #cursor_pos          = pygame.mouse.get_pos()
+    #cursor_in_primary   = self._check_inside_rect(cursor_pos, self.rect_spectrum_display_primary)
+    #cursor_in_secondary = self._check_inside_rect(cursor_pos, self.rect_spectrum_display_secondary)
+    #if cursor_in_primary or cursor_in_secondary:
+    #  if cursor_in_primary:
+    #    x_frac = (cursor_pos[0] - self.rect_spectrum_display_primary[0]) / self.rect_spectrum_display_primary[2]
+    #  else:
+    #    x_frac = (cursor_pos[0] - self.rect_spectrum_display_secondary[0]) / self.rect_spectrum_display_secondary[2]
+    #
+    #  freq = self.freq_zoom_range[0] + x_frac * (self.freq_zoom_range[1] - self.freq_zoom_range[0])
+    #  s = "[CURSOR]: freq={:<.1f}".format(freq)
+    #  text_data = self.font.render(s, True, self.colors["frame_elements"])
+    #  text_rect = text_data.get_rect()
+    #  text_rect.left = graph_rects[1][0]
+    #  text_rect.bottom = graph_rects[1][1] + graph_rects[i][3] + 16 * 3
+    #  self.surface.blit(text_data, text_rect)
 
   def render(self):
     self._render_dwell_display()

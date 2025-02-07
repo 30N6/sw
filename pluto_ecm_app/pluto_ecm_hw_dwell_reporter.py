@@ -54,10 +54,13 @@ class pluto_ecm_hw_dwell_reporter:
     report["dwell_entry_total_duration_max"]      = unpacked_header[13]
 
     report["dwell_seq_num"]                       = unpacked_header[14]
+
+    report["dwell_program_tag"]                   = unpacked_header[16]
     report["global_counter"]                      = unpacked_header[15]
-    report["actual_measurement_duration"]         = unpacked_header[16]
-    report["actual_total_duration"]               = unpacked_header[17]
-    report["ts_dwell_start"]                      = (unpacked_header[18] << 32) | unpacked_header[19]
+
+    report["actual_measurement_duration"]         = unpacked_header[17]
+    report["actual_total_duration"]               = unpacked_header[18]
+    report["ts_dwell_start"]                      = (unpacked_header[19] << 32) | unpacked_header[20]
 
     report["channel_data"] = [{"cycles": 1, "accum": 0, "max": 0} for i in range(ECM_NUM_CHANNELS)]
 

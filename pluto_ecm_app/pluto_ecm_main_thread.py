@@ -63,7 +63,7 @@ class pluto_ecm_main_thread:
 
   def run(self):
     key_handlers = [self.render_spectrum] #key_handlers = [self.render_spectrum, self.render_emitters]
-    update_calls = [self.hw_interface, self.sequencer, self.render_status, self.render_spectrum] #update_calls = [self.hw_interface, self.analysis_thread, self.sequencer, self.render_status, self.render_spectrum, self.render_emitters]
+    update_calls = [self.hw_interface, self.analysis_thread, self.sequencer, self.render_status, self.render_spectrum] #update_calls = [self.hw_interface, self.analysis_thread, self.sequencer, self.render_status, self.render_spectrum, self.render_emitters]
     render_calls = [self.render_status, self.render_spectrum] #render_calls = [self.render_status, self.render_spectrum, self.render_emitters]
 
     running = True
