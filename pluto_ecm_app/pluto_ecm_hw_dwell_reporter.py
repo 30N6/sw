@@ -51,7 +51,8 @@ class pluto_ecm_hw_dwell_reporter:
     report["dwell_entry_frequency"]               = unpacked_header[10]
 
     report["dwell_entry_measurement_duration"]    = unpacked_header[12]
-    report["dwell_entry_total_duration_max"]      = unpacked_header[13]
+    report["dwell_entry_total_duration_max"]      = unpacked_header[13] & 0x7FFFFFFF
+    report["dwell_tx_active"]                     = (unpacked_header[13] & 0x80000000) != 0
 
     report["dwell_seq_num"]                       = unpacked_header[14]
 

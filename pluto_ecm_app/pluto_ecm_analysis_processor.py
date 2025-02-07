@@ -194,12 +194,12 @@ class pluto_ecm_analysis_processor:
       for i in range(len(channel_reports)):
         r = channel_reports[i]
         if (r["channel_index"] != channel_index):
-          scan_data.append({"controller_state": report["state"], "dwell_freq": dwell_freq, "channel_index": channel_index, "iq_length": len(iq_data), "iq_data": np.asarray(iq_data)})
+          scan_data.append({"controller_state": report["state"], "dwell_freq": dwell_freq, "channel_index": channel_index, "timestamp": r["segment_timestamp"], "iq_length": len(iq_data), "iq_data": np.asarray(iq_data)})
           iq_data = []
           channel_index = r["channel_index"]
 
         iq_data.extend(r["iq_data"])
-      scan_data.append({"controller_state": report["state"], "dwell_freq": dwell_freq, "channel_index": channel_index, "iq_length": len(iq_data), "iq_data": np.asarray(iq_data)})
+      scan_data.append({"controller_state": report["state"], "dwell_freq": dwell_freq, "channel_index": channel_index, "timestamp": r["segment_timestamp"], "iq_length": len(iq_data), "iq_data": np.asarray(iq_data)})
 
       for sd in scan_data:
         sd["iq_data"] = self._remove_dc_offset(sd["iq_data"])
