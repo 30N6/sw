@@ -3,8 +3,9 @@
 %filename = "analysis-20250205-210851-ntsc-5917-dark-bright-20mw-far.log";
 %filename = "analysis-20250205-225643-915.log";
 %filename = "analysis-20250206-000801.log";
-filename = "analysis-20250207-003258.log";
 
+%filename = "analysis-20250207-003258.log";
+filename = "analysis-20250207-004611.log";
 
 Fs = 7.68e6;
 L = 2048;
@@ -55,45 +56,37 @@ end
 %filter_freq = 915;
 filter_freq = 1325;
 
-filtered_reports = scan_reports([scan_reports.dwell_freq] == filter_freq);
-
-
-channel_count = zeros(16, 1);
-for ii = 1:length(filtered_reports)
-    channel_count(filtered_reports(ii).channel_index + 1) = channel_count(filtered_reports(ii).channel_index + 1) + 1;
+is_tx_listen = false(length(scan_reports), 1);
+for ii = 1:length(scan_reports)
+    is_tx_listen(ii) = scan_reports(ii).controller_state == "TX_LISTEN";
 end
+freq_match = ([scan_reports.dwell_freq] == filter_freq).';
+length_match = ([scan_reports.iq_length] > 50).';
+filtered_reports = scan_reports(freq_match & length_match & is_tx_listen);
 
-max_channel_count = min(channel_count(3:15))
-current_channel_count = zeros(13, 1);
-reports_by_channel = repmat(filtered_reports(1), max_channel_count, 13);
-
-for ii = 1:length(filtered_reports)
-    r = filtered_reports(ii);
-    chan_m = r.channel_index - 1;
-    reports_by_channel(current_channel_count(chan_m) + 1, chan_m) = r;
-    current_channel_count(chan_m) = current_channel_count(chan_m) + 1;
-end
 
 
 %%
 figure(1);
 
 num_rows = 4;
-ax = zeros(4, 13);
+num_cols = 10;
+ax = zeros(num_rows, num_cols);
 for row = 1:num_rows
-    for col = 1:13
-        plot_index = (row-1) * 13 + col;
-        ax(row, col) = subplot(num_rows,13,plot_index);
+    for col = 1:num_cols
+        plot_index = (row-1) * num_cols + col;
+        ax(row, col) = subplot(num_rows,num_cols,plot_index);
         
-        d = reports_by_channel(row, col);
+        d = filtered_reports(plot_index);
+        
+        t = (0:d.iq_length-1) / Fs;
+        y = d.iq_data(1:d.iq_length);
 
-        Y = fft(d.iq_data);
-        %plot(Fs/L*(-L/2:L/2-1), 20*log10(abs(fftshift(Y))),"LineWidth",1)
-        plot(Fs/L*(-L/2:L/2-1), (abs(fftshift(Y))),"LineWidth",1)
+        plot(t, real(y), t, imag(y));
 
         channel_freq = d.dwell_freq + (Fs/2)/1e6 * (d.channel_index - 8);
 
-        s = sprintf("%d %d: %.1f", d.dwell_freq, d.channel_index, channel_freq);
+        s = sprintf("[%d] %d %d: %.1f", plot_index, d.dwell_freq, d.channel_index, channel_freq);
         title(s);
         xlabel("f (Hz)");
         ylabel("|fft(X)|");
@@ -103,47 +96,48 @@ end
 
 
 %%
-r = 1;
-c = 4;
-d = reports_by_channel(r, c);
+d = filtered_reports(2);
+
+t = (0:d.iq_length-1).' / Fs;
+y = d.iq_data(1:d.iq_length);
 
 figure(2);
 ax_1 = subplot(6,1,1);
-t = [(0:L-1) / Fs].' * 1e6;
-plot(t, real(d.iq_data), t, imag(d.iq_data));
+plot(t, real(y), t, imag(y));
 
 ax_2 = subplot(6,1,2);
-instfreq(d.iq_data, Fs);
-linkaxes([ax_1, ax_2], 'x');
+instfreq(y, Fs);
+%linkaxes([ax_1, ax_2], 'x');
 
 subplot(6,1,3);
-[c,lags] = xcorr(d.iq_data);
+[c,lags] = xcorr(y);
 plot(lags * (1/Fs) * 1e6, (abs(c)));
 
 subplot(6,1,4); 
-X = fft(d.iq_data);
-xc = abs(ifft(X .* conj(X)));
-
-tx = t(1:L/2);
-xc = xc(1:L/2);
-
-m_xc = mean(xc);
-s_xc = std(xc) * 1.0;
-
-i_th = xc > (m_xc + s_xc);
-xc_th = xc(i_th);
-t_th = tx(i_th);
-
-plot(tx, xc, [0, tx(end)], [m_xc, m_xc], [0, tx(end)], [m_xc + s_xc, m_xc + s_xc], t_th, xc_th, 'o');
+% X = fft(y);
+% xc = abs(ifft(X .* conj(X)));
+% 
+% tx = t(1:L/2);
+% xc = xc(1:L/2);
+% 
+% m_xc = mean(xc);
+% s_xc = std(xc) * 1.0;
+% 
+% i_th = xc > (m_xc + s_xc);
+% xc_th = xc(i_th);
+% t_th = tx(i_th);
+% 
+% plot(tx, xc, [0, tx(end)], [m_xc, m_xc], [0, tx(end)], [m_xc + s_xc, m_xc + s_xc], t_th, xc_th, 'o');
 
 subplot(6,1,5);
 sf = compute_sfft(d.iq_data, 32);
 imagesc(sf.');
 
 subplot(6,1,6);
-Y = fft(d.iq_data);
+Y = fft(y);
 %plot(Fs/L*(-L/2:L/2-1), 20*log10(abs(fftshift(Y))),"LineWidth",1)
-plot(Fs/L*(-L/2:L/2-1), (abs(fftshift(Y))),"LineWidth",1)
+%plot(Fs/L*(-L/2:L/2-1), (abs(fftshift(Y))),"LineWidth",1)
+plot(abs(fft(Y)));
 
 fprintf("corr ratio: %f\n", s_xc/m_xc);
 
