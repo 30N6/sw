@@ -57,6 +57,7 @@ ECM_NUM_CHANNEL_TX_PROGRAM_ENTRIES              = 4
 
 ECM_DRFM_MEM_DEPTH                              = 1024 * 24
 ECM_DRFM_MAX_PACKET_IQ_SAMPLES_PER_REPORT       = 116
+ECM_DRFM_SEGMENT_HYST_SHIFT_WIDTH               = 2 #TODO: better name
 
 ADC_CLOCK_FREQUENCY                             = 61.44e6
 ADC_CLOCK_PERIOD                                = 1/61.44e6

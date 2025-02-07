@@ -33,7 +33,7 @@ class render_spectrum:
     self.spectrogram = {}
     for freq in self.dwell_freqs:
       self.spectrogram[freq] = pluto_ecm_spectrogram.pluto_ecm_spectrogram(self.sw_config, freq, self.dwell_pane_width,
-        self.rect_spectrum_display_primary[3], self.rect_spectrum_display_secondary[3], self.sequencer.analysis_thread.scan_results)
+        self.rect_spectrum_display_primary[3], self.rect_spectrum_display_secondary[3], self.sequencer.ecm_controller.dwell_trigger_thresholds)
 
     self.colors = {}
     self.colors["cal_old"]        = (192, 0, 0)

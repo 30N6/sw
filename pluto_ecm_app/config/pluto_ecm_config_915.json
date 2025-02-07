@@ -16,9 +16,9 @@
   },
   "tx_config": {
     "signals": [
-      {"name": "DJI-RC",    "freq_range": [2400, 2500], "trigger_duration": [1024, -1], "threshold_dB": 12, "immediate_tx": 1, "trigger_modulation": "DJI-RC",  "tx_program": "tx_program_dji_rc.json"},
-      {"name": "ELRS",      "freq_range": [2400, 2500], "trigger_duration": [1024, -1], "threshold_dB": 12, "immediate_tx": 1, "trigger_modulation": "LORA",    "tx_program": "tx_program_elrs.json"},
-      {"name": "vid-NTSC",  "freq_range": [5600, 5950], "trigger_duration": [1024, -1], "threshold_dB": 12, "immediate_tx": 0, "trigger_modulation": "NTSC",    "tx_program": "tx_program_ntsc.json"}
+      {"name": "DJI-RC",    "freq_range": [2400, 2500], "trigger_duration": [1024, -1], "threshold_dB": 12, "threshold_hyst_dB": 9, "immediate_tx": 1, "trigger_modulation": "DJI-RC",  "tx_program": "tx_program_dji_rc.json"},
+      {"name": "ELRS",      "freq_range": [2400, 2500], "trigger_duration": [1024, -1], "threshold_dB": 12, "threshold_hyst_dB": 9, "immediate_tx": 1, "trigger_modulation": "LORA",    "tx_program": "tx_program_elrs.json"},
+      {"name": "vid-NTSC",  "freq_range": [5600, 5950], "trigger_duration": [1024, -1], "threshold_dB": 12, "threshold_hyst_dB": 9, "immediate_tx": 0, "trigger_modulation": "NTSC",    "tx_program": "tx_program_ntsc.json"}
     ]
   },
   "pluto_dma_reader_path": "../pluto_dma_reader/pluto_dma_reader",

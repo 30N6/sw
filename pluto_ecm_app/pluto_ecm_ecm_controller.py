@@ -27,12 +27,45 @@ class pluto_ecm_ecm_controller:
     self.map_tag_to_state             = {0: "IDLE", 10: "SCAN", 20: "TX_LISTEN"}
     self.dwell_program_tag            = self.map_state_to_tag[self.state]
 
-    #TODO: render_status: show controller state, forced trigger index/total
+    self.last_scan_seq_num            = -1
+    self.dwell_trigger_thresholds     = {}
+    self.dwell_trigger_offset_dB      = {}
+    self.dwell_trigger_hyst_dB        = {}
+    self.dwell_channel_freq           = {}
+
 
     for channel_index in range(ECM_NUM_CHANNELS):
       for dwell_index in range(len(sw_config.config["dwell_config"]["dwell_pattern"])):
+        freq_index = sw_config.config["dwell_config"]["dwell_pattern"][dwell_index]
+        freq_entry = sw_config.config["dwell_config"]["dwell_freqs"][freq_index]
+
         if (ECM_CHANNEL_MASK & (1 << channel_index)) != 0:
-          self.dwell_channels.append({"dwell_index": dwell_index, "channel_index": channel_index})
+          self.dwell_channels.append({"dwell_index": dwell_index, "channel_index": channel_index, "freq": freq_entry["freq"]})
+
+    for freq_entry in sw_config.config["dwell_config"]["dwell_freqs"]:
+      self.dwell_trigger_thresholds[freq_entry["freq"]] = [0xFFFFFFFF for i in range(ECM_NUM_CHANNELS)]
+      self.dwell_trigger_offset_dB[freq_entry["freq"]]  = [None for i in range(ECM_NUM_CHANNELS)]
+      self.dwell_trigger_hyst_dB[freq_entry["freq"]]    = [None for i in range(ECM_NUM_CHANNELS)]
+      self.dwell_channel_freq[freq_entry["freq"]]       = [freq_entry["freq"] + 1e-6 * (ADC_CLOCK_FREQUENCY / ECM_NUM_CHANNELS) * (i - ECM_NUM_CHANNELS/2) for i in range(ECM_NUM_CHANNELS)]
+
+      for channel_index in range(ECM_NUM_CHANNELS):
+        channel_freq = self.dwell_channel_freq[freq_entry["freq"]][channel_index]
+
+        min_threshold = None
+        max_hyst = None
+        for signal_entry in sw_config.config["tx_config"]["signals"]:
+          if (channel_freq >= signal_entry["freq_range"][0]) and (channel_freq <= signal_entry["freq_range"][1]):
+            if min_threshold is None:
+              min_threshold = signal_entry["threshold_dB"]
+            else:
+              min_threshold = min(signal_entry["threshold_dB"], min_threshold)
+            if max_hyst is None:
+              max_hyst = signal_entry["threshold_hyst_dB"]
+            else:
+              max_hyst = max(signal_entry["threshold_hyst_dB"], max_hyst)
+
+        self.dwell_trigger_offset_dB[freq_entry["freq"]][channel_index] = min_threshold
+        self.dwell_trigger_hyst_dB[freq_entry["freq"]][channel_index] = max_hyst
 
   def _clear_prev_forced_triggers(self):
     for entry in self.prev_pending_forced_triggers:
@@ -113,7 +146,50 @@ class pluto_ecm_ecm_controller:
     self.state              = new_state
     self.dwell_program_tag  = self.map_state_to_tag[new_state]
 
-  def update_state(self):
+  def _submit_channel_threshold_trigger_listen_only(self, freq, channel_index, threshold, trigger_hyst_shift):
+    channel_entry = pluto_ecm_hw_dwell.ecm_channel_control_entry.channel_entry_trigger_threshold(channel_index, threshold, trigger_hyst_shift)
+
+    for entry in self.dwell_channels:
+      if (entry["freq"] != freq) or (entry["channel_index"] != channel_index):
+        continue
+      self.sequencer.submit_channel_entry(entry["dwell_index"], channel_index, channel_entry)
+
+  def _get_hyst_shift(self, hyst_dB):
+    hyst_factor = int(round(10**(hyst_dB/10)))
+
+    for hyst_shift in range(2**ECM_DRFM_SEGMENT_HYST_SHIFT_WIDTH):
+      hyst_v = (1 << hyst_shift)
+      if hyst_v >= hyst_factor:
+        break
+
+    return hyst_shift
+
+  def _update_thresholds(self):
+    if self.last_scan_seq_num == self.analysis_thread.scan_seq_num:
+      return
+
+    self.last_scan_seq_num = self.analysis_thread.scan_seq_num
+
+    for freq in self.dwell_trigger_thresholds:
+      if freq not in self.analysis_thread.scan_results:
+        continue
+      for i in range(ECM_NUM_CHANNELS):
+        if (ECM_CHANNEL_MASK & (1 << i)) == 0:
+          continue
+
+        if (self.dwell_trigger_offset_dB[freq][i] is None) or (self.dwell_trigger_hyst_dB[freq][i] is None):
+          continue
+
+        threshold_offset_dB   = self.dwell_trigger_offset_dB[freq][i]
+        threshold_hyst_dB     = self.dwell_trigger_hyst_dB[freq][i]
+        channel_power         = self.analysis_thread.scan_results[freq]["summary_power_median"][i]
+        threshold_power       = int(round(channel_power * 10**(threshold_offset_dB/10)))
+        threshold_hyst_shift  = self._get_hyst_shift(threshold_hyst_dB)
+
+        self.dwell_trigger_thresholds[freq][i] = threshold_power
+        self._submit_channel_threshold_trigger_listen_only(freq, i, threshold_power, threshold_hyst_shift)
+
+  def _update_state(self):
     if self.state == "SCAN":
       if len(self.scan_pending_forced_triggers) == 0:
         if (time.time() - self.scan_start_time) > self.scan_duration:
@@ -128,6 +204,7 @@ class pluto_ecm_ecm_controller:
       pass
 
   def update(self):
-    self.update_state()
+    self._update_state()
+    self._update_thresholds()
 
     pass

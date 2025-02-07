@@ -180,6 +180,9 @@ class pluto_ecm_sequencer:
     self.channel_entry_write_queue.append({"dwell_index": dwell_index, "channel_index": channel_index, "channel_entry": channel_entry})
 
   def _flush_channel_entry_queue(self):
+    if len(self.channel_entry_write_queue) > 0:
+      self.logger.log(self.logger.LL_INFO, "[sequencer] _flush_channel_entry_queue: num_entries={}".format(len(self.channel_entry_write_queue)))
+
     while len(self.channel_entry_write_queue) > 0:
       entry = self.channel_entry_write_queue.pop(0)
       self._send_hw_channel_entry(entry["dwell_index"], entry["channel_index"], entry["channel_entry"])

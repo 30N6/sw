@@ -19,6 +19,7 @@ class pluto_ecm_analysis_processor:
     self.pending_scan_reports_bare  = []
     self.pending_tx_reports         = []
 
+    self.scan_seq_num = 0
     self.scan_stats = {}
     self._clear_scan_stats()
 
@@ -30,7 +31,7 @@ class pluto_ecm_analysis_processor:
                                         "summary_power_mean"    : [0  for i in range(ECM_NUM_CHANNELS)],
                                         "summary_power_median"  : [0  for i in range(ECM_NUM_CHANNELS)],
                                         "summary_power_history" : [[] for i in range(ECM_NUM_CHANNELS)]}
-
+    self.scan_seq_num += 1
 
     #self.pdw_processor        = pluto_esm_pdw_processor.pluto_esm_pdw_processor(logger, config)
     #self.dwell_processor      = pluto_esm_dwell_processor.pluto_esm_dwell_processor(logger, config)
@@ -240,6 +241,7 @@ class pluto_ecm_analysis_processor:
                                                 "iq_power_median"     : self.scan_stats[freq]["iq_power_median"],
                                                 "summary_power_mean"  : self.scan_stats[freq]["summary_power_mean"],
                                                 "summary_power_median": self.scan_stats[freq]["summary_power_median"]}})
+      self.output_queue.put({"scan_seq_num": self.scan_seq_num})
     else:
       raise RuntimeError("unknown command")
 

@@ -71,6 +71,7 @@ class pluto_ecm_analysis_runner:
     self.running      = True
 
     self.scan_results = {}
+    self.scan_seq_num = -1
 
     self.analysis_process = Process(target=pluto_ecm_analysis_thread_func,
                                args=({"input_queue": self.input_queue, "output_queue": self.output_queue,
@@ -83,6 +84,8 @@ class pluto_ecm_analysis_runner:
 
       if "scan_results" in data:
         self.scan_results[data["scan_results"]["freq"]] = data["scan_results"]
+      elif "scan_seq_num" in data:
+        self.scan_seq_num = data["scan_seq_num"]
 
       self.logger.log(self.logger.LL_DEBUG, "[analysis] _update_output_queue: received data: len={} data={}".format(len(data), data))
 
