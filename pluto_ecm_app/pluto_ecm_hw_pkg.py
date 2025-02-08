@@ -57,7 +57,7 @@ ECM_NUM_CHANNEL_TX_PROGRAM_ENTRIES              = 4
 
 ECM_DRFM_MEM_DEPTH                              = 1024 * 24
 ECM_DRFM_MAX_PACKET_IQ_SAMPLES_PER_REPORT       = 116
-ECM_DRFM_SEGMENT_HYST_SHIFT_WIDTH               = 2 #TODO: better name
+ECM_DRFM_SEGMENT_HYST_SHIFT_WIDTH               = 4 #TODO: better name
 
 ADC_CLOCK_FREQUENCY                             = 61.44e6
 ADC_CLOCK_PERIOD                                = 1/61.44e6
@@ -83,7 +83,7 @@ PACKED_ECM_DWELL_ENTRY  = struct.Struct("<" + PACKED_UINT8 + PACKED_UINT8 + PACK
                                               PACKED_UINT16 + PACKED_UINT16 +                               #tag, frequency
                                               PACKED_UINT32 +                                               #measurement_duration
                                               PACKED_UINT32 +                                               #total_duration_max
-                                              "xxxx")                                                       #padding
+                                              PACKED_UINT16 + "xx")                                         #min_trigger_duration, padding
 
 PACKED_ECM_CHANNEL_CONTROL_ENTRY_HEADER = struct.Struct("<" + PACKED_UINT8 + PACKED_UINT8 + PACKED_UINT16 + #enable, trigger_mode, trigger_duration_max_minus_one
                                                               PACKED_UINT32 +                               #trigger_threshold
@@ -108,6 +108,7 @@ PACKED_DWELL_STATS_HEADER = struct.Struct("<" + PACKED_UINT32 + PACKED_UINT32 + 
                                                 PACKED_UINT16 + PACKED_UINT16 +                                         #dwell_entry: tag, frequency
                                                 PACKED_UINT32 +                                                         #dwell_entry: measurement_duration
                                                 PACKED_UINT32 +                                                         #dwell_entry: total_duration_max
+                                                PACKED_UINT16 + "xx" +                                                  #dwell_entry: min_trigger_duration
                                                 PACKED_UINT32 +                                                         #dwell_seq_num
                                                 PACKED_UINT16 + PACKED_UINT16 +                                         #program tag, global counter
                                                 PACKED_UINT32 +                                                         #actual_measurement_duration

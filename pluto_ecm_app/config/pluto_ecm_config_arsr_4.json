@@ -3,10 +3,10 @@
   "fast_lock_config": {"recalibration_interval": 60.0, "recalibration_pause": 5.0},
   "dwell_config": {
     "dwell_freqs": [
-      {"index": 0, "freq": 1225.0, "dwell_measurement_time": 0.000500, "dwell_total_time_max": 0.0020000, "tx_enabled": 0},
-      {"index": 1, "freq": 1275.0, "dwell_measurement_time": 0.000500, "dwell_total_time_max": 0.0020000, "tx_enabled": 0},
-      {"index": 2, "freq": 1325.0, "dwell_measurement_time": 0.000500, "dwell_total_time_max": 0.0020000, "tx_enabled": 1},
-      {"index": 3, "freq": 1375.0, "dwell_measurement_time": 0.000500, "dwell_total_time_max": 0.0020000, "tx_enabled": 1}
+      {"index": 0, "freq": 1225.0, "dwell_measurement_time": 0.000500, "dwell_total_time_max": 0.0020000, "min_trigger_duration": 128, "tx_enabled": 0},
+      {"index": 1, "freq": 1275.0, "dwell_measurement_time": 0.000500, "dwell_total_time_max": 0.0020000, "min_trigger_duration": 128, "tx_enabled": 0},
+      {"index": 2, "freq": 1325.0, "dwell_measurement_time": 0.000500, "dwell_total_time_max": 0.0020000, "min_trigger_duration": 128, "tx_enabled": 1},
+      {"index": 3, "freq": 1375.0, "dwell_measurement_time": 0.000500, "dwell_total_time_max": 0.0020000, "min_trigger_duration": 128, "tx_enabled": 1}
     ],
     "dwell_pattern": [0, 1, 2, 3, 0, 1, 2, 3],
     "scans_per_frame": 32,

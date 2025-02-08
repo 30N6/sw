@@ -1,18 +1,4 @@
-%filename = "analysis-20250205-171622.log";
-%filename = "analysis-20250205-210734-ntsc-5917-dark-20mw-far.log";
-%filename = "analysis-20250205-210851-ntsc-5917-dark-bright-20mw-far.log";
-%filename = "analysis-20250205-225643-915.log";
-%filename = "analysis-20250206-000801.log";
-
-%filename = "analysis-20250207-003258.log";
-%filename = "analysis-20250207-004611.log";
-%filename = "analysis-20250207-100740-elrs.log";
-%filename = "analysis-20250207-103323-elrs.log";
-
-%filename = "analysis-20250207-104918-elrs.log";
-%filename = "analysis-20250207-153012-dji.log";
-%filename = "analysis-20250207-160557-wifi.log";
-filename = "analysis-20250207-165106-dji_5.8.log";
+filename = "analysis-20250207-180714-elrs-F1000.log";
 
 Fs = 7.68e6;
 dt = 1/Fs;
@@ -61,27 +47,6 @@ if reload
     scan_reports = scan_reports';
 end
 
-
-%filter_freq = 5665;
-%filter_freq = 5715;
-%filter_freq = 5925;
-%filter_freq = 915;
-
-%filter_freq = 5746;
-%filter_freq = 5788;
-filter_freq = 5830;
-
-is_tx_listen = false(length(scan_reports), 1);
-for ii = 1:length(scan_reports)
-    is_tx_listen(ii) = scan_reports(ii).controller_state == "TX_LISTEN";
-end
-freq_match      = ([scan_reports.dwell_freq] == filter_freq).';
-length_match    = ([scan_reports.iq_length] > 100).';
-power_match     = ([scan_reports.mean_power_dB] > 35).';
-timestamp_match = ([scan_reports.timestamp_sec] > 66.4).' & ([scan_reports.timestamp_sec] < 67.4).';
-filtered_reports = scan_reports(freq_match & length_match & is_tx_listen & power_match & timestamp_match);
-
-
 freqs = unique([scan_reports.dwell_freq]);
 figure(10);
 for ii = 1:length(freqs)
@@ -89,6 +54,18 @@ for ii = 1:length(freqs)
     r = scan_reports([scan_reports.dwell_freq] == freqs(ii));
     plot([r.timestamp] * (1/(4*61.44e6)), [r.mean_power_dB], 'o');
 end
+
+filter_freq = 2475;
+
+is_tx_listen = false(length(scan_reports), 1);
+for ii = 1:length(scan_reports)
+    is_tx_listen(ii) = scan_reports(ii).controller_state == "TX_LISTEN";
+end
+freq_match      = ([scan_reports.dwell_freq] == filter_freq).';
+length_match    = ([scan_reports.iq_length] > 1800).';
+power_match     = ([scan_reports.mean_power_dB] > 40).';
+timestamp_match = ([scan_reports.timestamp_sec] > 10.5).' & ([scan_reports.timestamp_sec] < 100).';
+filtered_reports = scan_reports(freq_match & length_match & is_tx_listen & power_match & timestamp_match);
 
 figure(11);
 subplot(3,1,1);
@@ -112,12 +89,10 @@ ax2 = zeros(num_rows, num_cols);
 for row = 1:num_rows
     for col = 1:num_cols
         plot_index = (row-1) * num_cols + col;
-        d = filtered_reports(plot_index + offset);
-
         channel_freq = d.dwell_freq + (Fs/2)/1e6 * (d.channel_index - 8);
         s = sprintf("[%d] %d %d: %.1f", plot_index + offset, d.dwell_freq, d.channel_index, channel_freq);
 
-                
+        d = filtered_reports(plot_index + offset);        
         t = (0:d.iq_length-1).' / Fs;
         y = d.iq_data(1:d.iq_length);
         
@@ -131,11 +106,10 @@ end
 for row = 1:num_rows
     for col = 1:num_cols
         plot_index = (row-1) * num_cols + col;
-        d = filtered_reports(plot_index + offset);
-
         channel_freq = d.dwell_freq + (Fs/2)/1e6 * (d.channel_index - 8);
         s = sprintf("[%d] %d %d: %.1f", plot_index + offset, d.dwell_freq, d.channel_index, channel_freq);
 
+        d = filtered_reports(plot_index + offset);        
         t = (0:d.iq_length-1).' / Fs;
         y = d.iq_data(1:d.iq_length);
     
@@ -149,7 +123,7 @@ end
 
 
 %%
-d = filtered_reports(12);
+d = filtered_reports(14);
 
 rows = 6;
 

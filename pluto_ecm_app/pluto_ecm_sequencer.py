@@ -23,7 +23,7 @@ class dwell_data:
     duration_meas = int(self.duration_meas / FAST_CLOCK_PERIOD)
     duration_max = int(self.duration_max / FAST_CLOCK_PERIOD)
 
-    self.hw_dwell_entry = pluto_ecm_hw_dwell.ecm_dwell_entry(1, self.next_dwell_index, self.fast_lock_profile_index, self.dwell_index, dwell_freq, duration_meas, duration_max)
+    self.hw_dwell_entry = pluto_ecm_hw_dwell.ecm_dwell_entry(1, self.next_dwell_index, self.fast_lock_profile_index, self.dwell_index, dwell_freq, duration_meas, duration_max, freq_entry["min_trigger_duration"])
     self.first_dwell    = is_first
     self.last_dwell     = is_last
 

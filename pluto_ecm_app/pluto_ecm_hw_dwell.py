@@ -51,7 +51,7 @@ class ecm_dwell_program_entry:
     return self.__str__()
 
 class ecm_dwell_entry:
-  def __init__(self, valid, next_index, fast_lock_profile, tag, freq, duration_meas, duration_max):
+  def __init__(self, valid, next_index, fast_lock_profile, tag, freq, duration_meas, duration_max, min_trigger_duration):
     assert (valid <= 1)
     assert (next_index < ECM_NUM_DWELL_ENTRIES)
     assert (fast_lock_profile < ECM_NUM_FAST_LOCK_PROFILES)
@@ -76,6 +76,7 @@ class ecm_dwell_entry:
     self.fields["frequency"]              = freq
     self.fields["measurement_duration"]   = duration_meas
     self.fields["total_duration_max"]     = duration_max
+    self.fields["min_trigger_duration"]   = min_trigger_duration
 
   def __str__(self):
     return "[dwell_entry: fields={}]".format(self.fields)
@@ -94,7 +95,8 @@ class ecm_dwell_entry:
                                        self.fields["pll_pre_lock_delay"], self.fields["pll_post_lock_delay"],
                                        self.fields["tag"], self.fields["frequency"],
                                        self.fields["measurement_duration"],
-                                       self.fields["total_duration_max"])
+                                       self.fields["total_duration_max"],
+                                       self.fields["min_trigger_duration"])
 
   #@staticmethod
   #def default_dwell():
@@ -123,7 +125,7 @@ class ecm_channel_control_entry:
     assert (trigger_mode <= ECM_CHANNEL_TRIGGER_MODE_THRESHOLD_TRIGGER)
     assert (trigger_duration_max_minus_one <= 0x0FFF)
     assert (trigger_threshold <= 0xFFFFFFFF)
-    assert (trigger_hyst_shift <= 3)
+    assert (trigger_hyst_shift <= (2**ECM_DRFM_SEGMENT_HYST_SHIFT_WIDTH - 1))
     assert (drfm_gain <= 1)
     assert (recording_addr <= 0x7FFF)
     assert (len(program_entries) == ECM_NUM_CHANNEL_TX_PROGRAM_ENTRIES)
