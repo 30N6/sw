@@ -94,12 +94,12 @@ class pluto_ecm_ecm_controller:
     #self.logger.log(self.logger.LL_INFO, "[ecm_controller] submit_report: {}".format(merged_report))
 
     if merged_report["drfm_channel_reports"] is None:
-      self.analysis_thread.submit_data({"scan_report_bare": merged_report, "state": self.state})
+      self.analysis_thread.submit_data({"scan_report_bare": merged_report, "state": self.state, "timestamp": time.time()})
 
     else:
       if (self.state == "TX_LISTEN") or (self.state == "TX_ACTIVE"):
         assert (len(self.scan_pending_forced_triggers) == 0)
-        self.analysis_thread.submit_data({"scan_report_iq": merged_report, "state": self.state})
+        self.analysis_thread.submit_data({"scan_report_iq": merged_report, "state": self.state, "timestamp": time.time()})
       else:
         if len(self.scan_pending_forced_triggers) == 0:
           return
@@ -124,7 +124,7 @@ class pluto_ecm_ecm_controller:
 
         assert (not partial_match or full_match)
         if full_match:
-          self.analysis_thread.submit_data({"scan_report_iq": merged_report, "state": self.state})
+          self.analysis_thread.submit_data({"scan_report_iq": merged_report, "state": self.state, "timestamp": time.time()})
         else:
           self.logger.log(self.logger.LL_INFO, "[ecm_controller] submit_report: match failed: expected={}/{}, report={}".format(expected_dwell_index, expected_channel_index, merged_report))
           print("match failed")
@@ -134,7 +134,7 @@ class pluto_ecm_ecm_controller:
 
     self._set_new_state("SCAN")
     self.scan_start_time  = time.time()
-    self.analysis_thread.submit_data({"command": "SCAN_START"})
+    self.analysis_thread.submit_data({"command": "SCAN_START", "timestamp": time.time()})
 
   def on_dwell_row_done(self):
     pass
@@ -197,7 +197,7 @@ class pluto_ecm_ecm_controller:
           self.logger.log(self.logger.LL_INFO, "[ecm_controller] scan complete - starting TX_LISTEN")
           self._set_new_state("TX_LISTEN")
 
-          self.analysis_thread.submit_data({"command": "SCAN_END"})
+          self.analysis_thread.submit_data({"command": "SCAN_END", "timestamp": time.time()})
         else:
           self._send_next_forced_triggers()
     elif self.state == "TX_LISTEN":

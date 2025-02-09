@@ -1,9 +1,11 @@
-import pluto_ecm_data_recorder
-
-from pluto_ecm_hw_pkg import *
 import time
 import numpy as np
 import copy
+
+from pluto_ecm_hw_pkg import *
+import pluto_ecm_data_recorder
+import pluto_ecm_modulation_analysis
+
 
 class pluto_ecm_analysis_processor:
   def __init__(self, logger, log_dir, config, output_queue):
@@ -11,6 +13,8 @@ class pluto_ecm_analysis_processor:
     self.recorder     = pluto_ecm_data_recorder.pluto_ecm_data_recorder(log_dir, "analysis", 1) #config["analysis_config"]["enable_pdw_recording"])
     self.config       = config
     self.output_queue = output_queue
+
+    self.mod_analysis = pluto_ecm_modulation_analysis.pluto_ecm_modulation_analysis(config)
 
     self.center_channel_index = (ECM_NUM_CHANNELS // 2)
     self.channel_spacing      = (ADC_CLOCK_FREQUENCY / ECM_NUM_CHANNELS) / 1e6
@@ -152,7 +156,7 @@ class pluto_ecm_analysis_processor:
     iq_data       = data["iq_data"]
     channel_index = data["channel_index"]
 
-    channel_power = np.square(iq_data[:, 0]) + np.square(iq_data[:, 1])
+    channel_power = np.square(np.real(iq_data)) + np.square(np.imag(iq_data))
     stats["iq_power_history"][channel_index].append(channel_power)
     stats["iq_power_mean"][channel_index]   = np.mean(stats["iq_power_history"][channel_index])
     stats["iq_power_median"][channel_index] = np.median(stats["iq_power_history"][channel_index])
@@ -175,10 +179,21 @@ class pluto_ecm_analysis_processor:
 
     self.logger.log(self.logger.LL_DEBUG, "_update_scan_stats_summary: freq={}".format(dwell_freq))
 
-  def _remove_dc_offset(self, data):
+  def _process_report_iq(self, data):
+    self.mod_analysis.process_iq_data(data["iq_data"])
+
+
+  @staticmethod
+  def _iq_to_complex(data):
+    data_c = [data[i][0] + 1j * data[i][1] for i in range(len(data))]
+    return np.asarray(data_c, dtype=np.complex64)
+
+  @staticmethod
+  def _remove_dc_offset(data):
     return data - np.mean(data, 0)
 
-  def _apply_basebanding(self, data):
+  @staticmethod
+  def _apply_basebanding(data):
     data[0:-1:2] *= -1
     return data
 
@@ -194,12 +209,12 @@ class pluto_ecm_analysis_processor:
       for i in range(len(channel_reports)):
         r = channel_reports[i]
         if (r["channel_index"] != channel_index):
-          scan_data.append({"controller_state": report["state"], "dwell_freq": dwell_freq, "channel_index": channel_index, "timestamp": r["segment_timestamp"], "iq_length": len(iq_data), "iq_data": np.asarray(iq_data)})
+          scan_data.append({"sw_timestamp": report["timestamp"], "controller_state": report["state"], "dwell_freq": dwell_freq, "channel_index": channel_index, "hw_timestamp": r["segment_timestamp"], "iq_length": len(iq_data), "iq_data": np.asarray(iq_data)})
           iq_data = []
           channel_index = r["channel_index"]
 
-        iq_data.extend(r["iq_data"])
-      scan_data.append({"controller_state": report["state"], "dwell_freq": dwell_freq, "channel_index": channel_index, "timestamp": r["segment_timestamp"], "iq_length": len(iq_data), "iq_data": np.asarray(iq_data)})
+        iq_data.extend(self._iq_to_complex(r["iq_data"]))
+      scan_data.append({"sw_timestamp": report["timestamp"], "controller_state": report["state"], "dwell_freq": dwell_freq, "channel_index": channel_index, "hw_timestamp": r["segment_timestamp"], "iq_length": len(iq_data), "iq_data": np.asarray(iq_data)})
 
       for sd in scan_data:
         sd["iq_data"] = self._remove_dc_offset(sd["iq_data"])
@@ -208,9 +223,14 @@ class pluto_ecm_analysis_processor:
 
         if sd["controller_state"] == "SCAN":
           self._update_scan_stats_iq(sd)
+        elif sd["controller_state"] == "TX_LISTEN":
+          self._process_report_iq(sd)
 
-        sd["iq_data"] = sd["iq_data"].tolist()
-        self.recorder.log(sd)
+        print("Processed report: time_diff={}".format(time.time() - sd["sw_timestamp"]))
+
+        #r_iq = [[float(np.real(sd["iq_data"][i])), float(np.imag(sd["iq_data"][i]))] for i in range(sd["iq_data"].shape[0])]
+        #sd["iq_data"] = r_iq
+        #self.recorder.log(sd)
 
       if report["state"] == "SCAN":
         self._update_scan_stats_summary(d)

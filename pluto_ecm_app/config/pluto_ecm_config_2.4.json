@@ -3,8 +3,8 @@
   "fast_lock_config": {"recalibration_interval": 60.0, "recalibration_pause": 5.0},
   "dwell_config": {
     "dwell_freqs": [
-      {"index": 0, "freq": 2425.0, "dwell_measurement_time": 0.000500, "dwell_total_time_max": 0.0020000, "min_trigger_duration": 128, "tx_enabled": 1},
-      {"index": 1, "freq": 2475.0, "dwell_measurement_time": 0.000500, "dwell_total_time_max": 0.0020000, "min_trigger_duration": 128, "tx_enabled": 1}
+      {"index": 0, "freq": 2425.0, "dwell_measurement_time": 0.000500, "dwell_total_time_max": 0.0020000, "min_trigger_duration": 1024, "tx_enabled": 1},
+      {"index": 1, "freq": 2475.0, "dwell_measurement_time": 0.000500, "dwell_total_time_max": 0.0020000, "min_trigger_duration": 1024, "tx_enabled": 1}
     ],
     "dwell_pattern": [0, 1, 0, 1, 0, 1, 0, 1],
     "scans_per_frame": 32,
