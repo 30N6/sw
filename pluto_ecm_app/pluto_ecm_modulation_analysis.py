@@ -2,6 +2,7 @@ from pluto_ecm_hw_pkg import *
 import numpy as np
 import scipy as sp
 import time
+import traceback
 
 class pluto_ecm_modulation_analysis:
   def __init__(self, config):
@@ -11,9 +12,11 @@ class pluto_ecm_modulation_analysis:
     self.lora_num_chunks      = [4, 16] #TODO: config
     self.lora_peak_threshold  = 0.25 #TODO: config
 
-  def process_iq_data(self, iq_data):
+  def process_iq_data(self, report):
     t_start = time.time()
     try:
+      iq_data = report["iq_data"]
+      timestamp = report["sw_timestamp"]
 
       padded_length = 2**int(np.ceil(np.log2(iq_data.size)))
       samples_to_pad = padded_length - iq_data.size
@@ -22,21 +25,52 @@ class pluto_ecm_modulation_analysis:
       phase_wrapped   = np.arctan2(np.imag(iq_data), np.real(iq_data))  #TODO: I/Q ordering
       phase_unwrapped = np.unwrap(phase_wrapped)
       iq_freq         = (1/(2*np.pi)) * np.diff(phase_unwrapped) / self.dt
+      iq_freq_mean    = np.mean(iq_freq)
 
       iq_padded_fft   = np.abs(np.fft.fftshift(np.fft.fft(iq_data_padded)))
 
-      fsk_r_squared, fsk_freq_spread = self._analyze_bfsk(iq_freq)
-      lora_r_squared, lora_mean_slope, lora_peak_count_ratio, lora_peak_spacing_ratio = self._analyze_lora(iq_data, iq_freq, iq_padded_fft)
+      results = {}
+
+      results = report.copy()
+      results.pop("iq_data")
+      results.pop("iq_length")
+      results["fft_mean"], results["fft_std"] = self._get_fft_stats(iq_padded_fft)
+      results["fsk_r_squared"], results["fsk_freq_spread"] = self._analyze_bfsk(iq_freq, iq_freq_mean)
+      results["lora_r_squared"], results["lora_slope"], results["lora_peak_count_ratio"], results["lora_peak_spacing_ratio"] = self._analyze_lora(iq_data, iq_freq, iq_padded_fft)
+      results["lfm_r_squared"], results["lfm_slope"] = self._analyze_lfm(iq_freq, iq_freq_mean)
+
+      #put these fields at the end
+      results["iq_length"] = report["iq_length"]
+      results["iq_data"] = [[float(np.real(report["iq_data"][i])), float(np.imag(report["iq_data"][i]))] for i in range(report["iq_data"].size)]
 
       t_end = time.time()
-      if (lora_r_squared > 0.7):
-        print("LORA: {:.3f} {:.1f} {:.2f} {:.2f} -- {:.6f}".format(lora_r_squared, lora_mean_slope / (1e3/1e-6), lora_peak_count_ratio, lora_peak_spacing_ratio, t_end - t_start))
+      if (results["lora_r_squared"] > 0.7):
+        print("LORA: {:.3f} {:.1f} {:.2f} {:.2f} -- {:.6f} {:.6f}".format(results["lora_r_squared"], results["lora_slope"] / (1e3/1e-6), results["lora_peak_count_ratio"], results["lora_peak_spacing_ratio"], t_end - t_start, t_end - timestamp))
 
-    except Exception as e:
-      print(e)
+      results["processing_time"] = t_end - t_start
+      results["time_since_read"] = t_end - timestamp
+
+      return results
+
+    except Exception:
+      print(traceback.format_exc())
+
+    return {}
 
     #print("FSK: {:.3f} {:.1f}".format(fsk_r_squared, fsk_freq_spread))
     #print("FSK: {} {}".format(fsk_r_squared, fsk_freq_spread))
+
+  def _get_fft_stats(self, iq_padded_fft):
+    f = np.arange(-iq_padded_fft.size/2, iq_padded_fft.size/2) * self.fs / iq_padded_fft.size
+
+    fft_sum       = np.sum(iq_padded_fft)
+    fft_scaled    = iq_padded_fft * (1/fft_sum)
+    fft_weighted  = fft_scaled * f
+
+    fft_mean      = np.sum(fft_weighted)
+    fft_var       = np.sum(fft_scaled * np.square(f - fft_mean))
+
+    return fft_mean, np.sqrt(fft_var)
 
   def _analyze_lora(self, iq_data, iq_freq, iq_padded_fft):
     r_squared, mean_slope = self._get_best_lora_poly_fit(iq_freq)
@@ -98,13 +132,11 @@ class pluto_ecm_modulation_analysis:
     max_i = np.argmax(r_squared)
     return r_squared[max_i], mean_slope[max_i]
 
-  def _analyze_bfsk(self, iq_freq):
+  def _analyze_bfsk(self, iq_freq, iq_freq_mean):
     M = 2
 
-    y_mean = np.mean(iq_freq, 0)
-
     #y_cluster = np.zeros(iq_freq.size, np.uint32)
-    y_cluster       = iq_freq >= y_mean
+    y_cluster       = iq_freq >= iq_freq_mean
     y_cluster_diff  = np.diff(y_cluster)
 
     ss_residual   = np.zeros(2)
@@ -124,52 +156,66 @@ class pluto_ecm_modulation_analysis:
       mu_cluster[i]   = np.mean(y_k)
       ss_residual[i]  = np.sum(np.square(y_k - mu_cluster[i]))
 
-    ss_total    = np.sum(np.square(iq_freq - y_mean))
+    ss_total    = np.sum(np.square(iq_freq - iq_freq_mean))
     r_squared   = 1 - np.sum(ss_residual) / ss_total
     freq_spread = np.abs(np.max(mu_cluster) - np.min(mu_cluster))
 
     return r_squared, freq_spread
 
-  def check_intrapulse_modulation(self, pulse_duration, pulse_iq_samples):
-    valid_duration = min(ESM_PDW_BUFFERED_SAMPLES_PER_FRAME, pulse_duration)
-    if (valid_duration - ESM_PDW_BUFFERED_IQ_DELAY_SAMPLES) < self.threshold_samples:
-      return None
+  def _analyze_lfm(self, iq_freq, iq_freq_mean):
+    freq_x = np.arange(iq_freq.size) * self.dt
 
-    pulse_iq = np.asarray(pulse_iq_samples[ESM_PDW_BUFFERED_IQ_DELAY_SAMPLES:valid_duration])
+    [p_freq, p_info]  = np.polynomial.polynomial.Polynomial.fit(freq_x, iq_freq, deg=1, full=True)
+    p_freq            = p_freq.convert().coef
 
-    phase_wrapped   = np.arctan2(pulse_iq[:, 0], pulse_iq[:, 1])
-    phase_unwrapped = np.unwrap(phase_wrapped)
+    mean_slope        = p_freq[1]
+    ss_residual       = p_info[0][0]
+    ss_total          = np.sum((iq_freq - iq_freq_mean)**2)
+    r_squared         = 1 - ss_residual/ss_total
 
-    y_freq = (1/(2*np.pi)) * np.diff(phase_unwrapped) / self.dt
-    x_freq = np.arange(0, y_freq.size * self.dt, self.dt)
+    return r_squared, mean_slope
 
-    [p_freq, p_info] = np.polynomial.polynomial.Polynomial.fit(x_freq, y_freq, deg=1, full=True)
-
-    p_freq = p_freq.convert().coef
-    y_poly = np.polynomial.polynomial.polyval(x_freq, p_freq)
-
-    if len(p_freq) < 2:
-      print("check_intrapulse_modulation: polynomial fit failed -- p_freq={} p_info={} x_freq={} y_freq={}".format(p_freq, p_info, x_freq, y_freq))
-      return None
-
-    freq_initial  = p_freq[0]
-    freq_slope    = p_freq[1] * 1e-6
-
-    ss_residual   = p_info[0][0]
-    ss_total      = np.sum((y_freq - np.mean(y_freq))**2)
-    r_squared     = 1 - ss_residual/ss_total
-    mean_residual = np.mean(np.abs(y_freq - y_poly))
-
-    matched_residual  = (mean_residual < self.threshold_residual)
-    matched_r_squared = (r_squared > self.threshold_r_squared)
-    matched_slope     = (abs(freq_slope) > self.threshold_slope)
-
-    #print("mod_analysis: duration={} matched_res={} matched_r2={} matched_slope={}".format(valid_duration, matched_residual, matched_r_squared, matched_slope))
-    #print("mod_analysis:   mean_residual={}  r_squared={}  slope={}".format(mean_residual, r_squared, freq_slope))
-
-    if matched_residual and matched_r_squared and matched_slope:
-      mod_type = "FM"
-    else:
-      mod_type = None
-
-    return {"modulation_type": mod_type, "LFM_slope": freq_slope, "LFM_r_squared": r_squared, "LFM_mean_residual": mean_residual}
+  #TODO: remove
+  #def check_intrapulse_modulation(self, pulse_duration, pulse_iq_samples):
+  #  valid_duration = min(ESM_PDW_BUFFERED_SAMPLES_PER_FRAME, pulse_duration)
+  #  if (valid_duration - ESM_PDW_BUFFERED_IQ_DELAY_SAMPLES) < self.threshold_samples:
+  #    return None
+  #
+  #  pulse_iq = np.asarray(pulse_iq_samples[ESM_PDW_BUFFERED_IQ_DELAY_SAMPLES:valid_duration])
+  #
+  #  phase_wrapped   = np.arctan2(pulse_iq[:, 0], pulse_iq[:, 1])
+  #  phase_unwrapped = np.unwrap(phase_wrapped)
+  #
+  #  y_freq = (1/(2*np.pi)) * np.diff(phase_unwrapped) / self.dt
+  #  x_freq = np.arange(0, y_freq.size * self.dt, self.dt)
+  #
+  #  [p_freq, p_info] = np.polynomial.polynomial.Polynomial.fit(x_freq, y_freq, deg=1, full=True)
+  #
+  #  p_freq = p_freq.convert().coef
+  #  y_poly = np.polynomial.polynomial.polyval(x_freq, p_freq)
+  #
+  #  if len(p_freq) < 2:
+  #    print("check_intrapulse_modulation: polynomial fit failed -- p_freq={} p_info={} x_freq={} y_freq={}".format(p_freq, p_info, x_freq, y_freq))
+  #    return None
+  #
+  #  freq_initial  = p_freq[0]
+  #  freq_slope    = p_freq[1] * 1e-6
+  #
+  #  ss_residual   = p_info[0][0]
+  #  ss_total      = np.sum((y_freq - np.mean(y_freq))**2)
+  #  r_squared     = 1 - ss_residual/ss_total
+  #  mean_residual = np.mean(np.abs(y_freq - y_poly))
+  #
+  #  matched_residual  = (mean_residual < self.threshold_residual)
+  #  matched_r_squared = (r_squared > self.threshold_r_squared)
+  #  matched_slope     = (abs(freq_slope) > self.threshold_slope)
+  #
+  #  #print("mod_analysis: duration={} matched_res={} matched_r2={} matched_slope={}".format(valid_duration, matched_residual, matched_r_squared, matched_slope))
+  #  #print("mod_analysis:   mean_residual={}  r_squared={}  slope={}".format(mean_residual, r_squared, freq_slope))
+  #
+  #  if matched_residual and matched_r_squared and matched_slope:
+  #    mod_type = "FM"
+  #  else:
+  #    mod_type = None
+  #
+  #  return {"modulation_type": mod_type, "LFM_slope": freq_slope, "LFM_r_squared": r_squared, "LFM_mean_residual": mean_residual}

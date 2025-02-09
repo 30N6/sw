@@ -5,6 +5,9 @@ import time
 import multiprocessing
 from multiprocessing import Process, Queue
 
+import cProfile, pstats, io
+from pstats import SortKey
+
 class pluto_ecm_analysis_thread:
 
   def __init__(self, arg):
@@ -31,11 +34,14 @@ class pluto_ecm_analysis_thread:
   def run(self):
     running = True
 
+    #self.pr = cProfile.Profile()
+
     while running:
-      if not self.input_queue.empty():
+      #read off data from the queue before calling update() - helps ensure a clean shutdown
+      while not self.input_queue.empty():
         data = self.input_queue.get()
         if isinstance(data, dict):
-          self.logger.log(self.logger.LL_DEBUG, data)
+          #self.logger.log(self.logger.LL_DEBUG, data)
           self.processor.submit_data(data)
         else:
           if data == "CMD_STOP":
@@ -45,8 +51,17 @@ class pluto_ecm_analysis_thread:
             raise RuntimeError("invalid command")
             running = False
 
+      #self.pr.enable()
+
       self.processor.update()
       #self._send_tracked_emitters()
+
+      #self.pr.disable()
+      #s = io.StringIO()
+      #sortby = SortKey.CUMULATIVE
+      #ps = pstats.Stats(self.pr, stream=s).sort_stats(sortby)
+      #ps.print_stats()
+      #print(s.getvalue())
 
     self.shutdown("graceful exit")
 

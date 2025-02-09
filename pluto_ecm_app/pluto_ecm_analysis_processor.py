@@ -1,6 +1,7 @@
 import time
 import numpy as np
 import copy
+import multiprocessing
 
 from pluto_ecm_hw_pkg import *
 import pluto_ecm_data_recorder
@@ -26,6 +27,13 @@ class pluto_ecm_analysis_processor:
     self.scan_seq_num = 0
     self.scan_stats = {}
     self._clear_scan_stats()
+
+    self.iq_stats_time    = time.time()
+    self.iq_stats_count   = 0
+    self.iq_stats_samples = 0
+
+    self.process_pool = multiprocessing.Pool(4) #TODO: config
+    self.pool_results = []
 
   def _clear_scan_stats(self):
     for entry in self.config["dwell_config"]["dwell_freqs"]:
@@ -179,9 +187,20 @@ class pluto_ecm_analysis_processor:
 
     self.logger.log(self.logger.LL_DEBUG, "_update_scan_stats_summary: freq={}".format(dwell_freq))
 
-  def _process_report_iq(self, data):
-    self.mod_analysis.process_iq_data(data["iq_data"])
+  def _process_report_for_iq(self, data):
+    now = time.time()
+    if (now - self.iq_stats_time) > 1.0:
+      self.logger.log(self.logger.LL_INFO, "_process_report_for_iq: count={} samples={}".format(self.iq_stats_count, self.iq_stats_samples))
+      self.iq_stats_time = now
+      self.iq_stats_count = 0
+      self.iq_stats_samples = 0
 
+    self.iq_stats_count += 1
+    self.iq_stats_samples += len(data["iq_data"])
+
+    result = self.process_pool.apply_async(self.mod_analysis.process_iq_data, (data,))
+    self.pool_results.append(result)
+    #self.mod_analysis.process_iq_data(data["iq_data"])
 
   @staticmethod
   def _iq_to_complex(data):
@@ -224,13 +243,12 @@ class pluto_ecm_analysis_processor:
         if sd["controller_state"] == "SCAN":
           self._update_scan_stats_iq(sd)
         elif sd["controller_state"] == "TX_LISTEN":
-          self._process_report_iq(sd)
+          self._process_report_for_iq(sd)
 
-        print("Processed report: time_diff={}".format(time.time() - sd["sw_timestamp"]))
-
-        #r_iq = [[float(np.real(sd["iq_data"][i])), float(np.imag(sd["iq_data"][i]))] for i in range(sd["iq_data"].shape[0])]
-        #sd["iq_data"] = r_iq
-        #self.recorder.log(sd)
+        #sd_rec = copy.deepcopy(sd)
+        #r_iq = [[float(np.real(sd_rec["iq_data"][i])), float(np.imag(sd_rec["iq_data"][i]))] for i in range(sd_rec["iq_data"].shape[0])]
+        #sd_rec["iq_data"] = r_iq
+        #self.recorder.log(sd_rec)
 
       if report["state"] == "SCAN":
         self._update_scan_stats_summary(d)
@@ -244,6 +262,17 @@ class pluto_ecm_analysis_processor:
 
     #
     #  scan_data.append({"controller_state": d["state"], "dwell_freq": dwell_freq, "channel_index": channel_index, "iq_length": len(iq_data), "iq_data": np.asarray(iq_data)})
+
+  def _process_pool_results(self):
+    while len(self.pool_results) > 0:
+      if not self.pool_results[0].ready():
+        break
+      result = self.pool_results[0].get()
+
+      #print("pool result ready at {}: {}".format(time.time(), result))
+      self.recorder.log(result)
+      self.pool_results.pop(0)
+
 
   def _process_command(self, data):
     command = data["command"]
@@ -286,6 +315,7 @@ class pluto_ecm_analysis_processor:
     #self._process_matched_reports()
     #self._update_tracked_emitters()
     self._process_scan_reports()
+    self._process_pool_results()
 
   def shutdown(self, reason):
     self.recorder.shutdown(reason)
