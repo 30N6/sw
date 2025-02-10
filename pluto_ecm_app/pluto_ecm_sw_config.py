@@ -37,4 +37,4 @@ class pluto_ecm_sw_config:
 
     for entry in self.config["tx_config"]["signals"]:
       assert (entry["freq_range"][0]  <= entry["freq_range"][1])
-      assert ((entry["trigger_duration"][0] <= entry["trigger_duration"][1]) or (entry["trigger_duration"][1] == -1))
+      assert (entry["trigger_duration"][0] <= entry["trigger_duration"][1])

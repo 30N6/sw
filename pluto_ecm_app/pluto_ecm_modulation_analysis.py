@@ -26,31 +26,34 @@ class pluto_ecm_modulation_analysis:
       phase_unwrapped = np.unwrap(phase_wrapped)
       iq_freq         = (1/(2*np.pi)) * np.diff(phase_unwrapped) / self.dt
       iq_freq_mean    = np.mean(iq_freq)
-
       iq_padded_fft   = np.abs(np.fft.fftshift(np.fft.fft(iq_data_padded)))
+      iq_power        = np.square(np.real(iq_data)) + np.square(np.imag(iq_data))
 
-      results = {}
+      r = report.copy()
+      r.pop("iq_data")
+      r.pop("iq_length")
 
-      results = report.copy()
-      results.pop("iq_data")
-      results.pop("iq_length")
-      results["fft_mean"], results["fft_std"] = self._get_fft_stats(iq_padded_fft)
-      results["fsk_r_squared"], results["fsk_freq_spread"] = self._analyze_bfsk(iq_freq, iq_freq_mean)
-      results["lora_r_squared"], results["lora_slope"], results["lora_peak_count_ratio"], results["lora_peak_spacing_ratio"] = self._analyze_lora(iq_data, iq_freq, iq_padded_fft)
-      results["lfm_r_squared"], results["lfm_slope"] = self._analyze_lfm(iq_freq, iq_freq_mean)
+      analysis = {}
+      analysis["power_mean"] = float(np.mean(iq_power))
+      analysis["power_max"] = float(np.max(iq_power))
+      analysis["fft_mean"], analysis["fft_std"] = self._get_fft_stats(iq_padded_fft)
+      analysis["bfsk_r_squared"], analysis["bfsk_freq_spread"], analysis["bfsk_len_peak"] = self._analyze_bfsk(iq_freq)
+      analysis["lora_r_squared"], analysis["lora_slope"], analysis["lora_peak_count_ratio"], analysis["lora_peak_spacing_ratio"] = self._analyze_lora(iq_data, iq_freq, iq_padded_fft)
+      analysis["lfm_r_squared"], analysis["lfm_slope"] = self._analyze_lfm(iq_freq, iq_freq_mean)
+      analysis["iq_length"] = report["iq_length"]
 
-      #put these fields at the end
-      results["iq_length"] = report["iq_length"]
-      results["iq_data"] = [[float(np.real(report["iq_data"][i])), float(np.imag(report["iq_data"][i]))] for i in range(report["iq_data"].size)]
+      r["analysis"] = analysis
 
       t_end = time.time()
-      if (results["lora_r_squared"] > 0.7):
-        print("LORA: {:.3f} {:.1f} {:.2f} {:.2f} -- {:.6f} {:.6f}".format(results["lora_r_squared"], results["lora_slope"] / (1e3/1e-6), results["lora_peak_count_ratio"], results["lora_peak_spacing_ratio"], t_end - t_start, t_end - timestamp))
+      r["processing_time"] = t_end - t_start
+      r["time_since_read"] = t_end - timestamp
+      r["iq_data"] = [[float(np.real(report["iq_data"][i])), float(np.imag(report["iq_data"][i]))] for i in range(report["iq_data"].size)]
 
-      results["processing_time"] = t_end - t_start
-      results["time_since_read"] = t_end - timestamp
-
-      return results
+      #if (analysis["lora_r_squared"] > 0.7):
+      #  print("LORA: [{}] {:.3f} {:.1f} {:.2f} {:.2f} -- {:.6f} {:.6f}".format(r["hw_timestamp"], analysis["lora_r_squared"], analysis["lora_slope"] / (1e3/1e-6), analysis["lora_peak_count_ratio"], analysis["lora_peak_spacing_ratio"], t_end - t_start, t_end - timestamp))
+      #if (analysis["lfm_r_squared"] > 0.7):
+      #  print("LFM: [{}] {:.3f} {:.1f}".format(r["hw_timestamp"], analysis["lfm_r_squared"], analysis["lfm_slope"] / (1e3/1e-6)))
+      return r
 
     except Exception:
       print(traceback.format_exc())
@@ -132,9 +135,7 @@ class pluto_ecm_modulation_analysis:
     max_i = np.argmax(r_squared)
     return r_squared[max_i], mean_slope[max_i]
 
-  def _analyze_bfsk(self, iq_freq, iq_freq_mean):
-    M = 2
-
+  def _get_bfsk_fit_metrics(self, iq_freq, iq_freq_mean):
     #y_cluster = np.zeros(iq_freq.size, np.uint32)
     y_cluster       = iq_freq >= iq_freq_mean
     y_cluster_diff  = np.diff(y_cluster)
@@ -151,7 +152,7 @@ class pluto_ecm_modulation_analysis:
       else:
         det_len += 1
 
-    for i in range(M):
+    for i in range(2):
       y_k             = iq_freq[y_cluster == i]
       mu_cluster[i]   = np.mean(y_k)
       ss_residual[i]  = np.sum(np.square(y_k - mu_cluster[i]))
@@ -160,7 +161,23 @@ class pluto_ecm_modulation_analysis:
     r_squared   = 1 - np.sum(ss_residual) / ss_total
     freq_spread = np.abs(np.max(mu_cluster) - np.min(mu_cluster))
 
-    return r_squared, freq_spread
+    det_len_peak = np.argmax(det_len_hist)
+
+    return r_squared, freq_spread, det_len_peak
+
+  def _analyze_bfsk(self, iq_freq):
+    r_squared = np.zeros(2)
+    freq_spread = np.zeros(2)
+    det_len_peak = np.zeros(2)
+
+    input_iq_freq       = [iq_freq[0:iq_freq.size//2], iq_freq[iq_freq.size//2:-1]]
+    input_iq_freq_mean  = [np.mean(input_iq_freq[0]), np.mean(input_iq_freq[1])]
+
+    for i in range(2):
+      r_squared[i], freq_spread[i], det_len_peak[i] = self._get_bfsk_fit_metrics(input_iq_freq[i], input_iq_freq_mean[i])
+
+    max_i = np.argmax(r_squared)
+    return r_squared[max_i], freq_spread[max_i], det_len_peak[max_i]
 
   def _analyze_lfm(self, iq_freq, iq_freq_mean):
     freq_x = np.arange(iq_freq.size) * self.dt

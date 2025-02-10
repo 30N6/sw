@@ -73,6 +73,9 @@ class render_status:
                   {"format": "HW temp FPGA      : {:.1f}", "value": self.hw_interface.temp_fpga,                "pos_offset": [8, 368]},
                   ]
 
+                  #TODO: show dwell total meas time, dwell total tx time
+                  #TODO: show current processing delay
+
     for entry in stats_desc:
       stats_str = entry["format"].format(entry["value"])
       text_data = self.font.render(stats_str, True, self.colors["stats"])

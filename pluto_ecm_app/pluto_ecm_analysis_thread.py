@@ -4,6 +4,7 @@ from pluto_ecm_hw_pkg import *
 import time
 import multiprocessing
 from multiprocessing import Process, Queue
+import traceback
 
 import cProfile, pstats, io
 from pstats import SortKey
@@ -18,18 +19,10 @@ class pluto_ecm_analysis_thread:
 
     self.logger.log(self.logger.LL_INFO, "init: queues={}/{}, current_process={}".format(self.input_queue, self.output_queue, multiprocessing.current_process()))
 
-  #def _send_tracked_emitters(self):
-  #  if len(self.processor.confirmed_pulsed_signals_to_render) > 0:
-  #    self.output_queue.put({"pulsed_emitters": self.processor.confirmed_pulsed_signals_to_render})
-  #    self.processor.confirmed_pulsed_signals_to_render = []
-  #
-  #  if len(self.processor.confirmed_cw_primary_signals_to_render) > 0:
-  #    self.output_queue.put({"cw_emitters_primary": self.processor.confirmed_cw_primary_signals_to_render})
-  #    self.processor.confirmed_cw_primary_signals_to_render = []
-  #
-  #  if len(self.processor.confirmed_cw_secondary_signals_to_render) > 0:
-  #    self.output_queue.put({"cw_emitters_secondary": self.processor.confirmed_cw_secondary_signals_to_render})
-  #    self.processor.confirmed_cw_secondary_signals_to_render = []
+  def _send_tracked_signals(self):
+    if len(self.processor.signals_to_render) > 0:
+      self.output_queue.put({"confirmed_signals": self.processor.signals_to_render})
+      self.processor.signals_to_render = []
 
   def run(self):
     running = True
@@ -52,9 +45,8 @@ class pluto_ecm_analysis_thread:
             running = False
 
       #self.pr.enable()
-
       self.processor.update()
-      #self._send_tracked_emitters()
+      self._send_tracked_signals()
 
       #self.pr.disable()
       #s = io.StringIO()
@@ -85,8 +77,9 @@ class pluto_ecm_analysis_runner:
     self.output_queue = Queue()
     self.running      = True
 
-    self.scan_results = {}
-    self.scan_seq_num = -1
+    self.scan_results       = {}
+    self.scan_seq_num       = -1
+    self.signals_to_render  = []
 
     self.analysis_process = Process(target=pluto_ecm_analysis_thread_func,
                                args=({"input_queue": self.input_queue, "output_queue": self.output_queue,
@@ -101,6 +94,10 @@ class pluto_ecm_analysis_runner:
         self.scan_results[data["scan_results"]["freq"]] = data["scan_results"]
       elif "scan_seq_num" in data:
         self.scan_seq_num = data["scan_seq_num"]
+      elif "confirmed_signals":
+        self.signals_to_render.append(data)
+      else:
+        raise RuntimeError("unexpected data in output queue")
 
       self.logger.log(self.logger.LL_DEBUG, "[analysis] _update_output_queue: received data: len={} data={}".format(len(data), data))
 

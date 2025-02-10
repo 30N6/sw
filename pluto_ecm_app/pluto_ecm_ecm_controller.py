@@ -127,7 +127,7 @@ class pluto_ecm_ecm_controller:
           self.analysis_thread.submit_data({"scan_report_iq": merged_report, "state": self.state, "timestamp": time.time()})
         else:
           self.logger.log(self.logger.LL_INFO, "[ecm_controller] submit_report: match failed: expected={}/{}, report={}".format(expected_dwell_index, expected_channel_index, merged_report))
-          print("match failed")
+          #print("match failed")
 
   def on_sequencer_active(self):
     self.hardware_active  = True
