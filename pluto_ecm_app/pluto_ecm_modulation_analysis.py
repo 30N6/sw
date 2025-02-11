@@ -9,8 +9,17 @@ class pluto_ecm_modulation_analysis:
     self.fs = ADC_CLOCK_FREQUENCY / (ECM_NUM_CHANNELS / CHANNELIZER_OVERSAMPLING)
     self.dt = 1/self.fs
 
-    self.lora_num_chunks      = [4, 16] #TODO: config
-    self.lora_peak_threshold  = 0.25 #TODO: config
+    self.lora_num_chunks        = config["analysis_config"]["modulation_analysis"]["elrs-lora"]["parameters"]["lora_num_chunks"]
+    self.lora_peak_threshold    = config["analysis_config"]["modulation_analysis"]["elrs-lora"]["parameters"]["lora_peak_threshold"]
+    self.cvbs_xcorr_window_inc  = config["analysis_config"]["modulation_analysis"]["cvbs"]["parameters"]["cvbs_xcorr_window_inc"]
+    self.cvbs_xcorr_window_exc  = config["analysis_config"]["modulation_analysis"]["cvbs"]["parameters"]["cvbs_xcorr_window_exc"]
+
+    self.cvbs_xcorr_window_inc_by_len = {}
+    self.cvbs_xcorr_window_exc_by_len = {}
+    for i in range(9, 12):
+      data_len = 2**i
+      self.cvbs_xcorr_window_inc_by_len[data_len] = [int(self.cvbs_xcorr_window_inc[0] // self.dt), int(self.cvbs_xcorr_window_inc[1] // self.dt)]
+      self.cvbs_xcorr_window_exc_by_len[data_len] = [int(self.cvbs_xcorr_window_exc[0] // self.dt), int(self.cvbs_xcorr_window_exc[1] // self.dt)]
 
   def process_iq_data(self, report):
     t_start = time.time()
@@ -22,12 +31,13 @@ class pluto_ecm_modulation_analysis:
       samples_to_pad = padded_length - iq_data.size
       iq_data_padded = np.pad(iq_data, (0, samples_to_pad))
 
-      phase_wrapped   = np.arctan2(np.imag(iq_data), np.real(iq_data))  #TODO: I/Q ordering
-      phase_unwrapped = np.unwrap(phase_wrapped)
-      iq_freq         = (1/(2*np.pi)) * np.diff(phase_unwrapped) / self.dt
-      iq_freq_mean    = np.mean(iq_freq)
-      iq_padded_fft   = np.abs(np.fft.fftshift(np.fft.fft(iq_data_padded)))
-      iq_power        = np.square(np.real(iq_data)) + np.square(np.imag(iq_data))
+      phase_wrapped     = np.arctan2(np.imag(iq_data), np.real(iq_data))  #TODO: I/Q ordering
+      phase_unwrapped   = np.unwrap(phase_wrapped)
+      iq_freq           = (1/(2*np.pi)) * np.diff(phase_unwrapped) / self.dt
+      iq_freq_mean      = np.mean(iq_freq)
+      iq_padded_fft     = np.abs(np.fft.fftshift(np.fft.fft(iq_data_padded)))
+      iq_padded_fft_abs = np.abs(iq_padded_fft)
+      iq_power          = np.square(np.real(iq_data)) + np.square(np.imag(iq_data))
 
       r = report.copy()
       r.pop("iq_data")
@@ -36,10 +46,11 @@ class pluto_ecm_modulation_analysis:
       analysis = {}
       analysis["power_mean"] = float(np.mean(iq_power))
       analysis["power_max"] = float(np.max(iq_power))
-      analysis["fft_mean"], analysis["fft_std"] = self._get_fft_stats(iq_padded_fft)
+      analysis["fft_mean"], analysis["fft_std"] = self._get_fft_stats(iq_padded_fft_abs)
       analysis["bfsk_r_squared"], analysis["bfsk_freq_spread"], analysis["bfsk_len_peak"] = self._analyze_bfsk(iq_freq)
-      analysis["lora_r_squared"], analysis["lora_slope"], analysis["lora_peak_count_ratio"], analysis["lora_peak_spacing_ratio"] = self._analyze_lora(iq_data, iq_freq, iq_padded_fft)
+      analysis["lora_r_squared"], analysis["lora_slope"], analysis["lora_peak_count_ratio"], analysis["lora_peak_spacing_ratio"] = self._analyze_lora(iq_data, iq_freq, iq_padded_fft_abs)
       analysis["lfm_r_squared"], analysis["lfm_slope"] = self._analyze_lfm(iq_freq, iq_freq_mean)
+      analysis["cvbs_xcorr_1"], analysis["cvbs_xcorr_2"] = self._analyze_cvbs(iq_padded_fft)
       analysis["iq_length"] = report["iq_length"]
 
       r["analysis"] = analysis
@@ -63,11 +74,11 @@ class pluto_ecm_modulation_analysis:
     #print("FSK: {:.3f} {:.1f}".format(fsk_r_squared, fsk_freq_spread))
     #print("FSK: {} {}".format(fsk_r_squared, fsk_freq_spread))
 
-  def _get_fft_stats(self, iq_padded_fft):
-    f = np.arange(-iq_padded_fft.size/2, iq_padded_fft.size/2) * self.fs / iq_padded_fft.size
+  def _get_fft_stats(self, iq_padded_fft_abs):
+    f = np.arange(-iq_padded_fft_abs.size/2, iq_padded_fft_abs.size/2) * self.fs / iq_padded_fft_abs.size
 
-    fft_sum       = np.sum(iq_padded_fft)
-    fft_scaled    = iq_padded_fft * (1/fft_sum)
+    fft_sum       = np.sum(iq_padded_fft_abs)
+    fft_scaled    = iq_padded_fft_abs * (1/fft_sum)
     fft_weighted  = fft_scaled * f
 
     fft_mean      = np.sum(fft_weighted)
@@ -75,22 +86,22 @@ class pluto_ecm_modulation_analysis:
 
     return fft_mean, np.sqrt(fft_var)
 
-  def _analyze_lora(self, iq_data, iq_freq, iq_padded_fft):
+  def _analyze_lora(self, iq_data, iq_freq, iq_padded_fft_abs):
     r_squared, mean_slope = self._get_best_lora_poly_fit(iq_freq)
-    peak_count_ratio, peak_spacing_ratio = self._get_lora_fit_metrics(iq_data, iq_padded_fft, mean_slope)
+    peak_count_ratio, peak_spacing_ratio = self._get_lora_fit_metrics(iq_data, iq_padded_fft_abs, mean_slope)
     return r_squared, mean_slope, peak_count_ratio, peak_spacing_ratio
 
-  def _get_lora_fit_metrics(self, iq_data, iq_padded_fft, original_slope):
+  def _get_lora_fit_metrics(self, iq_data, iq_padded_fft_abs, original_slope):
     t_chirp = np.arange(iq_data.size) * self.dt
     f_chirp = -0.5 * original_slope * t_chirp
     y_chirp = np.exp(2j * np.pi * f_chirp * t_chirp)
 
     iq_dechirped = iq_data * y_chirp
-    iq_dechirped = np.pad(iq_dechirped, (0, iq_padded_fft.size - iq_dechirped.size))
+    iq_dechirped = np.pad(iq_dechirped, (0, iq_padded_fft_abs.size - iq_dechirped.size))
 
     iq_dechirped_fft = np.abs(np.fft.fftshift(np.fft.fft(iq_dechirped)))
 
-    loc_a, props = sp.signal.find_peaks(iq_padded_fft, height=(self.lora_peak_threshold * np.max(iq_padded_fft)))
+    loc_a, props = sp.signal.find_peaks(iq_padded_fft_abs, height=(self.lora_peak_threshold * np.max(iq_padded_fft_abs)))
     loc_b, props = sp.signal.find_peaks(iq_dechirped_fft, height=(self.lora_peak_threshold * np.max(iq_dechirped_fft)))
 
     peak_count_ratio = loc_a.size / loc_b.size
@@ -192,47 +203,22 @@ class pluto_ecm_modulation_analysis:
 
     return r_squared, mean_slope
 
-  #TODO: remove
-  #def check_intrapulse_modulation(self, pulse_duration, pulse_iq_samples):
-  #  valid_duration = min(ESM_PDW_BUFFERED_SAMPLES_PER_FRAME, pulse_duration)
-  #  if (valid_duration - ESM_PDW_BUFFERED_IQ_DELAY_SAMPLES) < self.threshold_samples:
-  #    return None
-  #
-  #  pulse_iq = np.asarray(pulse_iq_samples[ESM_PDW_BUFFERED_IQ_DELAY_SAMPLES:valid_duration])
-  #
-  #  phase_wrapped   = np.arctan2(pulse_iq[:, 0], pulse_iq[:, 1])
-  #  phase_unwrapped = np.unwrap(phase_wrapped)
-  #
-  #  y_freq = (1/(2*np.pi)) * np.diff(phase_unwrapped) / self.dt
-  #  x_freq = np.arange(0, y_freq.size * self.dt, self.dt)
-  #
-  #  [p_freq, p_info] = np.polynomial.polynomial.Polynomial.fit(x_freq, y_freq, deg=1, full=True)
-  #
-  #  p_freq = p_freq.convert().coef
-  #  y_poly = np.polynomial.polynomial.polyval(x_freq, p_freq)
-  #
-  #  if len(p_freq) < 2:
-  #    print("check_intrapulse_modulation: polynomial fit failed -- p_freq={} p_info={} x_freq={} y_freq={}".format(p_freq, p_info, x_freq, y_freq))
-  #    return None
-  #
-  #  freq_initial  = p_freq[0]
-  #  freq_slope    = p_freq[1] * 1e-6
-  #
-  #  ss_residual   = p_info[0][0]
-  #  ss_total      = np.sum((y_freq - np.mean(y_freq))**2)
-  #  r_squared     = 1 - ss_residual/ss_total
-  #  mean_residual = np.mean(np.abs(y_freq - y_poly))
-  #
-  #  matched_residual  = (mean_residual < self.threshold_residual)
-  #  matched_r_squared = (r_squared > self.threshold_r_squared)
-  #  matched_slope     = (abs(freq_slope) > self.threshold_slope)
-  #
-  #  #print("mod_analysis: duration={} matched_res={} matched_r2={} matched_slope={}".format(valid_duration, matched_residual, matched_r_squared, matched_slope))
-  #  #print("mod_analysis:   mean_residual={}  r_squared={}  slope={}".format(mean_residual, r_squared, freq_slope))
-  #
-  #  if matched_residual and matched_r_squared and matched_slope:
-  #    mod_type = "FM"
-  #  else:
-  #    mod_type = None
-  #
-  #  return {"modulation_type": mod_type, "LFM_slope": freq_slope, "LFM_r_squared": r_squared, "LFM_mean_residual": mean_residual}
+  def _analyze_cvbs(self, iq_padded_fft):
+    if iq_padded_fft.size not in self.cvbs_xcorr_window_inc_by_len:
+      return 0, 0
+
+    w_inc = self.cvbs_xcorr_window_inc_by_len[iq_padded_fft.size]
+    w_exc = self.cvbs_xcorr_window_exc_by_len[iq_padded_fft.size]
+
+    fft_conj = np.conjugate(iq_padded_fft)
+    fft_prod = iq_padded_fft * fft_conj
+    xcorr = np.abs(np.fft.ifft(fft_prod))
+
+    v_inc = xcorr[w_inc[0] : w_inc[1]]
+    v_exc = np.concatenate((xcorr[w_exc[0] : w_inc[0]], xcorr[w_inc[1] : w_exc[1]]))
+
+    inc_max = np.max(v_inc)
+    cvbs_xcorr_1 = float(inc_max / xcorr[0])
+    cvbs_xcorr_2 = float(min(np.mean(v_exc) / inc_max, 1))
+
+    return cvbs_xcorr_1, cvbs_xcorr_2

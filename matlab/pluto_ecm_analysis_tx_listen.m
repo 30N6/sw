@@ -1,5 +1,5 @@
 %filename = "analysis-20250205-171622.log";
-%filename = "analysis-20250205-210734-ntsc-5917-dark-20mw-far.log";
+filename = "analysis-20250205-210734-ntsc-5917-dark-20mw-far.log";
 %filename = "analysis-20250205-210851-ntsc-5917-dark-bright-20mw-far.log";
 %filename = "analysis-20250205-225643-915.log";
 %filename = "analysis-20250206-000801.log";
@@ -12,13 +12,13 @@
 %filename = "analysis-20250207-104918-elrs.log";
 %filename = "analysis-20250207-153012-dji.log";
 %filename = "analysis-20250207-160557-wifi.log";
-filename = "analysis-20250207-165106-dji_5.8.log";
+%filename = "analysis-20250207-165106-dji_5.8.log";
 
 Fs = 7.68e6;
 dt = 1/Fs;
 L = 2048;
 
-reload = 0;
+reload = 1;
 
 if reload
     lines = readlines(filename);
@@ -54,7 +54,8 @@ if reload
         scan_reports(ii).iq_data_padded = paddata(scan_reports(ii).iq_data, L);        
 
         scan_reports(ii).iq_phase = unwrap(atan2(imag(scan_reports(ii).iq_data), real(scan_reports(ii).iq_data)));
-        scan_reports(ii).iq_freq = (1/(2*pi)) * diff(scan_reports(ii).iq_phase) / dt;        
+        scan_reports(ii).iq_freq = (1/(2*pi)) * diff(scan_reports(ii).iq_phase) / dt;     
+
         scan_reports(ii).timestamp_sec = scan_reports(ii).timestamp * (1/(4*61.44e6));
     end
 
