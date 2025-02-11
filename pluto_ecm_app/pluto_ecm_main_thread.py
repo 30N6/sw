@@ -57,7 +57,7 @@ class pluto_ecm_main_thread:
     self.analysis_thread  = pluto_ecm_analysis_thread.pluto_ecm_analysis_runner(self.logger, self.sw_config)
     self.sequencer        = pluto_ecm_sequencer.pluto_ecm_sequencer(self.logger, self.recorder, self.sw_config,
                                                                     self.hw_interface, self.analysis_thread, self.sim_loader)
-    self.render_status    = render_status.render_status(self.surface, self.sw_config, self.hw_interface, self.sequencer, self.VERSION)
+    self.render_status    = render_status.render_status(self.surface, self.sw_config, self.hw_interface, self.sequencer, self.analysis_thread, self.VERSION)
     self.render_spectrum  = render_spectrum.render_spectrum(self.surface, self.sw_config, self.sequencer)
     self.render_signals   = render_signals.render_signals(self.surface, self.sw_config, self.analysis_thread)
 

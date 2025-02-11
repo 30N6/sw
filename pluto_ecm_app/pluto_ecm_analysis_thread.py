@@ -5,6 +5,7 @@ import time
 import multiprocessing
 from multiprocessing import Process, Queue
 import traceback
+import copy
 
 import cProfile, pstats, io
 from pstats import SortKey
@@ -20,9 +21,9 @@ class pluto_ecm_analysis_thread:
     self.logger.log(self.logger.LL_INFO, "init: queues={}/{}, current_process={}".format(self.input_queue, self.output_queue, multiprocessing.current_process()))
 
   def _send_tracked_signals(self):
-    if len(self.processor.signals_to_render) > 0:
-      self.output_queue.put({"confirmed_signals": self.processor.signals_to_render})
-      self.processor.signals_to_render = []
+    while len(self.processor.signals_to_render) > 0:
+      self.output_queue.put(self.processor.signals_to_render.pop(0))
+      #self.processor.signals_to_render = []
 
   def run(self):
     running = True
@@ -77,9 +78,11 @@ class pluto_ecm_analysis_runner:
     self.output_queue = Queue()
     self.running      = True
 
-    self.scan_results       = {}
-    self.scan_seq_num       = -1
-    self.signals_to_render  = []
+    self.scan_results             = {}
+    self.scan_seq_num             = -1
+    self.signals_to_render        = []
+    self.signal_processing_delay  = 0
+
 
     self.analysis_process = Process(target=pluto_ecm_analysis_thread_func,
                                args=({"input_queue": self.input_queue, "output_queue": self.output_queue,
@@ -94,8 +97,12 @@ class pluto_ecm_analysis_runner:
         self.scan_results[data["scan_results"]["freq"]] = data["scan_results"]
       elif "scan_seq_num" in data:
         self.scan_seq_num = data["scan_seq_num"]
-      elif "confirmed_signals":
+      elif "confirmed_signals" in data:
         self.signals_to_render.append(data)
+        self.signal_processing_delay = data["confirmed_signals"][0]["processing_delay"]
+      elif "scan_signals" in data:
+        self.signals_to_render.append(data)
+
       else:
         raise RuntimeError("unexpected data in output queue")
 

@@ -127,6 +127,10 @@ class pluto_ecm_modulation_analysis:
       [p_freq, p_info]  = np.polynomial.polynomial.Polynomial.fit(chunk_x, chunk_y, deg=1, full=True)
       p_freq            = p_freq.convert().coef
 
+      if len(p_freq) < 2:
+        print("_try_lora_poly_fit: polynomial fit failed -- p_freq={} p_info={}".format(p_freq, p_info))
+        return 0, 0
+
       mean_slope[i]     = p_freq[1]
       ss_residual       = p_info[0][0]
       ss_total          = np.sum((chunk_y - np.mean(chunk_y))**2)

@@ -40,6 +40,8 @@ class pluto_ecm_analysis_processor:
     self.process_pool = multiprocessing.Pool(4) #TODO: config
     self.pool_results = []
 
+    self.signals_to_render = []
+
   def _clear_scan_stats(self):
     for entry in self.config["dwell_config"]["dwell_freqs"]:
       self.scan_stats[entry["freq"]] = {"iq_power_mean"         : [0  for i in range(ECM_NUM_CHANNELS)],
@@ -140,7 +142,12 @@ class pluto_ecm_analysis_processor:
 
         if sd["controller_state"] == "SCAN":
           self._update_scan_stats_iq(sd)
+          self._process_report_for_iq(sd)
+
         elif sd["controller_state"] == "TX_LISTEN":
+          self._process_report_for_iq(sd)
+
+        elif sd["controller_state"] == "TX_ACTIVE":
           self._process_report_for_iq(sd)
 
         #sd_rec = copy.deepcopy(sd)
@@ -153,6 +160,7 @@ class pluto_ecm_analysis_processor:
 
     while len(self.pending_scan_reports_bare) > 0:
       report = self.pending_scan_reports_bare.pop(0)
+      #TODO: remove?
     #  if report["state"] == "SCAN":
     #    d = report["scan_report_bare"]
     #    dwell_freq = d["dwell"]["dwell_data"].frequency
@@ -168,7 +176,9 @@ class pluto_ecm_analysis_processor:
       result = self.pool_results[0].get()
 
       self.signal_tracker.submit_analysis_report(result)
-      #print("pool result ready at {}: {}".format(time.time(), result))
+      #if (result["controller_state"] == "SCAN"):
+      #  print("pool result ready at {}: {}".format(time.time(), result))
+
       self.recorder.log(result)
       self.pool_results.pop(0)
 
@@ -178,16 +188,34 @@ class pluto_ecm_analysis_processor:
       return
     self.last_update_time = now
 
-    self.signals_to_render = []
+    confirmed_signals = []
+    scan_signals = []
 
     for entry in self.signal_tracker.confirmed_signals:
       copied_entry = {"freq"              : entry["freq"],
                       "name"              : entry["name"],
                       "stats"             : copy.deepcopy(entry["stats"]),
                       "timestamp_initial" : entry["timestamp_initial"],
-                      "timestamp_final"   : entry["timestamp_final"]}
+                      "timestamp_final"   : entry["timestamp_final"],
+                      "processing_delay"  : entry["processing_delay"]}
 
-      self.signals_to_render.append(copied_entry)
+      confirmed_signals.append(copied_entry)
+
+    for entry in self.signal_tracker.scan_signals:
+      copied_entry = {"freq"              : entry["freq"],
+                      "name"              : entry["name"],
+                      "stats"             : copy.deepcopy(entry["stats"]),
+                      "timestamp_initial" : entry["timestamp_initial"],
+                      "timestamp_final"   : entry["timestamp_final"],
+                      "processing_delay"  : entry["processing_delay"]}
+
+      scan_signals.append(copied_entry)
+
+    self.signals_to_render = []
+    if len(confirmed_signals) > 0:
+      self.signals_to_render.append({"confirmed_signals": confirmed_signals})
+    if len(scan_signals) > 0:
+      self.signals_to_render.append({"scan_signals": scan_signals})
 
   def _process_command(self, data):
     command = data["command"]

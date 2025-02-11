@@ -33,8 +33,11 @@ class pluto_ecm_signal_tracker:
     #  self.matched_analysis_reports[mod_type] = []
 
     self.confirmed_signals = []
+    self.scan_signals = []
 
   def submit_analysis_report(self, report):
+    #report_state = report["controller_state"]
+    #if (report_state == "TX_LISTEN") or (report_state == "TX_ACTIVE"):
     self.pending_analysis_reports.append(report)
 
   def update(self):
@@ -51,14 +54,23 @@ class pluto_ecm_signal_tracker:
       report = self.pending_analysis_reports.pop(0)
       analysis_data = report["analysis"]
 
+      #TODO: remove
+      #if report["channel_freq"] == 5917.32:
+      #  print(analysis_data)
+
       for mod_type, mod_config in self.config["analysis_config"]["modulation_analysis"].items():
         matched_criteria = {}
 
         for config_key, config_entry in mod_config["criteria"].items():
           matched_criteria[config_key] = (analysis_data[config_key] >= config_entry[0]) and (analysis_data[config_key] <= config_entry[1])
 
+        #TODO: remove
+        #if report["channel_freq"] == 5917.32:
+        #  print(matched_criteria)
+
         if all(matched_criteria.values()):
-          self._update_confirmed_signals(report, mod_type, mod_config)
+          print("matched: {}".format(mod_type))
+          self._update_matched_signals(report, mod_type, mod_config)
           break
 
   def _scrub_signals(self):
@@ -81,7 +93,7 @@ class pluto_ecm_signal_tracker:
 
     self.confirmed_signals = signals_to_keep
 
-  def _update_confirmed_signals(self, report, mod_type, mod_entry):
+  def _update_matched_signals(self, report, mod_type, mod_entry):
     channel_edge = [report["channel_freq"] - (self.channel_bandwidth/2), report["channel_freq"] + (self.channel_bandwidth/2)]
 
     signal_matched = False
@@ -106,41 +118,61 @@ class pluto_ecm_signal_tracker:
     if not signal_matched:
       return
 
-    confirmed_match = False
-    for confirmed_entry in self.confirmed_signals:
-      if signal_entry["name"] != confirmed_entry["name"]:
-        continue
-
-      if signal_entry["agile"]:
-        if confirmed_entry["freq"] != report["dwell_freq"]:
+    report_state = report["controller_state"]
+    if report_state in ("TX_LISTEN", "TX_ACTIVE"):
+      confirmed_match = False
+      for confirmed_entry in self.confirmed_signals:
+        if signal_entry["name"] != confirmed_entry["name"]:
           continue
+
+        if signal_entry["agile"]:
+          if confirmed_entry["freq"] != report["dwell_freq"]:
+            continue
+        else:
+          if confirmed_entry["freq"] != report["channel_freq"]:
+            continue
+
+        confirmed_match = True
+        break
+
+      if confirmed_match:
+        self._update_tracked_signal(confirmed_entry, report)
       else:
-        if confirmed_entry["freq"] != report["channel_freq"]:
+        self.confirmed_signals.append(self._initialize_tracked_signal(True, signal_entry, report, mod_entry["display_metric"]))
+
+    elif report_state == "SCAN":
+      scan_match = False
+      for scan_entry in self.scan_signals:
+        if signal_entry["name"] != scan_entry["name"]:
           continue
+        if scan_entry["freq"] != report["channel_freq"]:
+          continue
+        scan_match = True
+        break
 
-      confirmed_match = True
-      break
+      if scan_match:
+        self._update_tracked_signal(scan_entry, report)
+      else:
+        self.scan_signals.append(self._initialize_tracked_signal(False, signal_entry, report, mod_entry["display_metric"]))
 
-    if confirmed_match:
-      self._update_confirmed_signal(confirmed_entry, report)
-    else:
-      self.confirmed_signals.append(self._initialize_confirmed_signal(signal_entry, report, mod_entry["display_metric"]))
+  def _update_tracked_signal(self, confirmed_entry, report):
+    now = time.time()
 
-  def _update_confirmed_signal(self, confirmed_entry, report):
     new_report_entry = {"dwell_freq"    : report["dwell_freq"],
                         "channel_freq"  : report["channel_freq"],
                         "timestamp"     : report["sw_timestamp"],
                         "analysis"      : report["analysis"]}
 
     confirmed_entry["timestamp_final"] = report["sw_timestamp"]
+    confirmed_entry["processing_delay"] = now - report["sw_timestamp"]
     confirmed_entry["reports"].append(new_report_entry)
     confirmed_entry["stats"] = self._update_signal_stats(confirmed_entry)
 
-    max_report_age = time.time() - confirmed_entry["reports"][0]["timestamp"]
-    self.logger.log(self.logger.LL_INFO, "[signal_tracker] _update_confirmed_signal: name={} freq={} max_report_age={:.1f}  report={}".format(confirmed_entry["name"], confirmed_entry["freq"], max_report_age, new_report_entry))
+    max_report_age = now - confirmed_entry["reports"][0]["timestamp"]
+    self.logger.log(self.logger.LL_INFO, "[signal_tracker] _update_tracked_signal: [{}] name={} freq={} max_report_age={:.1f}  report={}".format(report["controller_state"], confirmed_entry["name"], confirmed_entry["freq"], max_report_age, new_report_entry))
 
-  def _initialize_confirmed_signal(self, signal_entry, report, display_metric):
-    if signal_entry["agile"]:
+  def _initialize_tracked_signal(self, confirmed, signal_entry, report, display_metric):
+    if confirmed and signal_entry["agile"]:
       freq = report["dwell_freq"]
     else:
       freq = report["channel_freq"]
@@ -155,11 +187,12 @@ class pluto_ecm_signal_tracker:
               "reports"             : [new_report_entry],
               "display_metric_name" : display_metric,
               "timestamp_initial"   : report["sw_timestamp"],
-              "timestamp_final"     : report["sw_timestamp"]}
+              "timestamp_final"     : report["sw_timestamp"],
+              "processing_delay"    : time.time() - report["sw_timestamp"]}
 
     signal["stats"] = self._update_signal_stats(signal)
 
-    self.logger.log(self.logger.LL_INFO, "[signal_tracker] _initialize_confirmed_signal: new signal added: name={} freq={} report={}".format(signal_entry["name"], freq, new_report_entry))
+    self.logger.log(self.logger.LL_INFO, "[signal_tracker] _initialize_tracked_signal: new signal added: [{}] name={} freq={} report={}".format(report["controller_state"], signal_entry["name"], freq, new_report_entry))
 
     return signal
 

@@ -100,7 +100,10 @@ class pluto_ecm_ecm_controller:
       if (self.state == "TX_LISTEN") or (self.state == "TX_ACTIVE"):
         assert (len(self.scan_pending_forced_triggers) == 0)
         self.analysis_thread.submit_data({"scan_report_iq": merged_report, "state": self.state, "timestamp": time.time()})
-      else:
+
+      elif (self.state == "SCAN"):
+        self.analysis_thread.submit_data({"scan_report_iq": merged_report, "state": self.state, "timestamp": time.time()})
+
         if len(self.scan_pending_forced_triggers) == 0:
           return
 
@@ -123,11 +126,11 @@ class pluto_ecm_ecm_controller:
               self.logger.log(self.logger.LL_INFO, "[ecm_controller] submit_report: matched dwell_index={} channel_index={}".format(expected_dwell_index, expected_channel_index))
 
         assert (not partial_match or full_match)
-        if full_match:
-          self.analysis_thread.submit_data({"scan_report_iq": merged_report, "state": self.state, "timestamp": time.time()})
-        else:
+        if not full_match:
           self.logger.log(self.logger.LL_INFO, "[ecm_controller] submit_report: match failed: expected={}/{}, report={}".format(expected_dwell_index, expected_channel_index, merged_report))
-          #print("match failed")
+
+      else:
+        self.logger.log(self.logger.LL_INFO, "[ecm_controller] submit_report: dropped, state={}".format(self.state))
 
   def on_sequencer_active(self):
     self.hardware_active  = True

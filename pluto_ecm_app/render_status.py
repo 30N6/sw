@@ -3,11 +3,12 @@ import time
 import numpy as np
 
 class render_status:
-  def __init__(self, surface, sw_config, hw_interface, sequencer, version):
-    self.surface      = surface
-    self.hw_interface = hw_interface
-    self.sequencer    = sequencer
-    self.version      = version
+  def __init__(self, surface, sw_config, hw_interface, sequencer, analysis_thread, version):
+    self.surface          = surface
+    self.hw_interface     = hw_interface
+    self.sequencer        = sequencer
+    self.analysis_thread  = analysis_thread
+    self.version          = version
 
     self.colors = {}
     self.colors["border"] = (0, 0, 255)
@@ -61,16 +62,16 @@ class render_status:
                   {"format": "Dwell cv tot all  : {:.3f}", "value": hw_stats["dwell_coverage_total_all"],                 "pos_offset": [8, 176]},
                   {"format": "Dwell gap frac    : {:.3f}", "value": hw_stats["dwell_gap_fraction"],                       "pos_offset": [8, 192]},
                   {"format": "Dwell total time  : {:.1f}", "value": hw_stats["dwell_time_total_sec"],                     "pos_offset": [8, 208]},
-                  {"format": "Rpt dly chan wr   : {}",     "value": hw_stats["drfm_total_channel_write_report_delay"], "pos_offset": [8, 224]},
-                  {"format": "Rpt dly sumry wr  : {}",     "value": hw_stats["drfm_total_summary_write_report_delay"], "pos_offset": [8, 240]},
-                  {"format": "Rpt dly sumry st  : {}",     "value": hw_stats["drfm_total_summary_start_report_delay"], "pos_offset": [8, 256]},
-                  #{"format": "PDW dwells missing: {}",     "value": hw_stats["pdw_dwells_missing"],                       "pos_offset": [8, 272]},
-                  {"format": "HW commands sent  : {}",     "value": self.hw_interface.hwcp.num_commands,        "pos_offset": [8, 288]},
-                  {"format": "HW DMA writes     : {}",     "value": self.hw_interface.hwcp.num_dma_writes,      "pos_offset": [8, 304]},
-                  {"format": "HW DMA reads      : {}",     "value": self.hw_interface.hwdr.num_dma_reads,       "pos_offset": [8, 320]},
-                  {"format": "HW status reports : {}",     "value": self.hw_interface.hwdr.num_status_reports,  "pos_offset": [8, 336]},
-                  {"format": "HW temp AD9361    : {:.1f}", "value": self.hw_interface.temp_9361,                "pos_offset": [8, 352]},
-                  {"format": "HW temp FPGA      : {:.1f}", "value": self.hw_interface.temp_fpga,                "pos_offset": [8, 368]},
+                  {"format": "Rpt dly chan wr   : {}",     "value": hw_stats["drfm_total_channel_write_report_delay"],    "pos_offset": [8, 224]},
+                  {"format": "Rpt dly sumry wr  : {}",     "value": hw_stats["drfm_total_summary_write_report_delay"],    "pos_offset": [8, 240]},
+                  {"format": "Rpt dly sumry st  : {}",     "value": hw_stats["drfm_total_summary_start_report_delay"],    "pos_offset": [8, 256]},
+                  {"format": "Signal proc delay : {:.3f}", "value": self.analysis_thread.signal_processing_delay,         "pos_offset": [8, 272]},
+                  {"format": "HW commands sent  : {}",     "value": self.hw_interface.hwcp.num_commands,                  "pos_offset": [8, 288]},
+                  {"format": "HW DMA writes     : {}",     "value": self.hw_interface.hwcp.num_dma_writes,                "pos_offset": [8, 304]},
+                  {"format": "HW DMA reads      : {}",     "value": self.hw_interface.hwdr.num_dma_reads,                 "pos_offset": [8, 320]},
+                  {"format": "HW status reports : {}",     "value": self.hw_interface.hwdr.num_status_reports,            "pos_offset": [8, 336]},
+                  {"format": "HW temp AD9361    : {:.1f}", "value": self.hw_interface.temp_9361,                          "pos_offset": [8, 352]},
+                  {"format": "HW temp FPGA      : {:.1f}", "value": self.hw_interface.temp_fpga,                          "pos_offset": [8, 368]},
                   ]
 
                   #TODO: show dwell total meas time, dwell total tx time
