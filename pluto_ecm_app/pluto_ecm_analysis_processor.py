@@ -40,7 +40,8 @@ class pluto_ecm_analysis_processor:
     self.process_pool = multiprocessing.Pool(4) #TODO: config
     self.pool_results = []
 
-    self.signals_to_render = []
+    self.data_to_render = []
+    self.signal_processing_delay = 0
 
   def _clear_scan_stats(self):
     for entry in self.config["dwell_config"]["dwell_freqs"]:
@@ -176,6 +177,7 @@ class pluto_ecm_analysis_processor:
       result = self.pool_results[0].get()
 
       self.signal_tracker.submit_analysis_report(result)
+      self.signal_processing_delay = time.time() - result["sw_timestamp"]
       #if (result["controller_state"] == "SCAN"):
       #  print("pool result ready at {}: {}".format(time.time(), result))
 
@@ -211,11 +213,13 @@ class pluto_ecm_analysis_processor:
 
       scan_signals.append(copied_entry)
 
-    self.signals_to_render = []
+    self.data_to_render = []
     if len(confirmed_signals) > 0:
-      self.signals_to_render.append({"confirmed_signals": confirmed_signals})
+      self.data_to_render.append({"confirmed_signals": confirmed_signals})
     if len(scan_signals) > 0:
-      self.signals_to_render.append({"scan_signals": scan_signals})
+      self.data_to_render.append({"scan_signals": scan_signals})
+
+    self.data_to_render.append({"signal_processing_delay": self.signal_processing_delay})
 
   def _process_command(self, data):
     command = data["command"]

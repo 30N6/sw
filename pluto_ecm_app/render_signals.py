@@ -282,12 +282,12 @@ class render_signals:
 
 
   def update(self):
-    if len(self.analysis_thread.signals_to_render) == 0:
+    if len(self.analysis_thread.data_to_render) == 0:
       return
 
     now = time.time()
 
-    for entry in self.analysis_thread.signals_to_render:
+    for entry in self.analysis_thread.data_to_render:
       if "confirmed_signals" in entry:
         self.last_update_time_confirmed = now
         self.confirmed_signals = []
@@ -307,13 +307,14 @@ class render_signals:
           signal["signal_age"]   = now - signal_data["timestamp_initial"]
           signal["update_age"]   = now - signal_data["timestamp_final"]
           self.scan_signals.append(signal)
+
       else:
         raise RuntimeError("unexpected data")
 
     if (now - self.last_update_time_confirmed) > self.update_timeout_confirmed:
       self.confirmed_signals = []
 
-    self.analysis_thread.signals_to_render = []
+    self.analysis_thread.data_to_render = []
     self.confirmed_signals.sort(key=lambda entry: entry["signal_data"]["stats"]["power_mean"], reverse=True)
 
     self._clamp_selected_emitters()

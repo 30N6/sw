@@ -21,9 +21,8 @@ class pluto_ecm_analysis_thread:
     self.logger.log(self.logger.LL_INFO, "init: queues={}/{}, current_process={}".format(self.input_queue, self.output_queue, multiprocessing.current_process()))
 
   def _send_tracked_signals(self):
-    while len(self.processor.signals_to_render) > 0:
-      self.output_queue.put(self.processor.signals_to_render.pop(0))
-      #self.processor.signals_to_render = []
+    while len(self.processor.data_to_render) > 0:
+      self.output_queue.put(self.processor.data_to_render.pop(0))
 
   def run(self):
     running = True
@@ -80,7 +79,7 @@ class pluto_ecm_analysis_runner:
 
     self.scan_results             = {}
     self.scan_seq_num             = -1
-    self.signals_to_render        = []
+    self.data_to_render           = []
     self.signal_processing_delay  = 0
 
 
@@ -98,11 +97,13 @@ class pluto_ecm_analysis_runner:
       elif "scan_seq_num" in data:
         self.scan_seq_num = data["scan_seq_num"]
       elif "confirmed_signals" in data:
-        self.signals_to_render.append(data)
+        self.data_to_render.append(data)
         self.signal_processing_delay = data["confirmed_signals"][0]["processing_delay"]
       elif "scan_signals" in data:
-        self.signals_to_render.append(data)
-
+        self.data_to_render.append(data)
+      elif "signal_processing_delay" in data:
+        print("processing_delay: {}".format(data["signal_processing_delay"]))
+        self.signal_processing_delay = data["signal_processing_delay"]
       else:
         raise RuntimeError("unexpected data in output queue")
 
