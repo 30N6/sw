@@ -35,9 +35,10 @@
       "max_signal_age"  : 30
     },
     "modulation_analysis": {
-      "elrs-bfsk" : {"display_metric": "bfsk_r_squared", "criteria": {"iq_length": [1024, 9999], "bfsk_r_squared": [0.8, 1.0], "bfsk_len_peak": [6, 999], "bfsk_freq_spread": [100e3, 1e7]}},
-      "elrs-lora" : {"display_metric": "lora_r_squared", "criteria": {"iq_length": [1024, 9999], "lora_r_squared": [0.8, 1.0], "lora_peak_count_ratio": [2.0, 999], "lora_peak_spacing_ratio": [0, 0.5]}},
-      "lfm":        {"display_metric": "lfm_r_squared",  "criteria": {"iq_length": [64,   1024], "lfm_r_squared": [0.7, 1.0]}}
+      "elrs-bfsk" : {"display_metric": "bfsk_r_squared",  "criteria": {"power_mean": [5, 1e9], "iq_length": [1024, 9999], "bfsk_r_squared": [0.8, 1.0], "bfsk_len_peak": [6, 999], "bfsk_freq_spread": [100e3, 350e3]}},
+      "elrs-lora" : {"display_metric": "lora_r_squared",  "criteria": {"power_mean": [5, 1e9], "iq_length": [1024, 9999], "lora_r_squared": [0.8, 1.0], "lora_peak_count_ratio": [2.0, 999], "lora_peak_spacing_ratio": [0, 0.5]}, "parameters": {"lora_num_chunks": [4, 16], "lora_peak_threshold": 0.25}},
+      "lfm"       : {"display_metric": "lfm_r_squared",   "criteria": {"power_mean": [5, 1e9], "iq_length": [64,   1024], "lfm_r_squared": [0.7, 1.0]}},
+      "cvbs"      : {"display_metric": "cvbs_xcorr_1",    "criteria": {"power_mean": [5, 1e9], "iq_length": [1024, 9999], "cvbs_xcorr_1": [0.2, 1.0], "cvbs_xcorr_2": [0.0, 0.2]}, "parameters": {"cvbs_xcorr_window_inc":  [60e-6, 67e-6], "cvbs_xcorr_window_exc": [55e-6, 72e-6]}}
     }
   },
   "pluto_dma_reader_path": "../pluto_dma_reader/pluto_dma_reader",

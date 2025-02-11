@@ -308,7 +308,7 @@ class pluto_ecm_hw_interface:
     attributes_phy      = [("bb_dc_offset_tracking_en",  "1"),
                            ("filter_fir_en",             "0"),
                            ("gain_control_mode",         "manual"),
-                           ("hardwaregain",              "20"), #60
+                           ("hardwaregain",              "60"), #60
                            ("quadrature_tracking_en",    "1"),
                            ("rf_bandwidth",              "56000000"),
                            ("rf_dc_offset_tracking_en",  "1"),
