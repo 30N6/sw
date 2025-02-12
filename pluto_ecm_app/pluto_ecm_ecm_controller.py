@@ -204,6 +204,10 @@ class pluto_ecm_ecm_controller:
         else:
           self._send_next_forced_triggers()
     elif self.state == "TX_LISTEN":
+      # if time elapsed -> back to scan
+      # if key pressed -> tx_active
+    
+    
       pass
 
   def update(self):

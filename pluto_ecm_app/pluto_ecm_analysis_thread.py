@@ -102,7 +102,6 @@ class pluto_ecm_analysis_runner:
       elif "scan_signals" in data:
         self.data_to_render.append(data)
       elif "signal_processing_delay" in data:
-        print("processing_delay: {}".format(data["signal_processing_delay"]))
         self.signal_processing_delay = data["signal_processing_delay"]
       else:
         raise RuntimeError("unexpected data in output queue")

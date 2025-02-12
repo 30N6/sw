@@ -5,13 +5,14 @@ import turbo_colormap
 
 class pluto_ecm_spectrogram:
 
-  def __init__(self, sw_config, dwell_freq, dwell_pane_width, dwell_pane_height_main, dwell_pane_height_trace, dwell_trigger_thresholds):
+  def __init__(self, sw_config, dwell_freq, dwell_pane_width, dwell_pane_height_main, dwell_pane_height_trace, dwell_trigger_thresholds, program_tag_to_state):
     self.sw_config                = sw_config
     self.dwell_freq               = dwell_freq
     self.dwell_pane_width         = dwell_pane_width
     self.dwell_pane_height_main   = dwell_pane_height_main
     self.dwell_pane_height_trace  = dwell_pane_height_trace
     self.dwell_trigger_thresholds = dwell_trigger_thresholds
+    self.program_tag_to_state     = program_tag_to_state
 
     self.output_col_width   = int(dwell_pane_width // ECM_NUM_CHANNELS)
     self.output_row_height  = 2 #TODO: config
@@ -32,6 +33,7 @@ class pluto_ecm_spectrogram:
     self.colors["trace_peak"]   = np.asarray([32, 255, 32])
     self.colors["trace_avg"]    = np.asarray([255, 32, 32])
     self.colors["trace_thresh"] = np.asarray([0, 128, 255])
+    self.colors["state_colors"] = {"IDLE": np.asarray([0, 0, 0]), "SCAN": np.asarray([0, 32, 128]), "TX_LISTEN": np.asarray([0, 128, 32]), "TX_ACTIVE": np.asarray([128, 32, 32])}
 
   def get_spectrogram(self, peak_not_avg):
     if peak_not_avg:
@@ -63,12 +65,17 @@ class pluto_ecm_spectrogram:
     return np.vstack((new_row, buf[:-1]))
 
   def process_new_row(self, dwell_buffer):
-    scaled_duration = dwell_buffer.dwell_data_by_freq[self.dwell_freq]["channel_duration"][dwell_buffer.dwell_data_last_row_index]
+    dwell_data = dwell_buffer.dwell_data_by_freq[self.dwell_freq]
+
+    scaled_duration = dwell_data["channel_duration"][dwell_buffer.dwell_data_last_row_index]
     scaled_duration[scaled_duration == 0] = 1
 
-    input_row_avg     = np.divide(dwell_buffer.dwell_data_by_freq[self.dwell_freq]["channel_accum"][dwell_buffer.dwell_data_last_row_index], scaled_duration)
-    input_row_peak    = dwell_buffer.dwell_data_by_freq[self.dwell_freq]["channel_peak"][dwell_buffer.dwell_data_last_row_index].copy()
+    input_row_avg     = np.divide(dwell_data["channel_accum"][dwell_buffer.dwell_data_last_row_index], scaled_duration)
+    input_row_peak    = dwell_data["channel_peak"][dwell_buffer.dwell_data_last_row_index].copy()
     input_row_thresh  = self.dwell_trigger_thresholds[self.dwell_freq]
+    input_row_tag     = dwell_data["program_tag"][dwell_buffer.dwell_data_last_row_index]
+
+    state_color = self.colors["state_colors"][self.program_tag_to_state[input_row_tag]]
 
     buf_avg     = np.zeros(self.spec_width)
     buf_peak    = np.zeros(self.spec_width)
@@ -82,6 +89,9 @@ class pluto_ecm_spectrogram:
     for i in range(self.output_row_height):
       self.spec_main_avg      = self._shift_and_insert(self.spec_main_avg,  np.expand_dims(turbo_colormap.interpolate_color(self._normalize_row(buf_avg)), 0))
       self.spec_main_peak     = self._shift_and_insert(self.spec_main_peak, np.expand_dims(turbo_colormap.interpolate_color(self._normalize_row(buf_peak)), 0))
+
+      self.spec_main_avg[0, 0:self.output_col_width, :]   = state_color
+      self.spec_main_peak[0, 0:self.output_col_width, :]  = state_color
 
     power_floor = 10 ** (self.spec_trace_min_dB / 10)
     power_ceil  = 10 ** (self.spec_trace_max_dB / 10)

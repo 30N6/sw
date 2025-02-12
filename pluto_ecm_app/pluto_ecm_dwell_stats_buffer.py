@@ -20,6 +20,7 @@ class pluto_ecm_dwell_stats_buffer:
       self.dwell_data_by_freq[freq]["channel_peak"]      = np.zeros((self.buffer_depth, ECM_NUM_CHANNELS), dtype=np.uint32)
       self.dwell_data_by_freq[freq]["channel_duration"]  = np.zeros((self.buffer_depth, ECM_NUM_CHANNELS), dtype=np.uint32)
       self.dwell_data_by_freq[freq]["start_time"]        = np.zeros(self.buffer_depth, dtype=np.uint64)
+      self.dwell_data_by_freq[freq]["program_tag"]       = np.zeros(self.buffer_depth, dtype=np.uint32)
 
   def process_dwell_update(self, dwell_entry):
     dwell_data    = dwell_entry["dwell_data"]
@@ -34,6 +35,7 @@ class pluto_ecm_dwell_stats_buffer:
         freq_data["channel_peak"][self.dwell_data_row_index, :]      = 0
         freq_data["channel_duration"][self.dwell_data_row_index, :]  = 0
         freq_data["start_time"][self.dwell_data_row_index]           = dwell_report["ts_dwell_start"]
+        freq_data["program_tag"][self.dwell_data_row_index]          = dwell_report["dwell_program_tag"]
 
     for i in range(ECM_NUM_CHANNELS):
       entry = dwell_report["channel_data"][i]
