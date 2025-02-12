@@ -4,9 +4,9 @@ import pluto_ecm_hw_pkg
 
 class pluto_ecm_sw_config:
   def __init__(self, filename):
-    fd = open(filename, "r")
-    self.config = json.load(fd)
-    fd.close()
+    self.filename = filename
+    with open(filename, "r") as fd:
+      self.config = json.load(fd)
 
     self._sanity_check()
 

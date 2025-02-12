@@ -46,6 +46,11 @@ ECM_TX_OUTPUT_CONTROL_DRFM                      = 2
 ECM_TX_OUTPUT_CONTROL_MIXER                     = 3
 ECM_TX_OUTPUT_CONTROL_WIDTH                     = 2
 
+DDS_CONTROL_TYPE_NONE                           = 0
+DDS_CONTROL_TYPE_LFSR                           = 1
+DDS_CONTROL_TYPE_SIN_SWEEP                      = 2
+DDS_CONTROL_TYPE_SIN_STEP                       = 3
+
 ECM_NUM_FAST_LOCK_PROFILES                      = 8
 ECM_NUM_DWELL_ENTRIES                           = 32
 ECM_NUM_CHANNEL_CONTROL_ENTRIES                 = ECM_NUM_CHANNELS * ECM_NUM_DWELL_ENTRIES

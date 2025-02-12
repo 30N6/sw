@@ -53,19 +53,24 @@ class pluto_ecm_analysis_processor:
                                         "summary_power_history" : [[] for i in range(ECM_NUM_CHANNELS)]}
     self.scan_seq_num += 1
 
-  def _update_scan_stats_iq(self, data):
-    dwell_freq    = data["dwell_freq"]
-    stats         = self.scan_stats[dwell_freq]
-    iq_data       = data["iq_data"]
-    channel_index = data["channel_index"]
-
-    channel_power = np.square(np.real(iq_data)) + np.square(np.imag(iq_data))
-    stats["iq_power_history"][channel_index].append(channel_power)
-    stats["iq_power_mean"][channel_index]   = np.mean(stats["iq_power_history"][channel_index])
-    stats["iq_power_median"][channel_index] = np.median(stats["iq_power_history"][channel_index])
-
-    self.logger.log(self.logger.LL_DEBUG, "_update_scan_stats_iq: dwell_freq={} channel_index={} power_mean={:.1f} power_median={:.1f}".format(dwell_freq, channel_index,
-      stats["iq_power_mean"][channel_index], stats["iq_power_median"][channel_index]))
+  #TODO: remove
+  #def _update_scan_stats_iq(self, data):
+  #  dwell_freq    = data["dwell_freq"]
+  #  stats         = self.scan_stats[dwell_freq]
+  #  iq_data       = data["iq_data"]
+  #  channel_index = data["channel_index"]
+  #
+  #  channel_power = np.square(np.real(iq_data)) + np.square(np.imag(iq_data))
+  #  stats["iq_power_history"][channel_index].append(channel_power)
+  #
+  #  print("channel={}: power={} history={}".format(channel_index, channel_power, stats["iq_power_history"][channel_index]))
+  #
+  #
+  #  stats["iq_power_mean"][channel_index]   = np.mean(stats["iq_power_history"][channel_index])
+  #  stats["iq_power_median"][channel_index] = np.median(stats["iq_power_history"][channel_index])
+  #
+  #  self.logger.log(self.logger.LL_DEBUG, "_update_scan_stats_iq: dwell_freq={} channel_index={} power_mean={:.1f} power_median={:.1f}".format(dwell_freq, channel_index,
+  #    stats["iq_power_mean"][channel_index], stats["iq_power_median"][channel_index]))
 
   def _update_scan_stats_summary(self, data):
     dwell_freq    = data["dwell"]["dwell_data"].frequency
@@ -142,7 +147,7 @@ class pluto_ecm_analysis_processor:
           sd["iq_data"] = self._apply_basebanding(sd["iq_data"])
 
         if sd["controller_state"] == "SCAN":
-          self._update_scan_stats_iq(sd)
+          #self._update_scan_stats_iq(sd)
           self._process_report_for_iq(sd)
 
         elif sd["controller_state"] == "TX_LISTEN":
@@ -214,11 +219,8 @@ class pluto_ecm_analysis_processor:
       scan_signals.append(copied_entry)
 
     self.data_to_render = []
-    if len(confirmed_signals) > 0:
-      self.data_to_render.append({"confirmed_signals": confirmed_signals})
-    if len(scan_signals) > 0:
-      self.data_to_render.append({"scan_signals": scan_signals})
-
+    self.data_to_render.append({"confirmed_signals": confirmed_signals})
+    self.data_to_render.append({"scan_signals": scan_signals})
     self.data_to_render.append({"signal_processing_delay": self.signal_processing_delay})
 
   def _process_command(self, data):
@@ -226,18 +228,29 @@ class pluto_ecm_analysis_processor:
 
     if command == "SCAN_START":
       self._clear_scan_stats()
+
     elif command == "SCAN_END":
       for freq in self.scan_stats:
-        self.logger.log(self.logger.LL_DEBUG, "_process_command: SCAN_END: iq_power_mean[{}]        ={}".format(freq, self.scan_stats[freq]["iq_power_mean"]))
-        self.logger.log(self.logger.LL_DEBUG, "_process_command: SCAN_END: iq_power_median[{}]      ={}".format(freq, self.scan_stats[freq]["iq_power_median"]))
+        #self.logger.log(self.logger.LL_DEBUG, "_process_command: SCAN_END: iq_power_mean[{}]        ={}".format(freq, self.scan_stats[freq]["iq_power_mean"]))
+        #self.logger.log(self.logger.LL_DEBUG, "_process_command: SCAN_END: iq_power_median[{}]      ={}".format(freq, self.scan_stats[freq]["iq_power_median"]))
         self.logger.log(self.logger.LL_DEBUG, "_process_command: SCAN_END: summary_power_mean[{}]   ={}".format(freq, self.scan_stats[freq]["summary_power_mean"]))
         self.logger.log(self.logger.LL_DEBUG, "_process_command: SCAN_END: summary_power_median[{}] ={}".format(freq, self.scan_stats[freq]["summary_power_median"]))
         self.output_queue.put({"scan_results": {"freq": freq,
-                                                "iq_power_mean"       : self.scan_stats[freq]["iq_power_mean"],
-                                                "iq_power_median"     : self.scan_stats[freq]["iq_power_median"],
+                                                #"iq_power_mean"       : self.scan_stats[freq]["iq_power_mean"],
+                                                #"iq_power_median"     : self.scan_stats[freq]["iq_power_median"],
                                                 "summary_power_mean"  : self.scan_stats[freq]["summary_power_mean"],
                                                 "summary_power_median": self.scan_stats[freq]["summary_power_median"]}})
+
       self.output_queue.put({"scan_seq_num": self.scan_seq_num})
+
+    elif command == "TX_LISTEN_START":
+      pass
+    elif command == "TX_LISTEN_END":
+      pass
+    elif command == "TX_ACTIVE_START":
+      pass
+    elif command == "TX_ACTIVE_END":
+      pass
     else:
       raise RuntimeError("unknown command")
 

@@ -169,7 +169,7 @@ class ecm_channel_control_entry:
     return ecm_channel_control_entry(enable, ECM_CHANNEL_TRIGGER_MODE_FORCE_TRIGGER, recording_length - 1, 0xFFFFFFFF, 1, 0, recording_addr, program_entries)
 
   @staticmethod
-  def channel_entry_trigger_threshold(channel_index_sw, threshold, hyst_shift):
+  def channel_entry_trigger_threshold_listen_only(channel_index_sw, threshold, hyst_shift):
     enable = (ECM_CHANNEL_MASK & (1 << channel_index_sw)) != 0
     program_entries = [ecm_channel_tx_program_entry(0, 0, 0, 0, 0) for i in range(ECM_NUM_CHANNEL_TX_PROGRAM_ENTRIES)]
 

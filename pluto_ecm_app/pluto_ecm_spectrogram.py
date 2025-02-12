@@ -33,7 +33,7 @@ class pluto_ecm_spectrogram:
     self.colors["trace_peak"]   = np.asarray([32, 255, 32])
     self.colors["trace_avg"]    = np.asarray([255, 32, 32])
     self.colors["trace_thresh"] = np.asarray([0, 128, 255])
-    self.colors["state_colors"] = {"IDLE": np.asarray([0, 0, 0]), "SCAN": np.asarray([0, 32, 128]), "TX_LISTEN": np.asarray([0, 128, 32]), "TX_ACTIVE": np.asarray([128, 32, 32])}
+    self.colors["state_colors"] = {"IDLE": np.asarray([0, 0, 0]), "SCAN": np.asarray([0, 32, 128]), "TX_LISTEN": np.asarray([0, 128, 32]), "TX_ACTIVE": np.asarray([255, 192, 32])}
 
   def get_spectrogram(self, peak_not_avg):
     if peak_not_avg:

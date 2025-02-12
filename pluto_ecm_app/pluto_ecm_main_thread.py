@@ -11,6 +11,10 @@ import render_status
 import render_spectrum
 import render_signals
 
+#TODO: find source of numpy warnings
+import warnings
+warnings.filterwarnings('error', category=RuntimeWarning)
+
 class pluto_ecm_main_thread:
   SCREEN_SIZE = (1280, 800)
   FPS = 60
@@ -62,9 +66,10 @@ class pluto_ecm_main_thread:
     self.render_signals   = render_signals.render_signals(self.surface, self.sw_config, self.analysis_thread)
 
   def run(self):
-    key_handlers = [self.render_spectrum, self.render_signals]
-    update_calls = [self.hw_interface, self.analysis_thread, self.sequencer, self.render_status, self.render_spectrum, self.render_signals]
-    render_calls = [self.render_status, self.render_spectrum, self.render_signals]
+    keydown_handlers  = [self.render_spectrum, self.render_signals]
+    keystate_handlers = [self.sequencer]
+    update_calls      = [self.hw_interface, self.analysis_thread, self.sequencer, self.render_status, self.render_spectrum, self.render_signals]
+    render_calls      = [self.render_status, self.render_spectrum, self.render_signals]
 
     running = True
     while (running):
@@ -75,8 +80,12 @@ class pluto_ecm_main_thread:
           if i.key == pygame.K_ESCAPE:
             running = False
 
-          for handler in key_handlers:
+          for handler in keydown_handlers:
             handler.process_keydown(i.key)
+
+      key_state = pygame.key.get_pressed()
+      for handler in keystate_handlers:
+        handler.process_keystate(key_state)
 
       self.logger.flush()
       self.recorder.flush()

@@ -540,3 +540,6 @@ class pluto_ecm_sequencer:
       self._update_scan_dwells()
       self.hw_stats.update()
       self.ecm_controller.update()
+
+  def process_keystate(self, key_state):
+    self.ecm_controller.process_keystate(key_state)

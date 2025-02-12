@@ -75,8 +75,8 @@ class pluto_ecm_signal_tracker:
 
   def _scrub_signals(self):
     now = time.time()
-    signals_to_keep = []
 
+    signals_to_keep = []
     for entry in self.confirmed_signals:
       reports = entry["reports"]
       while len(reports) > 0:
@@ -87,11 +87,26 @@ class pluto_ecm_signal_tracker:
 
       if (len(reports) > 0) and ((now - reports[0]["timestamp"]) < self.max_signal_age):
         signals_to_keep.append(entry)
-        #self.logger.log(self.logger.LL_INFO, "[signal_tracker] _scrub_emitters: keeping emitter {}".format(entry))
       else:
         self.logger.log(self.logger.LL_INFO, "[signal_tracker] _scrub_emitters: confirmed signal timeout - {}".format(entry))
 
     self.confirmed_signals = signals_to_keep
+
+    signals_to_keep = []
+    for entry in self.scan_signals:
+      reports = entry["reports"]
+      while len(reports) > 0:
+        if (now - reports[0]["timestamp"]) > self.max_report_age:
+          reports.pop(0)
+        else:
+          break
+
+      if (len(reports) > 0) and ((now - reports[0]["timestamp"]) < self.max_signal_age):
+        signals_to_keep.append(entry)
+      else:
+        self.logger.log(self.logger.LL_INFO, "[signal_tracker] _scrub_emitters: scan signal timeout - {}".format(entry))
+
+    self.scan_signals = signals_to_keep
 
   def _update_matched_signals(self, report, mod_type, mod_entry):
     channel_edge = [report["channel_freq"] - (self.channel_bandwidth/2), report["channel_freq"] + (self.channel_bandwidth/2)]
