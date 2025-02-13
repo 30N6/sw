@@ -66,6 +66,9 @@ class pluto_ecm_hw_dwell_reporter:
 
     report["channel_data"] = [{"cycles": 1, "accum": 0, "max": 0} for i in range(ECM_NUM_CHANNELS)]
 
+    if report["dwell_tx_active"]:
+      print("dwell_tx_active=1")
+
     for channel_index_hw in range(ECM_NUM_CHANNELS):
       channel_index = pluto_ecm_hw_dwell.ecm_channel_index_hw_to_sw(channel_index_hw)
 

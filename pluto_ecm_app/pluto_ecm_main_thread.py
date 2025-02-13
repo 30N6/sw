@@ -63,7 +63,7 @@ class pluto_ecm_main_thread:
                                                                     self.hw_interface, self.analysis_thread, self.sim_loader)
     self.render_status    = render_status.render_status(self.surface, self.sw_config, self.hw_interface, self.sequencer, self.analysis_thread, self.VERSION)
     self.render_spectrum  = render_spectrum.render_spectrum(self.surface, self.sw_config, self.sequencer)
-    self.render_signals   = render_signals.render_signals(self.surface, self.sw_config, self.analysis_thread)
+    self.render_signals   = render_signals.render_signals(self.surface, self.sw_config, self.analysis_thread, self.sequencer)
 
   def run(self):
     keydown_handlers  = [self.render_spectrum, self.render_signals]

@@ -177,6 +177,14 @@ class ecm_channel_control_entry:
     recording_addr = recording_length * ECM_ACTIVE_CHANNEL_DRFM_SEGMENT_MAP[channel_index_sw]
     return ecm_channel_control_entry(enable, ECM_CHANNEL_TRIGGER_MODE_THRESHOLD_TRIGGER, recording_length - 1, threshold, hyst_shift, 0, recording_addr, program_entries)
 
+  @staticmethod
+  def channel_entry_trigger_threshold_tx(channel_index_sw, threshold, hyst_shift, program_entries):
+    enable = (ECM_CHANNEL_MASK & (1 << channel_index_sw)) != 0
+
+    recording_length = (ECM_DRFM_MEM_DEPTH // ECM_NUM_CHANNELS_ACTIVE)
+    recording_addr = recording_length * ECM_ACTIVE_CHANNEL_DRFM_SEGMENT_MAP[channel_index_sw]
+    return ecm_channel_control_entry(enable, ECM_CHANNEL_TRIGGER_MODE_THRESHOLD_TRIGGER, recording_length - 1, threshold, hyst_shift, 0, recording_addr, program_entries)
+
 
 class ecm_channel_tx_program_entry:
   def __init__(self, valid, trigger_immediate_after_min, tx_instruction_index, duration_gate_min_minus_one, duration_gate_max_minus_one):

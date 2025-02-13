@@ -78,6 +78,7 @@ class pluto_ecm_analysis_runner:
     self.running      = True
 
     self.scan_results             = {}
+    self.signals_confirmed        = []
     self.scan_seq_num             = -1
     self.data_to_render           = []
     self.signal_processing_delay  = 0
@@ -98,6 +99,7 @@ class pluto_ecm_analysis_runner:
         self.scan_seq_num = data["scan_seq_num"]
       elif "confirmed_signals" in data:
         self.data_to_render.append(data)
+        self.signals_confirmed = data["confirmed_signals"]
         if len(data["confirmed_signals"]) > 0:
           self.signal_processing_delay = data["confirmed_signals"][0]["processing_delay"]
       elif "scan_signals" in data:

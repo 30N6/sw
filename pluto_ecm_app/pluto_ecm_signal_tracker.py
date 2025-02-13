@@ -69,7 +69,7 @@ class pluto_ecm_signal_tracker:
         #  print(matched_criteria)
 
         if all(matched_criteria.values()):
-          print("matched: {}".format(mod_type))
+          #print("matched: {}".format(mod_type))
           self._update_matched_signals(report, mod_type, mod_config)
           break
 
@@ -197,8 +197,14 @@ class pluto_ecm_signal_tracker:
                         "timestamp"     : report["sw_timestamp"],
                         "analysis"      : report["analysis"]}
 
+    tx_parameters = {"trigger_duration" : signal_entry["trigger_duration"],
+                     "immediate_tx"     : signal_entry["immediate_tx"],
+                     "tx_program"       : signal_entry["tx_program"]}
+
     signal = {"freq"                : freq,
               "name"                : signal_entry["name"],
+              "agile"               : signal_entry["agile"],
+              "tx_parameters"       : tx_parameters,
               "reports"             : [new_report_entry],
               "display_metric_name" : display_metric,
               "timestamp_initial"   : report["sw_timestamp"],

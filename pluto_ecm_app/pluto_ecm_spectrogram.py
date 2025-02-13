@@ -34,6 +34,7 @@ class pluto_ecm_spectrogram:
     self.colors["trace_avg"]    = np.asarray([255, 32, 32])
     self.colors["trace_thresh"] = np.asarray([0, 128, 255])
     self.colors["state_colors"] = {"IDLE": np.asarray([0, 0, 0]), "SCAN": np.asarray([0, 32, 128]), "TX_LISTEN": np.asarray([0, 128, 32]), "TX_ACTIVE": np.asarray([255, 192, 32])}
+    self.colors["tx_active"]    = np.asarray([255, 128, 128])
 
   def get_spectrogram(self, peak_not_avg):
     if peak_not_avg:
@@ -70,10 +71,11 @@ class pluto_ecm_spectrogram:
     scaled_duration = dwell_data["channel_duration"][dwell_buffer.dwell_data_last_row_index]
     scaled_duration[scaled_duration == 0] = 1
 
-    input_row_avg     = np.divide(dwell_data["channel_accum"][dwell_buffer.dwell_data_last_row_index], scaled_duration)
-    input_row_peak    = dwell_data["channel_peak"][dwell_buffer.dwell_data_last_row_index].copy()
-    input_row_thresh  = self.dwell_trigger_thresholds[self.dwell_freq]
-    input_row_tag     = dwell_data["program_tag"][dwell_buffer.dwell_data_last_row_index]
+    input_row_avg       = np.divide(dwell_data["channel_accum"][dwell_buffer.dwell_data_last_row_index], scaled_duration)
+    input_row_peak      = dwell_data["channel_peak"][dwell_buffer.dwell_data_last_row_index].copy()
+    input_row_thresh    = self.dwell_trigger_thresholds[self.dwell_freq]
+    input_row_tag       = dwell_data["program_tag"][dwell_buffer.dwell_data_last_row_index]
+    input_row_tx_active = dwell_data["tx_active"][dwell_buffer.dwell_data_last_row_index]
 
     state_color = self.colors["state_colors"][self.program_tag_to_state[input_row_tag]]
 
@@ -92,6 +94,10 @@ class pluto_ecm_spectrogram:
 
       self.spec_main_avg[0, 0:self.output_col_width, :]   = state_color
       self.spec_main_peak[0, 0:self.output_col_width, :]  = state_color
+
+      if input_row_tx_active:
+        self.spec_main_avg[0, -self.output_col_width:-1, :]   = self.colors["tx_active"]
+        self.spec_main_peak[0, -self.output_col_width:-1, :]  = self.colors["tx_active"]
 
     power_floor = 10 ** (self.spec_trace_min_dB / 10)
     power_ceil  = 10 ** (self.spec_trace_max_dB / 10)

@@ -36,11 +36,16 @@ class pluto_ecm_ecm_controller:
     self.map_tag_to_state             = {0: "IDLE", 10: "SCAN", 20: "TX_LISTEN", 30: "TX_ACTIVE"}
     self.dwell_program_tag            = self.map_state_to_tag[self.state]
 
-    self.last_scan_seq_num            = -1
-    self.dwell_trigger_thresholds     = {}
-    self.dwell_trigger_offset_dB      = {}
-    self.dwell_trigger_hyst_dB        = {}
-    self.dwell_channel_freq           = {}
+    self.last_scan_seq_num              = -1
+    self.dwell_trigger_threshold_level  = {}
+    self.dwell_trigger_threshold_shift  = {}
+    self.dwell_trigger_offset_dB        = {}
+    self.dwell_trigger_hyst_dB          = {}
+    self.dwell_channel_freq             = {}
+    self.dwell_tx_enabled               = {}
+
+    self.signals_for_tx                 = []
+    self.tx_channels_active             = []
 
     for channel_index in range(ECM_NUM_CHANNELS):
       for dwell_index in range(len(sw_config.config["dwell_config"]["dwell_pattern"])):
@@ -54,10 +59,12 @@ class pluto_ecm_ecm_controller:
                                       "channel_freq": [freq_entry["freq"] + 1e-6 * (ADC_CLOCK_FREQUENCY / ECM_NUM_CHANNELS) * (channel_index - ECM_NUM_CHANNELS/2) for i in range(ECM_NUM_CHANNELS)]})
 
     for freq_entry in sw_config.config["dwell_config"]["dwell_freqs"]:
-      self.dwell_trigger_thresholds[freq_entry["freq"]] = [0xFFFFFFFF for i in range(ECM_NUM_CHANNELS)]
-      self.dwell_trigger_offset_dB[freq_entry["freq"]]  = [None for i in range(ECM_NUM_CHANNELS)]
-      self.dwell_trigger_hyst_dB[freq_entry["freq"]]    = [None for i in range(ECM_NUM_CHANNELS)]
-      self.dwell_channel_freq[freq_entry["freq"]]       = [freq_entry["freq"] + 1e-6 * (ADC_CLOCK_FREQUENCY / ECM_NUM_CHANNELS) * (i - ECM_NUM_CHANNELS/2) for i in range(ECM_NUM_CHANNELS)]
+      self.dwell_trigger_threshold_level[freq_entry["freq"]]  = [0xFFFFFFFF for i in range(ECM_NUM_CHANNELS)]
+      self.dwell_trigger_threshold_shift[freq_entry["freq"]]  = [1 for i in range(ECM_NUM_CHANNELS)]
+      self.dwell_trigger_offset_dB[freq_entry["freq"]]        = [None for i in range(ECM_NUM_CHANNELS)]
+      self.dwell_trigger_hyst_dB[freq_entry["freq"]]          = [None for i in range(ECM_NUM_CHANNELS)]
+      self.dwell_channel_freq[freq_entry["freq"]]             = [freq_entry["freq"] + 1e-6 * (ADC_CLOCK_FREQUENCY / ECM_NUM_CHANNELS) * (i - ECM_NUM_CHANNELS/2) for i in range(ECM_NUM_CHANNELS)]
+      self.dwell_tx_enabled[freq_entry["freq"]]               = freq_entry["tx_enabled"]
 
       for channel_index in range(ECM_NUM_CHANNELS):
         channel_freq = self.dwell_channel_freq[freq_entry["freq"]][channel_index]
@@ -154,7 +161,8 @@ class pluto_ecm_ecm_controller:
         self.logger.log(self.logger.LL_INFO, "[ecm_controller] submit_report: dropped, state={}".format(self.state))
 
   def on_sequencer_active(self):
-    self.hardware_active  = True
+    self.hardware_active = True
+    #TODO: write programs to hardware
     self.state_start_scan()
 
   def on_dwell_row_done(self):
@@ -167,16 +175,30 @@ class pluto_ecm_ecm_controller:
     self.state              = new_state
     self.dwell_program_tag  = self.map_state_to_tag[new_state]
 
-  def _submit_channel_threshold_trigger_listen_only(self, dwell_freq, channel_index, threshold, trigger_hyst_shift):
-    channel_entry = pluto_ecm_hw_dwell.ecm_channel_control_entry.channel_entry_trigger_threshold_listen_only(channel_index, threshold, trigger_hyst_shift)
+  def _submit_channel_threshold_trigger_listen_only(self, dwell_freq, channel_index, threshold_level, threshold_shift):
+    self.logger.log(self.logger.LL_INFO, "[ecm_controller] _submit_channel_threshold_trigger_listen_only: dwell_freq={} channel_index={} threshold_level={} threshold_shift={}".format(
+      dwell_freq, channel_index, threshold_level, threshold_shift))
+
+    channel_entry = pluto_ecm_hw_dwell.ecm_channel_control_entry.channel_entry_trigger_threshold_listen_only(channel_index, threshold_level, threshold_shift)
 
     for entry in self.dwell_channels:
-      if (entry["dwell_freq"] != freq) or (entry["channel_index"] != channel_index):
+      if (entry["dwell_freq"] != dwell_freq) or (entry["channel_index"] != channel_index):
         continue
       self.sequencer.submit_channel_entry(entry["dwell_index"], channel_index, channel_entry)
 
-  #def _submit_
+  def _submit_channel_threshold_trigger_with_tx(self, dwell_freq, channel_index, threshold_level, threshold_shift, tx_trigger_immediate_after_min, tx_instruction_index, tx_duration_min_minus_one, tx_duration_max_minus_one):
+    self.logger.log(self.logger.LL_INFO, "[ecm_controller] _submit_channel_threshold_trigger_with_tx: dwell_freq={} channel_index={} threshold_level={} threshold_shift={} tx_immediate={} tx_inst_index={} tx_duration_min={} tx_duration_max={}".format(
+      dwell_freq, channel_index, threshold_level, threshold_shift, tx_trigger_immediate_after_min, tx_instruction_index, tx_duration_min_minus_one, tx_duration_max_minus_one))
 
+    program_entries = [pluto_ecm_hw_dwell.ecm_channel_tx_program_entry(0, 0, 0, 0, 0) for i in range(ECM_NUM_CHANNEL_TX_PROGRAM_ENTRIES)]
+    program_entries[0] = pluto_ecm_hw_dwell.ecm_channel_tx_program_entry(1, tx_trigger_immediate_after_min, tx_instruction_index, tx_duration_min_minus_one, tx_duration_max_minus_one)
+
+    channel_entry = pluto_ecm_hw_dwell.ecm_channel_control_entry.channel_entry_trigger_threshold_tx(channel_index, threshold_level, threshold_shift, program_entries)
+
+    for entry in self.dwell_channels:
+      if (entry["dwell_freq"] != dwell_freq) or (entry["channel_index"] != channel_index):
+        continue
+      self.sequencer.submit_channel_entry(entry["dwell_index"], channel_index, channel_entry)
 
   def _get_hyst_shift(self, hyst_dB):
     hyst_factor = int(round(10**(hyst_dB/10)))
@@ -188,13 +210,13 @@ class pluto_ecm_ecm_controller:
 
     return hyst_shift
 
-  def _update_thresholds(self):
+  def _update_thresholds_from_scan(self):
     if self.last_scan_seq_num == self.analysis_thread.scan_seq_num:
       return
 
     self.last_scan_seq_num = self.analysis_thread.scan_seq_num
 
-    for dwell_freq in self.dwell_trigger_thresholds:
+    for dwell_freq in self.dwell_trigger_threshold_level:
       if dwell_freq not in self.analysis_thread.scan_results:
         continue
 
@@ -211,32 +233,67 @@ class pluto_ecm_ecm_controller:
         threshold_power       = int(round(channel_power * 10**(threshold_offset_dB/10)))
         threshold_hyst_shift  = self._get_hyst_shift(threshold_hyst_dB)
 
-        self.dwell_trigger_thresholds[dwell_freq][i] = threshold_power
+        self.dwell_trigger_threshold_level[dwell_freq][i] = threshold_power
+        self.dwell_trigger_threshold_shift[dwell_freq][i] = threshold_hyst_shift
         self._submit_channel_threshold_trigger_listen_only(dwell_freq, i, threshold_power, threshold_hyst_shift)
 
-  def _update_hardware_tx_active(self):
+  def _update_hardware_tx_active_start(self):
     #TODO: similar scheme to _update_thresholds -- wait for tx_listen seq num to change -- need to make sure next state is active, not scan
-    pass
-    ##for dwell_freq in self.dwell_trigger_thresholds:
-    ##  if dwell_freq not in self.analysis_thread.scan_results:
-    ##    continue
-    ##
-    ##  for i in range(ECM_NUM_CHANNELS):
-    ##    if (ECM_CHANNEL_MASK & (1 << i)) == 0:
-    ##      continue
-    ##
-    ##    if (self.dwell_trigger_offset_dB[dwell_freq][i] is None) or (self.dwell_trigger_hyst_dB[dwell_freq][i] is None):
-    ##      continue
-    ##
-    ##    threshold_offset_dB   = self.dwell_trigger_offset_dB[dwell_freq][i]
-    ##    threshold_hyst_dB     = self.dwell_trigger_hyst_dB[dwell_freq][i]
-    ##    channel_power         = self.analysis_thread.scan_results[dwell_freq]["summary_power_median"][i]
-    ##    threshold_power       = int(round(channel_power * 10**(threshold_offset_dB/10)))
-    ##    threshold_hyst_shift  = self._get_hyst_shift(threshold_hyst_dB)
-    ##
-    ##    self.dwell_trigger_thresholds[dwell_freq][i] = threshold_power
-    ##    self._submit_channel_threshold_trigger_listen_only(dwell_freq, i, threshold_power, threshold_hyst_shift)
 
+    self.tx_channels_active = []
+
+    for dwell_freq in self.dwell_trigger_threshold_level:
+      if not self.dwell_tx_enabled[dwell_freq]:
+        continue
+
+      for i in range(ECM_NUM_CHANNELS):
+        if (ECM_CHANNEL_MASK & (1 << i)) == 0:
+          continue
+
+        if (self.dwell_trigger_offset_dB[dwell_freq][i] is None) or (self.dwell_trigger_hyst_dB[dwell_freq][i] is None):
+          continue
+
+        channel_match = False
+        for signal_entry in self.signals_for_tx:
+          if signal_entry["agile"]:
+            if signal_entry["freq"] == dwell_freq:
+              channel_match = True
+              break
+          else:
+            if signal_entry["freq"] == self.dwell_channel_freq[dwell_freq][i]:
+              channel_match = True
+              break
+
+        if not channel_match:
+          continue
+
+        threshold_level = self.dwell_trigger_threshold_level[dwell_freq][i]
+        threshold_shift = self.dwell_trigger_threshold_shift[dwell_freq][i]
+
+        tx_parameters = signal_entry["tx_parameters"]
+        if len(tx_parameters["tx_program"]) == 0:
+          continue
+
+        trigger_duration_min_minus_one = min(tx_parameters["trigger_duration"][0] - 1, 4095) + 100
+        trigger_duration_max_minus_one = min(tx_parameters["trigger_duration"][1] - 1, 4095)
+
+        signal_entry["tx_enabled"]      = True
+        signal_entry["threshold_level"] = min(signal_entry["threshold_level"], threshold_level)
+        signal_entry["threshold_shift"] = max(signal_entry["threshold_shift"], threshold_shift)
+
+        tx_entry = {"dwell_freq": dwell_freq, "channel_index": i, "threshold_level": threshold_level, "threshold_shift": threshold_shift}
+        self.tx_channels_active.append(tx_entry)
+        self.logger.log(self.logger.LL_INFO, "[ecm_controller] _update_hardware_tx_active_start: channel enabled: {}".format(tx_entry))
+
+        self._submit_channel_threshold_trigger_with_tx(dwell_freq, i, threshold_level, threshold_shift,
+                                                       tx_parameters["immediate_tx"], self.tx_program_loader.tx_programs_by_name[tx_parameters["tx_program"]]["address"],
+                                                       trigger_duration_min_minus_one, trigger_duration_max_minus_one)
+
+  def _update_hardware_tx_active_end(self):
+    while len(self.tx_channels_active) > 0:
+      tx_entry = self.tx_channels_active.pop(0)
+      self.logger.log(self.logger.LL_INFO, "[ecm_controller] _update_hardware_tx_active_end: reverting channel: {}".format(tx_entry))
+      self._submit_channel_threshold_trigger_listen_only(tx_entry["dwell_freq"], tx_entry["channel_index"], tx_entry["threshold_level"], tx_entry["threshold_shift"])
 
   def _update_state(self):
     if self.state == "SCAN":
@@ -262,15 +319,11 @@ class pluto_ecm_ecm_controller:
 
     elif self.state == "TX_ACTIVE":
       if not self.tx_key_active:
+        self.signals_for_tx = []
+        self._update_hardware_tx_active_end()
         self.logger.log(self.logger.LL_INFO, "[ecm_controller] exiting tx_active - starting tx_listen")
         self.analysis_thread.submit_data({"command": "TX_ACTIVE_END", "timestamp": time.time()})
         self.state_start_tx_listen()
-
-      # if time elapsed -> back to scan
-      # if key pressed -> tx_active
-
-
-      pass
 
   def state_start_scan(self):
     self._set_new_state("SCAN")
@@ -283,14 +336,27 @@ class pluto_ecm_ecm_controller:
     self.analysis_thread.submit_data({"command": "TX_LISTEN_START", "timestamp": time.time()})
 
   def state_start_tx_active(self):
+    now = time.time()
+    self.signals_for_tx = []
+    for entry in self.analysis_thread.signals_confirmed:
+      tx_entry = {"name"            : entry["name"],
+                  "freq"            : entry["freq"],
+                  "agile"           : entry["agile"],
+                  "tx_parameters"   : entry["tx_parameters"],
+                  "tx_enabled"      : False,
+                  "threshold_level" : 0xFFFFFFFF,
+                  "threshold_shift" : 0,
+                  "timestamp"       : now}
+      self.signals_for_tx.append(tx_entry)
     self._set_new_state("TX_ACTIVE")
     self.start_time_tx_active = time.time()
     self.analysis_thread.submit_data({"command": "TX_ACTIVE_START", "timestamp": time.time()})
 
+    self._update_hardware_tx_active_start()
 
   def update(self):
     self._update_state()
-    self._update_thresholds()
+    self._update_thresholds_from_scan()
 
   def process_keystate(self, key_state):
     self.tx_key_active = key_state[pygame.K_TAB]

@@ -201,6 +201,8 @@ class pluto_ecm_analysis_processor:
     for entry in self.signal_tracker.confirmed_signals:
       copied_entry = {"freq"              : entry["freq"],
                       "name"              : entry["name"],
+                      "agile"             : entry["agile"],
+                      "tx_parameters"     : entry["tx_parameters"],
                       "stats"             : copy.deepcopy(entry["stats"]),
                       "timestamp_initial" : entry["timestamp_initial"],
                       "timestamp_final"   : entry["timestamp_final"],
@@ -211,6 +213,8 @@ class pluto_ecm_analysis_processor:
     for entry in self.signal_tracker.scan_signals:
       copied_entry = {"freq"              : entry["freq"],
                       "name"              : entry["name"],
+                      "agile"             : entry["agile"],
+                      "tx_parameters"     : entry["tx_parameters"],
                       "stats"             : copy.deepcopy(entry["stats"]),
                       "timestamp_initial" : entry["timestamp_initial"],
                       "timestamp_final"   : entry["timestamp_final"],

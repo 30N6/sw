@@ -177,6 +177,7 @@ class pluto_ecm_sequencer:
 #        self._process_pdw_report(entry["data"])
 
   def submit_channel_entry(self, dwell_index, channel_index, channel_entry):
+    self.logger.log(self.logger.LL_INFO, "[sequencer] submit_channel_entry: dwell_index={} channel_index={} entry={}".format(dwell_index, channel_index, channel_entry))
     self.channel_entry_write_queue.append({"dwell_index": dwell_index, "channel_index": channel_index, "channel_entry": channel_entry})
 
   def _flush_channel_entry_queue(self):
@@ -197,7 +198,8 @@ class pluto_ecm_sequencer:
         self.logger.log(self.logger.LL_WARN, "[sequencer] _process_dwell_reports_from_hw: dwell frequency mismatch: received={} expected={}".format(r["dwell_entry_frequency"], int(round(expected_dwell_data.frequency))))
       assert (r["dwell_entry_frequency"] == int(round(expected_dwell_data.frequency)))
 
-      self.logger.log(self.logger.LL_INFO, "[sequencer] _process_dwell_reports_from_hw: report received for frequency={} dwell_seq={}".format(expected_dwell_data.frequency, r["dwell_seq_num"]))
+      self.logger.log(self.logger.LL_INFO, "[sequencer] _process_dwell_reports_from_hw: report received for frequency={} dwell_seq={} -- report={}".format(expected_dwell_data.frequency, r["dwell_seq_num"], r))
+
       report = {"dwell_data": expected_dwell_data, "dwell_report": r, "first_in_sequence": expected_dwell_data.first_dwell, "last_in_sequence": expected_dwell_data.last_dwell}
       self.recorder.log({"dwell_report": report})
       self.dwell_active.pop(0)

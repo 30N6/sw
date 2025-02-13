@@ -5,10 +5,11 @@ from pluto_ecm_hw_pkg import *
 
 class render_signals:
 
-  def __init__(self, surface, sw_config, analysis_thread):
+  def __init__(self, surface, sw_config, analysis_thread, sequencer):
     self.surface          = surface
     self.sw_config        = sw_config
     self.analysis_thread  = analysis_thread
+    self.ecm_controller   = sequencer.ecm_controller
 
     self.colors = {}
     self.colors["border"]               = (0, 0, 255)
@@ -18,6 +19,7 @@ class render_signals:
     self.colors["signal_entry_active"]  = (0, 255, 0)
     self.colors["signal_entry_stale"]   = (64, 128, 64)
     self.colors["signal_entry_scan"]    = (0, 128, 192)
+    self.colors["signal_entry_tx"]      = (255, 64, 64)
     self.colors["emitter_histogram"]    = (192, 255, 0)
 
     self.font_main                      = pygame.font.SysFont('Consolas', 14)
@@ -25,7 +27,7 @@ class render_signals:
 
     self.rect_frame_signals_primary               = [640, 0,   384, 384]
     self.rect_frame_signals_secondary             = [640, 384, 384, 384]
-    self.rect_frame_cw_secondary                  = [1024,384, 256, 384]
+    self.rect_frame_signals_tx                    = [1024,432, 256, 336]
     self.rect_frame_signals_primary_details       = [640, 192, 384, 192]
     self.rect_frame_signals_primary_plot_frame    = [648, 200, 368, 96]
     self.rect_frame_signals_primary_plot_image    = [649, 201, 366, 94]
@@ -33,11 +35,13 @@ class render_signals:
     self.emitter_text_height            = 16
     self.emitter_stale_threshold        = 10
 
-    self.confirmed_signals              = []
-    self.scan_signals                   = []
+    self.signals_confirmed              = []
+    self.signals_scan                   = []
+    self.signals_tx                     = []
     self.last_update_time_confirmed     = 0
     self.max_rendered_signals_confirmed = 12
     self.max_rendered_signals_scan      = 20
+    self.max_rendered_signals_tx        = self.max_rendered_signals_confirmed
     self.selected_signal                = 0
 
     self.update_timeout_confirmed       = 1.0
@@ -45,7 +49,7 @@ class render_signals:
   def _render_confirmed_signal_list(self):
     emitter_entries = []
     index = 1
-    for entry in self.confirmed_signals:
+    for entry in self.signals_confirmed:
       if index > self.max_rendered_signals_confirmed:
         break
 
@@ -78,7 +82,7 @@ class render_signals:
       text_rect.bottom = self.rect_frame_signals_primary[1] + entry["pos_offset"][1]
       self.surface.blit(text_data, text_rect)
 
-    if len(self.confirmed_signals) > 0:
+    if len(self.signals_confirmed) > 0:
       sel_x = self.rect_frame_signals_primary[0] + 2
       sel_y = self.rect_frame_signals_primary[1] + 8 + self.emitter_text_height * self.selected_signal
       sel_wh = 8
@@ -91,7 +95,7 @@ class render_signals:
   def _render_scan_signal_list(self):
     emitter_entries = []
     index = 1
-    for entry in self.scan_signals:
+    for entry in self.signals_scan:
       if index > self.max_rendered_signals_scan:
         break
 
@@ -120,14 +124,41 @@ class render_signals:
       text_rect.bottom = self.rect_frame_signals_secondary[1] + entry["pos_offset"][1]
       self.surface.blit(text_data, text_rect)
 
+  def _render_tx_signal_list(self):
+    emitter_entries = []
+    index = 1
+    for entry in self.signals_tx:
+      if index > self.max_rendered_signals_tx:
+        break
+
+      signal_data   = entry["signal_data"]
+
+      threshold_dB  = 10*np.log10(signal_data["threshold_level"])
+      #signal_age    = min(99, round(entry["signal_age"]))
+      tx_enabled    = "T" if signal_data["tx_enabled"] else ""
+      emitter_color = self.colors["signal_entry_tx"]
+
+      s = "{:2} {:<10} {:6.1f} {:4.1f} {:>2} {}".format(index, signal_data["name"], signal_data["freq"], threshold_dB, signal_data["threshold_shift"], tx_enabled)
+      pos_offset = [8, 16 + self.emitter_text_height * (index - 1)]
+
+      emitter_entries.append({"str": s, "pos_offset": pos_offset, "color": emitter_color})
+      index += 1
+
+    for entry in emitter_entries:
+      text_data = self.font_main.render(entry["str"], True, entry["color"])
+      text_rect = text_data.get_rect()
+      text_rect.left = self.rect_frame_signals_tx[0] + entry["pos_offset"][0]
+      text_rect.bottom = self.rect_frame_signals_tx[1] + entry["pos_offset"][1]
+      self.surface.blit(text_data, text_rect)
+
   #def _render_pulsed_emitter_details(self):
   #  pygame.draw.rect(self.surface, self.colors["border"], self.rect_frame_signals_primary_details, 1)
   #  pygame.draw.rect(self.surface, self.colors["frame_elements"], self.rect_frame_signals_primary_plot_frame, 1)
   #
-  #  if len(self.confirmed_signals) < (self.selected_signal + 1):
+  #  if len(self.signals_confirmed) < (self.selected_signal + 1):
   #    return
   #
-  #  emitter = self.confirmed_signals[self.selected_signal]
+  #  emitter = self.signals_confirmed[self.selected_signal]
   #  hist_image, max_pri = emitter["histogram_pri"]
   #
   #  surf = pygame.surfarray.make_surface(hist_image)
@@ -259,63 +290,69 @@ class render_signals:
   #  for entry in emitter_entries:
   #    text_data = self.font_main.render(entry["str"], True, entry["color"])
   #    text_rect = text_data.get_rect()
-  #    text_rect.left = self.rect_frame_cw_secondary[0] + entry["pos_offset"][0]
-  #    text_rect.bottom = self.rect_frame_cw_secondary[1] + entry["pos_offset"][1]
+  #    text_rect.left = self.rect_frame_signals_tx[0] + entry["pos_offset"][0]
+  #    text_rect.bottom = self.rect_frame_signals_tx[1] + entry["pos_offset"][1]
   #    self.surface.blit(text_data, text_rect)
 
   def _clamp_selected_emitters(self):
     if self.selected_signal >= self.max_rendered_signals_confirmed:
       self.selected_signal = self.max_rendered_signals_confirmed - 1
-    if self.selected_signal >= len(self.confirmed_signals):
-      self.selected_signal = len(self.confirmed_signals) - 1
+    if self.selected_signal >= len(self.signals_confirmed):
+      self.selected_signal = len(self.signals_confirmed) - 1
     if self.selected_signal < 0:
       self.selected_signal = 0
 
   def render(self):
     pygame.draw.rect(self.surface, self.colors["border"], self.rect_frame_signals_primary, 1)
     pygame.draw.rect(self.surface, self.colors["border"], self.rect_frame_signals_secondary, 1)
-    pygame.draw.rect(self.surface, self.colors["border"], self.rect_frame_cw_secondary, 1)
+    pygame.draw.rect(self.surface, self.colors["border"], self.rect_frame_signals_tx, 1)
 
     self._render_confirmed_signal_list()
     self._render_scan_signal_list()
+    self._render_tx_signal_list()
     #self._render_pulsed_emitter_details()
 
 
   def update(self):
-    if len(self.analysis_thread.data_to_render) == 0:
-      return
-
     now = time.time()
 
     for entry in self.analysis_thread.data_to_render:
       if "confirmed_signals" in entry:
         self.last_update_time_confirmed = now
-        self.confirmed_signals = []
+        self.signals_confirmed = []
 
         for signal_data in entry["confirmed_signals"]:
           signal = {}
           signal["signal_data"]  = signal_data
           signal["signal_age"]   = now - signal_data["timestamp_initial"]
           signal["update_age"]   = now - signal_data["timestamp_final"]
-          self.confirmed_signals.append(signal)
+          self.signals_confirmed.append(signal)
 
       elif "scan_signals" in entry:
-        self.scan_signals = []
+        self.signals_scan = []
         for signal_data in entry["scan_signals"]:
           signal = {}
           signal["signal_data"]  = signal_data
           signal["signal_age"]   = now - signal_data["timestamp_initial"]
           signal["update_age"]   = now - signal_data["timestamp_final"]
-          self.scan_signals.append(signal)
+          self.signals_scan.append(signal)
 
       else:
         raise RuntimeError("unexpected data")
 
+    self.signals_tx = []
+    for signal_data in self.ecm_controller.signals_for_tx:
+      signal = {}
+      signal["signal_data"] = signal_data
+      signal["signal_age"] = now - signal_data["timestamp"]
+      self.signals_tx.append(signal)
+
     if (now - self.last_update_time_confirmed) > self.update_timeout_confirmed:
-      self.confirmed_signals = []
+      self.signals_confirmed = []
 
     self.analysis_thread.data_to_render = []
-    self.confirmed_signals.sort(key=lambda entry: entry["signal_data"]["stats"]["power_mean"], reverse=True)
+    self.signals_confirmed.sort(key=lambda entry: entry["signal_data"]["stats"]["power_mean"], reverse=True)
+    self.signals_tx.sort(key=lambda entry: entry["signal_data"]["freq"], reverse=False)
 
     self._clamp_selected_emitters()
 
