@@ -25,7 +25,7 @@ class pluto_ecm_ecm_controller:
     self.start_time_tx_listen         = 0
     self.start_time_tx_active         = 0
     self.duration_scan                = 2
-    self.duration_tx_listen           = 5
+    self.duration_tx_listen           = 50 #TODO: config
 
     self.forced_triggers_per_cycle    = 8   #TODO: config
     self.prev_pending_forced_triggers = []
@@ -192,7 +192,6 @@ class pluto_ecm_ecm_controller:
 
     program_entries = [pluto_ecm_hw_dwell.ecm_channel_tx_program_entry(0, 0, 0, 0, 0) for i in range(ECM_NUM_CHANNEL_TX_PROGRAM_ENTRIES)]
     program_entries[0] = pluto_ecm_hw_dwell.ecm_channel_tx_program_entry(1, tx_trigger_immediate_after_min, tx_instruction_index, tx_duration_min_minus_one, tx_duration_max_minus_one)
-
     channel_entry = pluto_ecm_hw_dwell.ecm_channel_control_entry.channel_entry_trigger_threshold_tx(channel_index, threshold_level, threshold_shift, program_entries)
 
     for entry in self.dwell_channels:
@@ -274,7 +273,7 @@ class pluto_ecm_ecm_controller:
         if len(tx_parameters["tx_program"]) == 0:
           continue
 
-        trigger_duration_min_minus_one = min(tx_parameters["trigger_duration"][0] - 1, 4095) + 100
+        trigger_duration_min_minus_one = min(tx_parameters["trigger_duration"][0] - 1, 4095)
         trigger_duration_max_minus_one = min(tx_parameters["trigger_duration"][1] - 1, 4095)
 
         signal_entry["tx_enabled"]      = True

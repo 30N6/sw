@@ -92,11 +92,12 @@ PACKED_ECM_DWELL_ENTRY  = struct.Struct("<" + PACKED_UINT8 + PACKED_UINT8 + PACK
 
 PACKED_ECM_CHANNEL_CONTROL_ENTRY_HEADER = struct.Struct("<" + PACKED_UINT8 + PACKED_UINT8 + PACKED_UINT16 + #enable, trigger_mode, trigger_duration_max_minus_one
                                                               PACKED_UINT32 +                               #trigger_threshold
-                                                              PACKED_UINT8 + PACKED_UINT8 + PACKED_UINT16 + #trigger_hyst_shift, drfm_gain, recording_address
-                                                              "xxxx")
+                                                              PACKED_UINT8 + PACKED_UINT8 + PACKED_UINT16   #trigger_hyst_shift, drfm_gain, recording_address
+                                                              )
 
 PACKED_ECM_CHANNEL_TX_PROGRAM_ENTRY     = struct.Struct("<" + PACKED_UINT8 + PACKED_UINT8 + PACKED_UINT16 + #valid, trigger_immediate_after_min, tx_instruction_index
                                                               PACKED_UINT16 + PACKED_UINT16)                #duration_gate_min_minus_one, duration_gate_max_minus_one
+PACKED_ECM_CHANNEL_CONTROL_ENTRY_PADDING = struct.Struct("<" + "xxxx")
 
 PACKED_ECM_TX_INSTRUCTION_HEADER              = struct.Struct("<" + PACKED_UINT16)
 PACKED_ECM_TX_INSTRUCTION_DDS_SETUP_BPSK      = struct.Struct("<" + PACKED_UINT16 + PACKED_UINT16 + "xxxx")

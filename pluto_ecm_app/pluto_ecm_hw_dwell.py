@@ -146,6 +146,7 @@ class ecm_channel_control_entry:
                                                                self.fields["trigger_hyst_shift"], self.fields["drfm_gain"], self.fields["recording_addr"])
     for i in range(ECM_NUM_CHANNEL_TX_PROGRAM_ENTRIES):
       packed_data += self.fields["program_entries"][i].pack()
+    packed_data += PACKED_ECM_CHANNEL_CONTROL_ENTRY_PADDING.pack()
     return packed_data
 
   def __str__(self):

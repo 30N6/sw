@@ -67,9 +67,9 @@ class pluto_ecm_modulation_analysis:
       return r
 
     except Exception:
-      print(traceback.format_exc())
-
-    return {}
+      s = traceback.format_exc()
+      print(s)
+      return {"exception": s}
 
     #print("FSK: {:.3f} {:.1f}".format(fsk_r_squared, fsk_freq_spread))
     #print("FSK: {} {}".format(fsk_r_squared, fsk_freq_spread))
@@ -105,6 +105,9 @@ class pluto_ecm_modulation_analysis:
     loc_b, props = sp.signal.find_peaks(iq_dechirped_fft, height=(self.lora_peak_threshold * np.max(iq_dechirped_fft)))
 
     peak_count_ratio = loc_a.size / loc_b.size
+
+    if loc_a.size < 2:
+      return 0, 0
 
     if loc_b.size > 1:
       peak_spacing_ratio = np.mean(np.diff(loc_a)) / np.mean(np.diff(loc_b))

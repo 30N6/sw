@@ -51,8 +51,7 @@ class pluto_ecm_hw_dwell_reporter:
     report["dwell_entry_frequency"]               = unpacked_header[10]
 
     report["dwell_entry_measurement_duration"]    = unpacked_header[12]
-    report["dwell_entry_total_duration_max"]      = unpacked_header[13] & 0x7FFFFFFF
-    report["dwell_tx_active"]                     = (unpacked_header[13] & 0x80000000) != 0
+    report["dwell_entry_total_duration_max"]      = unpacked_header[13]
     report["dwell_min_trigger_duration"]          = unpacked_header[14]
 
     report["dwell_seq_num"]                       = unpacked_header[15]
@@ -61,7 +60,8 @@ class pluto_ecm_hw_dwell_reporter:
     report["global_counter"]                      = unpacked_header[16]
 
     report["actual_measurement_duration"]         = unpacked_header[18]
-    report["actual_total_duration"]               = unpacked_header[19]
+    report["actual_total_duration"]               = unpacked_header[19] & 0x7FFFFFFF
+    report["dwell_tx_active"]                     = (unpacked_header[19] & 0x80000000) != 0
     report["ts_dwell_start"]                      = (unpacked_header[20] << 32) | unpacked_header[21]
 
     report["channel_data"] = [{"cycles": 1, "accum": 0, "max": 0} for i in range(ECM_NUM_CHANNELS)]

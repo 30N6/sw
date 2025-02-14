@@ -181,6 +181,9 @@ class pluto_ecm_analysis_processor:
         break
       result = self.pool_results[0].get()
 
+      if "sw_timestamp" not in result:
+        print("result: {}".format(result))
+
       self.signal_tracker.submit_analysis_report(result)
       self.signal_processing_delay = time.time() - result["sw_timestamp"]
       #if (result["controller_state"] == "SCAN"):
