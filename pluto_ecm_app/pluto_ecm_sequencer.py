@@ -91,6 +91,7 @@ class pluto_ecm_sequencer:
     self.initial_hw_dwells_sent         = False
     self.initial_hw_dwells_loaded       = False
 
+    self.hw_tx_instruction_pending      = []
     self.hw_channel_entry_pending       = []
     self.hw_dwell_entry_pending         = []
     self.hw_dwell_program_pending       = []
@@ -108,6 +109,7 @@ class pluto_ecm_sequencer:
     self.dwell_entries                    = []
     self.initial_channel_entries_by_dwell = []
     self.channel_entry_write_queue        = []
+    self.tx_program_write_queue           = []
 
     self.report_merge_queue_dwell_summary = []
     self.report_merge_queue_drfm_summary  = {}
@@ -180,6 +182,9 @@ class pluto_ecm_sequencer:
     self.logger.log(self.logger.LL_INFO, "[sequencer] submit_channel_entry: dwell_index={} channel_index={} entry={}".format(dwell_index, channel_index, channel_entry))
     self.channel_entry_write_queue.append({"dwell_index": dwell_index, "channel_index": channel_index, "channel_entry": channel_entry})
 
+  def submit_tx_program(self, entry):
+    self.tx_program_write_queue.append(entry)
+
   def _flush_channel_entry_queue(self):
     if len(self.channel_entry_write_queue) > 0:
       self.logger.log(self.logger.LL_INFO, "[sequencer] _flush_channel_entry_queue: num_entries={}".format(len(self.channel_entry_write_queue)))
@@ -187,6 +192,18 @@ class pluto_ecm_sequencer:
     while len(self.channel_entry_write_queue) > 0:
       entry = self.channel_entry_write_queue.pop(0)
       self._send_hw_channel_entry(entry["dwell_index"], entry["channel_index"], entry["channel_entry"])
+
+  def _flush_tx_program_queue(self):
+    if len(self.tx_program_write_queue) > 0:
+      self.logger.log(self.logger.LL_INFO, "[sequencer] _flush_tx_program_queue: num_entries={}".format(len(self.tx_program_write_queue)))
+
+    while len(self.tx_program_write_queue) > 0:
+      entry = self.tx_program_write_queue.pop(0)
+      base_addr = entry["address"]
+      instruction_data = entry["instructions"]
+      for i in range(len(instruction_data)):
+        instruction_addr = base_addr + i
+        self._send_hw_tx_instruction(instruction_addr, instruction_data[i])
 
   def _process_dwell_reports_from_hw(self):
     while len(self.hw_interface.hwdr.output_data_dwell) > 0:
@@ -361,6 +378,11 @@ class pluto_ecm_sequencer:
       self.hw_dwell_entry_pending.append(key)
       self.logger.log(self.logger.LL_INFO, "[sequencer] sending initial hw dwell: uk={} dwell_index={} hw_dwell_entry={}".format(key, entry.dwell_index, entry.hw_dwell_entry))
 
+  def _send_hw_tx_instruction(self, addr, data):
+    key = self.dwell_ctrl_interface.send_tx_instruction(addr, data)
+    self.hw_tx_instruction_pending.append(key)
+    self.logger.log(self.logger.LL_INFO, "[sequencer] sending hw tx instruction: uk={} addr={} data={:016X}".format(key, addr, data))
+
   def _send_hw_channel_entry(self, dwell_index, channel_index, channel_entry):
     key = self.dwell_ctrl_interface.send_channel_entry(dwell_index, channel_index, channel_entry)
     self.hw_channel_entry_pending.append(key)
@@ -400,6 +422,16 @@ class pluto_ecm_sequencer:
       self.logger.log(self.logger.LL_INFO, "[sequencer] pending hw dwell entry acknowledged -- uk={}".format(k))
     return len(keys_found)
 
+  def _check_pending_hw_tx_instructions(self):
+    keys_found = []
+    for k in self.hw_tx_instruction_pending:
+      if self.hw_interface.hwcp.try_get_result(k) is not None:
+        keys_found.append(k)
+    for k in keys_found:
+      self.hw_tx_instruction_pending.remove(k)
+      self.logger.log(self.logger.LL_INFO, "[sequencer] pending hw tx instruction acknowledged -- uk={}".format(k))
+    return len(keys_found)
+
   def _check_pending_hw_channel_entries(self):
     keys_found = []
     for k in self.hw_channel_entry_pending:
@@ -431,6 +463,7 @@ class pluto_ecm_sequencer:
     return len(keys_found)
 
   def _update_hw_dwells(self):
+    self._check_pending_hw_tx_instructions()
     self._check_pending_hw_channel_entries()
     self._check_pending_hw_dwells()
 
@@ -489,6 +522,7 @@ class pluto_ecm_sequencer:
 
         #do channel entry updates -- new thresholds, etc.
         self._flush_channel_entry_queue()
+        self._flush_tx_program_queue()
 
         dwell_program = self._compute_next_dwell_program(self.ecm_controller.dwell_program_tag)
         self._send_hw_dwell_program(dwell_program)

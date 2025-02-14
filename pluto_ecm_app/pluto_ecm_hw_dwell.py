@@ -220,6 +220,7 @@ class ecm_dwell_controller:
     self.dwells_by_index          = {}
     self.dwells_by_tag            = {}
     self.channel_entries_by_index = {}
+    self.tx_instructions_by_addr  = {}
 
   def send_dwell_program(self, dwell_program):
     self.current_dwell_program = dwell_program
@@ -235,3 +236,7 @@ class ecm_dwell_controller:
 
     self.channel_entries_by_index[full_channel_index] = channel_entry
     return self.config_writer.send_module_data(ECM_MODULE_ID_DWELL_CONTROLLER, ECM_CONTROL_MESSAGE_TYPE_DWELL_CHANNEL_CONTROL, full_channel_index, channel_entry.pack(), True)
+
+  def send_tx_instruction(self, addr, data):
+    self.tx_instructions_by_addr[addr] = data
+    return self.config_writer.send_module_data(ECM_MODULE_ID_DWELL_CONTROLLER, ECM_CONTROL_MESSAGE_TYPE_DWELL_TX_INSTRUCTION, addr, PACKED_ECM_TX_INSTRUCTION.pack(data), True)

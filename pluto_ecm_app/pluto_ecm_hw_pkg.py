@@ -60,7 +60,7 @@ ECM_CHANNEL_TRIGGER_MODE_FORCE_TRIGGER          = 1
 ECM_CHANNEL_TRIGGER_MODE_THRESHOLD_TRIGGER      = 2
 ECM_NUM_CHANNEL_TX_PROGRAM_ENTRIES              = 4
 
-ECM_DRFM_MEM_DEPTH                              = 1024 * 24
+ECM_DRFM_MEM_DEPTH                              = 1024 * 6  #TODO: 24k
 ECM_DRFM_MAX_PACKET_IQ_SAMPLES_PER_REPORT       = 116
 ECM_DRFM_SEGMENT_HYST_SHIFT_WIDTH               = 4 #TODO: better name
 
@@ -99,6 +99,7 @@ PACKED_ECM_CHANNEL_TX_PROGRAM_ENTRY     = struct.Struct("<" + PACKED_UINT8 + PAC
                                                               PACKED_UINT16 + PACKED_UINT16)                #duration_gate_min_minus_one, duration_gate_max_minus_one
 PACKED_ECM_CHANNEL_CONTROL_ENTRY_PADDING = struct.Struct("<" + "xxxx")
 
+PACKED_ECM_TX_INSTRUCTION                     = struct.Struct("<" + PACKED_UINT64)
 PACKED_ECM_TX_INSTRUCTION_HEADER              = struct.Struct("<" + PACKED_UINT16)
 PACKED_ECM_TX_INSTRUCTION_DDS_SETUP_BPSK      = struct.Struct("<" + PACKED_UINT16 + PACKED_UINT16 + "xxxx")
 PACKED_ECM_TX_INSTRUCTION_DDS_SETUP_CW_SWEEP  = struct.Struct("<" + PACKED_UINT16 + PACKED_UINT16 + PACKED_UINT16 + PACKED_UINT16)

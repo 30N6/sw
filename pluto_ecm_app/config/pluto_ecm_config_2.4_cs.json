@@ -15,7 +15,7 @@
   "tx_config": {
     "signals": [
       {"name": "DJI-RC",    "freq_range": [2400, 2500], "trigger_duration": [256, 9999], "threshold_dB": 15, "threshold_hyst_dB": 6,   "immediate_tx": 1, "trigger_modulation": "dji-rc",    "agile": 1, "tx_program": ""},
-      {"name": "ELRS-LoRa", "freq_range": [2400, 2500], "trigger_duration": [256, 9999], "threshold_dB": 15, "threshold_hyst_dB": 12,  "immediate_tx": 1, "trigger_modulation": "elrs-lora", "agile": 1, "tx_program": "tx_program_elrs_lora.json"},
+      {"name": "ELRS-LoRa", "freq_range": [2400, 2500], "trigger_duration": [256, 9999], "threshold_dB": 15, "threshold_hyst_dB": 12,  "immediate_tx": 0, "trigger_modulation": "elrs-lora", "agile": 1, "tx_program": "tx_program_elrs_lora.json"},
       {"name": "ELRS-FLRC", "freq_range": [2400, 2500], "trigger_duration": [256, 9999], "threshold_dB": 15, "threshold_hyst_dB": 12,  "immediate_tx": 1, "trigger_modulation": "elrs-bfsk", "agile": 1, "tx_program": ""},
       {"name": "vid-CVBS",  "freq_range": [5600, 5950], "trigger_duration": [256, 9999], "threshold_dB": 15, "threshold_hyst_dB": 9,   "immediate_tx": 0, "trigger_modulation": "cvbs",      "agile": 0, "tx_program": ""},
       {"name": "ARSR",      "freq_range": [1200, 1400], "trigger_duration": [250,  600],  "threshold_dB": 15, "threshold_hyst_dB": 9,   "immediate_tx": 0, "trigger_modulation": "lfm",       "agile": 0, "tx_program": ""},

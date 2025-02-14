@@ -85,6 +85,11 @@ class pluto_ecm_ecm_controller:
         self.dwell_trigger_offset_dB[freq_entry["freq"]][channel_index] = min_threshold
         self.dwell_trigger_hyst_dB[freq_entry["freq"]][channel_index] = max_hyst
 
+  def _write_tx_programs_to_hw(self):
+    for name, entry in self.tx_program_loader.tx_programs_by_name.items():
+      self.logger.log(self.logger.LL_INFO, "[ecm_controller] sending tx program: name={} address={}".format(name, entry["address"]))
+      self.sequencer.submit_tx_program(entry)
+
   def _clear_prev_forced_triggers(self):
     for entry in self.prev_pending_forced_triggers:
       #self.logger.log(self.logger.LL_INFO, "[ecm_controller] _send_next_forced_triggers: clearing {}/{}".format(entry["dwell_index"], entry["channel_index"]))
@@ -162,7 +167,7 @@ class pluto_ecm_ecm_controller:
 
   def on_sequencer_active(self):
     self.hardware_active = True
-    #TODO: write programs to hardware
+    self._write_tx_programs_to_hw()
     self.state_start_scan()
 
   def on_dwell_row_done(self):
