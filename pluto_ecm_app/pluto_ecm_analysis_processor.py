@@ -290,4 +290,5 @@ class pluto_ecm_analysis_processor:
       print(traceback.format_exc())
 
   def shutdown(self, reason):
+    self.process_pool.close()
     self.recorder.shutdown(reason)
