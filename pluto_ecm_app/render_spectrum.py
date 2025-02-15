@@ -92,8 +92,8 @@ class render_spectrum:
     #px_per_dwell  = math.ceil(self.dwell_bw / mhz_per_px)
 
     # calibration status
-    for i in range(len(self.sequencer.fast_lock_cal_state)):
-      cal_state = self.sequencer.fast_lock_cal_state[i]
+    for i in range(len(self.sequencer.fast_lock_manager.fast_lock_cal_state)):
+      cal_state = self.sequencer.fast_lock_manager.fast_lock_cal_state[i]
       dwell_rect = [self.freq_coords[i] - self.dwell_pane_width/2, self.rect_dwell_display[1], self.dwell_pane_width, self.rect_dwell_display[3] * self.dwell_cal_height]
 
       if not cal_state.fast_lock_profile_valid:

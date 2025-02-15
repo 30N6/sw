@@ -8,19 +8,28 @@ import multiprocessing
 from multiprocessing import Process, Queue
 
 class hw_command:
-  CMD_WRITE_ATTR_PHY      = 0
-  CMD_WRITE_ATTR_RX_LO    = 1
-  CMD_WRITE_ATTR_DBG      = 2
-  CMD_READ_ATTR_PHY       = 3
-  CMD_READ_ATTR_RX_LO     = 4
-  CMD_WRITE_DMA_H2D       = 5
-  CMD_READ_ATTR_9361_TEMP = 6
-  CMD_READ_ATTR_FPGA_TEMP = 7
+  CMD_WRITE_ATTR_RX_PHY   = 0
+  CMD_WRITE_ATTR_TX_PHY   = 1
+  CMD_WRITE_ATTR_RX_LO    = 2
+  CMD_WRITE_ATTR_TX_LO    = 3
+  CMD_WRITE_ATTR_DBG      = 4
+  CMD_READ_ATTR_RX_PHY    = 5
+  CMD_READ_ATTR_TX_PHY    = 6
+  CMD_READ_ATTR_RX_LO     = 7
+  CMD_READ_ATTR_TX_LO     = 8
+  CMD_WRITE_DMA_H2D       = 9
+  CMD_READ_ATTR_9361_TEMP = 10
+  CMD_READ_ATTR_FPGA_TEMP = 11
   CMD_STOP                = 99
 
   @staticmethod
-  def gen_write_attr_phy(unique_key, attr, data):
-    cmd = {"unique_key": unique_key, "command_type": hw_command.CMD_WRITE_ATTR_PHY, "attr": attr, "data": data}
+  def gen_write_attr_rx_phy(unique_key, attr, data):
+    cmd = {"unique_key": unique_key, "command_type": hw_command.CMD_WRITE_ATTR_RX_PHY, "attr": attr, "data": data}
+    return cmd
+
+  @staticmethod
+  def gen_write_attr_tx_phy(unique_key, attr, data):
+    cmd = {"unique_key": unique_key, "command_type": hw_command.CMD_WRITE_ATTR_TX_PHY, "attr": attr, "data": data}
     return cmd
 
   @staticmethod
@@ -28,16 +37,28 @@ class hw_command:
     return {"unique_key": unique_key, "command_type": hw_command.CMD_WRITE_ATTR_RX_LO, "attr": attr, "data": data}
 
   @staticmethod
+  def gen_write_attr_tx_lo(unique_key, attr, data):
+    return {"unique_key": unique_key, "command_type": hw_command.CMD_WRITE_ATTR_TX_LO, "attr": attr, "data": data}
+
+  @staticmethod
   def gen_write_attr_dbg(unique_key, attr, data):
     return {"unique_key": unique_key, "command_type": hw_command.CMD_WRITE_ATTR_DBG, "attr": attr, "data": data}
 
   @staticmethod
-  def gen_read_attr_phy(unique_key, attr):
-    return {"unique_key": unique_key, "command_type": hw_command.CMD_READ_ATTR_PHY, "attr": attr, "data": None}
+  def gen_read_attr_rx_phy(unique_key, attr):
+    return {"unique_key": unique_key, "command_type": hw_command.CMD_READ_ATTR_RX_PHY, "attr": attr, "data": None}
+
+  @staticmethod
+  def gen_read_attr_rx_phy(unique_key, attr):
+    return {"unique_key": unique_key, "command_type": hw_command.CMD_READ_ATTR_TX_PHY, "attr": attr, "data": None}
 
   @staticmethod
   def gen_read_attr_rx_lo(unique_key, attr):
     return {"unique_key": unique_key, "command_type": hw_command.CMD_READ_ATTR_RX_LO, "attr": attr, "data": None}
+
+  @staticmethod
+  def gen_read_attr_tx_lo(unique_key, attr):
+    return {"unique_key": unique_key, "command_type": hw_command.CMD_READ_ATTR_TX_LO, "attr": attr, "data": None}
 
   @staticmethod
   def gen_write_dma(unique_key, data):
@@ -81,8 +102,10 @@ class pluto_ecm_hw_command_processor_thread:
     self.dev_ad9361         = self.context.find_device("ad9361-phy")
     self.dev_xadc           = self.context.find_device("xadc")
     self.chan_dma_h2d       = self.dev_h2d.find_channel("voltage0", True)
-    self.chan_ad9361_phy    = self.dev_ad9361.find_channel("voltage0", False)
+    self.chan_ad9361_rx_phy = self.dev_ad9361.find_channel("voltage0", False)
+    self.chan_ad9361_tx_phy = self.dev_ad9361.find_channel("voltage0", True)
     self.chan_ad9361_rx_lo  = self.dev_ad9361.find_channel("altvoltage0", True)
+    self.chan_ad9361_tx_lo  = self.dev_ad9361.find_channel("altvoltage1", True)
     self.chan_ad9361_temp   = self.dev_ad9361.find_channel("temp0", False)
     self.chan_xadc_temp     = self.dev_xadc.find_channel("temp0", False)
 
@@ -91,7 +114,8 @@ class pluto_ecm_hw_command_processor_thread:
 
     self.dma_writer = pluto_ecm_hw_dma_writer(self.logger, self.chan_dma_h2d)
 
-    self.logger.log(self.logger.LL_INFO, "init: queues={}/{} context={} dma_h2d={} phy={} rx_lo={}, current_process={}".format(self.request_queue, self.result_queue, self.context, self.chan_dma_h2d, self.chan_ad9361_phy, self.chan_ad9361_rx_lo, multiprocessing.current_process()))
+    self.logger.log(self.logger.LL_INFO, "init: queues={}/{} context={} dma_h2d={} rx_phy={} tx_phy={} rx_lo={} tx_lo={}, current_process={}".format(
+      self.request_queue, self.result_queue, self.context, self.chan_dma_h2d, self.chan_ad9361_rx_phy, self.chan_ad9361_tx_phy, self.chan_ad9361_rx_lo, self.chan_ad9361_tx_lo, multiprocessing.current_process()))
 
   def run(self):
     running = True
@@ -100,30 +124,50 @@ class pluto_ecm_hw_command_processor_thread:
       cmd = self.request_queue.get()
       t_start = time.time()
       self.logger.log(self.logger.LL_DEBUG, "command_start")
-      if cmd["command_type"] == hw_command.CMD_WRITE_ATTR_PHY:
-        self.chan_ad9361_phy.attrs[cmd["attr"]].value = cmd["data"]
+      if cmd["command_type"] == hw_command.CMD_WRITE_ATTR_RX_PHY:
+        self.chan_ad9361_rx_phy.attrs[cmd["attr"]].value = cmd["data"]
         self.result_queue.put({"unique_key": cmd["unique_key"], "data": None}, block=False)
-        self.logger.log(self.logger.LL_DEBUG, "write phy[{}]={}: uk={}".format(cmd["attr"], cmd["data"], cmd["unique_key"]))
+        self.logger.log(self.logger.LL_DEBUG, "write rx_phy[{}]={}: uk={}".format(cmd["attr"], cmd["data"], cmd["unique_key"]))
+
+      elif cmd["command_type"] == hw_command.CMD_WRITE_ATTR_TX_PHY:
+        self.chan_ad9361_tx_phy.attrs[cmd["attr"]].value = cmd["data"]
+        self.result_queue.put({"unique_key": cmd["unique_key"], "data": None}, block=False)
+        self.logger.log(self.logger.LL_DEBUG, "write tx_phy[{}]={}: uk={}".format(cmd["attr"], cmd["data"], cmd["unique_key"]))
 
       elif cmd["command_type"] == hw_command.CMD_WRITE_ATTR_RX_LO:
         self.chan_ad9361_rx_lo.attrs[cmd["attr"]].value = cmd["data"]
         self.result_queue.put({"unique_key": cmd["unique_key"], "data": None}, block=False)
         self.logger.log(self.logger.LL_DEBUG, "write rx_lo[{}]={}: uk={}".format(cmd["attr"], cmd["data"], cmd["unique_key"]))
 
+      elif cmd["command_type"] == hw_command.CMD_WRITE_ATTR_TX_LO:
+        self.chan_ad9361_tx_lo.attrs[cmd["attr"]].value = cmd["data"]
+        self.result_queue.put({"unique_key": cmd["unique_key"], "data": None}, block=False)
+        self.logger.log(self.logger.LL_DEBUG, "write tx_lo[{}]={}: uk={}".format(cmd["attr"], cmd["data"], cmd["unique_key"]))
+
       elif cmd["command_type"] == hw_command.CMD_WRITE_ATTR_DBG:
         self.dev_ad9361.debug_attrs[cmd["attr"]].value = cmd["data"]
         self.result_queue.put({"unique_key": cmd["unique_key"], "data": None}, block=False)
         self.logger.log(self.logger.LL_DEBUG, "write dbg[{}]={}: uk={}".format(cmd["attr"], cmd["data"], cmd["unique_key"]))
 
-      elif cmd["command_type"] == hw_command.CMD_READ_ATTR_PHY:
-        data = self.chan_ad9361_phy.attrs[cmd["attr"]].value
+      elif cmd["command_type"] == hw_command.CMD_READ_ATTR_RX_PHY:
+        data = self.chan_ad9361_rx_phy.attrs[cmd["attr"]].value
         self.result_queue.put({"unique_key": cmd["unique_key"], "data": data}, block=False)
-        self.logger.log(self.logger.LL_DEBUG, "read phy[{}]={}: uk={}".format(cmd["attr"], data, cmd["unique_key"]))
+        self.logger.log(self.logger.LL_DEBUG, "read rx_phy[{}]={}: uk={}".format(cmd["attr"], data, cmd["unique_key"]))
+
+      elif cmd["command_type"] == hw_command.CMD_READ_ATTR_TX_PHY:
+        data = self.chan_ad9361_tx_phy.attrs[cmd["attr"]].value
+        self.result_queue.put({"unique_key": cmd["unique_key"], "data": data}, block=False)
+        self.logger.log(self.logger.LL_DEBUG, "read tx_phy[{}]={}: uk={}".format(cmd["attr"], data, cmd["unique_key"]))
 
       elif cmd["command_type"] == hw_command.CMD_READ_ATTR_RX_LO:
         data = self.chan_ad9361_rx_lo.attrs[cmd["attr"]].value
         self.result_queue.put({"unique_key": cmd["unique_key"], "data": data}, block=False)
         self.logger.log(self.logger.LL_DEBUG, "read rx_lo[{}]={}: uk={}".format(cmd["attr"], data, cmd["unique_key"]))
+
+      elif cmd["command_type"] == hw_command.CMD_READ_ATTR_TX_LO:
+        data = self.chan_ad9361_tx_lo.attrs[cmd["attr"]].value
+        self.result_queue.put({"unique_key": cmd["unique_key"], "data": data}, block=False)
+        self.logger.log(self.logger.LL_DEBUG, "read tx_lo[{}]={}: uk={}".format(cmd["attr"], data, cmd["unique_key"]))
 
       elif cmd["command_type"] == hw_command.CMD_WRITE_DMA_H2D:
         self.dma_writer.write(cmd["data"])
@@ -145,7 +189,7 @@ class pluto_ecm_hw_command_processor_thread:
         running = False
 
       else:
-        raise RuntimeError("invalid command")
+        raise RuntimeError("invalid command: {}".format(cmd["command_type"]))
         running = False
 
       self.logger.log(self.logger.LL_DEBUG, "command_end: diff={}".format(time.time() - t_start))
@@ -291,8 +335,6 @@ class pluto_ecm_hw_interface:
 
     self.logger.log(self.logger.LL_INFO, "[hwi] init done, hwcp={} hwdr={}".format(self.hwcp, self.hwdr))
 
-    self.fast_lock_cal_pending  = []
-
     self.temp_update_interval   = 5.0
     self.temp_last_update_time  = 0
     self.temp_commands_pending  = {}
@@ -305,7 +347,7 @@ class pluto_ecm_hw_interface:
     self.hw_cfg.send_enables(0, 0, 1)
 
   def _initial_ad9361_setup(self):
-    attributes_phy      = [("bb_dc_offset_tracking_en",  "1"),
+    attributes_rx_phy   = [("bb_dc_offset_tracking_en",  "1"),
                            ("filter_fir_en",             "0"),
                            ("gain_control_mode",         "manual"),
                            ("hardwaregain",              "60"), #60
@@ -314,10 +356,21 @@ class pluto_ecm_hw_interface:
                            ("rf_dc_offset_tracking_en",  "1"),
                            ("bb_dc_offset_tracking_en",  "1"),
                            ("sampling_frequency",        "61440000")]
-    attributes_dev_dbg  = [("adi,rx-fastlock-pincontrol-enable", "1")]
 
-    for entry in attributes_phy:
-      cmd = hw_command.gen_write_attr_phy(self.hwcp.get_next_unique_key(), entry[0], entry[1])
+    attributes_tx_phy   = [("filter_fir_en",             "0"),
+                           ("hardwaregain",              "0"),
+                           ("rf_bandwidth",              "56000000"),
+                           ("sampling_frequency",        "61440000")]
+
+    attributes_dev_dbg  = [("adi,rx-fastlock-pincontrol-enable", "1"),
+                           ("adi,tx-fastlock-pincontrol-enable", "1")]
+
+    for entry in attributes_rx_phy:
+      cmd = hw_command.gen_write_attr_rx_phy(self.hwcp.get_next_unique_key(), entry[0], entry[1])
+      self.hwcp.send_command(cmd, False)
+
+    for entry in attributes_tx_phy:
+      cmd = hw_command.gen_write_attr_tx_phy(self.hwcp.get_next_unique_key(), entry[0], entry[1])
       self.hwcp.send_command(cmd, False)
 
     for entry in attributes_dev_dbg:
@@ -367,43 +420,6 @@ class pluto_ecm_hw_interface:
 
   def enable_hw(self):
     self.hw_cfg.send_enables(255, 255, 255)
-
-  #TODO: move this to the sequencer? at least move the cal pending stuff
-  def send_fast_lock_cal_cmd(self, frequency):
-    self.logger.log(self.logger.LL_INFO, "[hwi] send_fast_lock_cal_cmd: freq={}".format(frequency))
-
-    cmd = []
-    cmd.append(hw_command.gen_write_attr_rx_lo(self.hwcp.get_next_unique_key(), "frequency", str(int(frequency * 1e6))))
-    cmd.append(hw_command.gen_write_attr_rx_lo(self.hwcp.get_next_unique_key(), "fastlock_store", "0"))
-    cmd.append(hw_command.gen_read_attr_rx_lo(self.hwcp.get_next_unique_key(), "fastlock_save"))
-
-    self.fast_lock_cal_pending.append({"freq": frequency, "keys": [c["unique_key"] for c in cmd]})
-
-    for entry in cmd:
-      self.hwcp.send_command(entry, True)
-
-  def check_fast_lock_cal_results(self):
-    assert (len(self.fast_lock_cal_pending) > 0)
-    cmd_result = self.hwcp.try_get_result(self.fast_lock_cal_pending[0]["keys"][0])
-
-    if cmd_result is not None:
-      finished_key = self.fast_lock_cal_pending[0]["keys"].pop(0)
-      assert (cmd_result["unique_key"] == finished_key)
-      if len(self.fast_lock_cal_pending[0]["keys"]) == 0:
-        freq = self.fast_lock_cal_pending[0]["freq"]
-        self.fast_lock_cal_pending.pop(0)
-        return {"freq": freq, "data": cmd_result["data"]}
-
-    return None
-
-  def send_fast_lock_profile(self, profile_index, profile_data):
-    modified_data = "{} {}".format(profile_index, profile_data.split(" ")[1])
-    cmd = hw_command.gen_write_attr_rx_lo(self.hwcp.get_next_unique_key(), "fastlock_load", modified_data)
-    return self.hwcp.send_command(cmd, True)
-
-  def send_fastlock_recall(self, value):
-    cmd = hw_command.gen_write_attr_rx_lo(self.hwcp.get_next_unique_key(), "fastlock_recall", value)
-    return self.hwcp.send_command(cmd, True)
 
   def update(self):
     self._update_temp()

@@ -9,6 +9,7 @@ import pluto_ecm_hw_dwell_reporter
 import pluto_ecm_hw_drfm_reporter
 import pluto_ecm_dwell_stats_buffer
 import pluto_ecm_ecm_controller
+import pluto_ecm_fast_lock_manager
 
 class dwell_data:
   def __init__(self, dwell_index, next_dwell_index, is_first, is_last, freq_entry):
@@ -45,21 +46,6 @@ class dwell_data:
   def __repr__(self):
     return self.__str__()
 
-class fast_lock_cal_state:
-  def __init__(self, freq, fast_lock_profile_index):
-    self.frequency                  = freq
-    self.fast_lock_profile_index    = fast_lock_profile_index
-    self.fast_lock_profile_valid    = False
-    self.fast_lock_profile_updated  = False
-    self.fast_lock_profile_data     = []
-    self.fast_lock_profile_time     = 0
-
-  def __str__(self):
-    return "[fast_lock_cal_state: {} : {} {} {}]".format(self.frequency, self.fast_lock_profile_index, self.fast_lock_profile_valid, self.fast_lock_profile_data)
-  def __repr__(self):
-    return self.__str__()
-
-
 class pluto_ecm_sequencer:
 
   def __init__(self, logger, recorder, sw_config, hw_interface, analysis_thread, sim_loader):
@@ -75,18 +61,11 @@ class pluto_ecm_sequencer:
     self.hw_stats                       = pluto_ecm_hw_stats.pluto_ecm_hw_stats(logger)
     self.ecm_controller                 = pluto_ecm_ecm_controller.pluto_ecm_ecm_controller(logger, sw_config, self, analysis_thread)
     self.analysis_thread                = analysis_thread
+    self.fast_lock_manager              = pluto_ecm_fast_lock_manager.pluto_ecm_fast_lock_manager(logger, sw_config, hw_interface)
 
     self.state                          = "FLUSH"
     self.flush_start_time               = time.time()
     self.flush_delay                    = 1.5
-
-    self.fast_lock_recal_interval       = sw_config.config["fast_lock_config"]["recalibration_interval"]
-    self.fast_lock_recal_pause          = sw_config.config["fast_lock_config"]["recalibration_pause"]
-    self.fast_lock_cal_pending          = []
-    self.fast_lock_last_cal_time        = None
-    self.fast_lock_initial_cal_sent     = False
-    self.fast_lock_initial_cal_done     = False
-    self.current_fast_lock_profiles     = {}
 
     self.initial_hw_dwells_sent         = False
     self.initial_hw_dwells_loaded       = False
@@ -95,7 +74,6 @@ class pluto_ecm_sequencer:
     self.hw_channel_entry_pending       = []
     self.hw_dwell_entry_pending         = []
     self.hw_dwell_program_pending       = []
-    self.fast_lock_load_pending         = []
 
     self.dwell_state                    = "IDLE"
     self.dwell_active                   = []
@@ -104,7 +82,6 @@ class pluto_ecm_sequencer:
     self.dwell_history                  = {}
     self.dwell_rows_to_render           = []
 
-    self.fast_lock_cal_state              = []
     self.dwell_freqs                      = []
     self.dwell_entries                    = []
     self.initial_channel_entries_by_dwell = []
@@ -119,10 +96,6 @@ class pluto_ecm_sequencer:
       assert (entry["index"] == len(self.dwell_freqs))
       self.dwell_freqs.append(entry["freq"])
       self.logger.log(self.logger.LL_INFO, "[sequencer] dwell_freqs: added {}".format(self.dwell_freqs[-1]))
-
-    for entry in sw_config.config["dwell_config"]["dwell_freqs"]:
-      self.fast_lock_cal_state.append(fast_lock_cal_state(entry["freq"], entry["index"]))
-      self.logger.log(self.logger.LL_INFO, "[sequencer] fast_lock_cal_state: added {}".format(self.fast_lock_cal_state[-1]))
 
     total_time_meas = 0
     for dwell_index in range(len(sw_config.config["dwell_config"]["dwell_pattern"])):
@@ -304,69 +277,6 @@ class pluto_ecm_sequencer:
 
     self._process_merged_reports()
 
-  #TODO: cal stuff into separate class
-  def _get_oldest_cal(self):
-    oldest_entry = self.fast_lock_cal_state[0]
-    for entry in self.fast_lock_cal_state:
-      if (not entry.fast_lock_profile_valid) or (entry.fast_lock_profile_time < oldest_entry.fast_lock_profile_time):
-        oldest_entry = entry
-    return oldest_entry
-
-  def _get_cal_by_freq(self, freq):
-    for entry in self.fast_lock_cal_state:
-      if entry.frequency == freq:
-        return entry
-    raise RuntimeError("failed to find cal frequency")
-
-  def _update_fast_lock_cal(self):
-    if self.state in ("FLUSH", "IDLE", "SIM"):
-      return
-
-    now = time.time()
-
-    #TODO: break out into two functions
-
-    if not self.fast_lock_initial_cal_sent:
-      for freq in self.dwell_freqs:
-        self.fast_lock_cal_pending.append(freq)
-        self.logger.log(self.logger.LL_INFO, "[sequencer] requesting initial fast lock cal for freq={}".format(freq))
-        self.hw_interface.send_fast_lock_cal_cmd(freq)
-
-      self.fast_lock_initial_cal_sent = True
-      self.logger.log(self.logger.LL_INFO, "[sequencer] initial cal sent")
-
-    if len(self.fast_lock_cal_pending) == 0:
-      if (now - self.fast_lock_last_cal_time) < self.fast_lock_recal_pause:
-        return
-
-      oldest_cal = self._get_oldest_cal()
-      if oldest_cal.fast_lock_profile_valid and ((now - oldest_cal.fast_lock_profile_time) < self.fast_lock_recal_interval):
-        return
-
-      self.fast_lock_cal_pending.append(oldest_cal.frequency)
-      self.logger.log(self.logger.LL_INFO, "[sequencer] requesting fast lock cal for freq={}: prior_valid={} prior_age={}".format(
-        oldest_cal.frequency, oldest_cal.fast_lock_profile_valid, (now - oldest_cal.fast_lock_profile_time)))
-      self.hw_interface.send_fast_lock_cal_cmd(oldest_cal.frequency)
-
-    else:
-      cal_results = self.hw_interface.check_fast_lock_cal_results()
-      if cal_results is None:
-        return
-
-      assert (cal_results["freq"] == self.fast_lock_cal_pending[0])
-      self.fast_lock_cal_pending.pop(0)
-      cal_state = self._get_cal_by_freq(cal_results["freq"])
-      cal_state.fast_lock_profile_valid   = True
-      cal_state.fast_lock_profile_updated = True
-      cal_state.fast_lock_profile_time    = now
-      cal_state.fast_lock_profile_data    = cal_results["data"]
-      self.fast_lock_last_cal_time        = now
-      self.logger.log(self.logger.LL_INFO, "[sequencer] received fast lock cal data for freq={}: {}".format(cal_results["freq"], cal_state.fast_lock_profile_data))
-
-      if not self.fast_lock_initial_cal_done:
-        if all([d.fast_lock_profile_valid for d in self.fast_lock_cal_state]):
-          self.fast_lock_initial_cal_done = True
-
   def _send_initial_hw_channel_entries(self):
     for dwell_index in range(len(self.initial_channel_entries_by_dwell)):
       for channel_index in range(ECM_NUM_CHANNELS):
@@ -392,24 +302,6 @@ class pluto_ecm_sequencer:
     key = self.dwell_ctrl_interface.send_dwell_program(dwell_program)
     self.hw_dwell_program_pending.append(key)
     self.logger.log(self.logger.LL_INFO, "[sequencer] sending dwell program: uk={} dwell_program={}".format(key, dwell_program))
-
-  def _send_fast_lock_profile(self, profile_index, profile_data, force):
-    if ((profile_index in self.current_fast_lock_profiles) and (self.current_fast_lock_profiles[profile_index] == profile_data) and (not force)):
-      self.logger.log(self.logger.LL_INFO, "[sequencer] skipping fast lock profile, already loaded: index={}".format(profile_index))
-      return False
-
-    self.current_fast_lock_profiles[profile_index] = profile_data
-    key = self.hw_interface.send_fast_lock_profile(profile_index, profile_data)
-    self.fast_lock_load_pending.append(key)
-    self.logger.log(self.logger.LL_INFO, "[sequencer] sending fast lock profile: index={} uk={}".format(profile_index, key))
-    return True
-
-  def _set_fast_lock_recall(self):
-    cmd = pluto_ecm_hw_interface.hw_command.gen_write_attr_dbg(self.hw_interface.hwcp.get_next_unique_key(), "adi,rx-fastlock-pincontrol-enable", "1")
-    self.hw_interface.hwcp.send_command(cmd, False)
-    key = self.hw_interface.send_fastlock_recall("0")
-    self.fast_lock_load_pending.append(key)
-    self.logger.log(self.logger.LL_INFO, "[sequencer] fastlock_recall=0")
 
   #TODO: use a generic function to reduce code duplication
   def _check_pending_hw_dwells(self):
@@ -452,16 +344,6 @@ class pluto_ecm_sequencer:
       self.logger.log(self.logger.LL_INFO, "[sequencer] pending hw dwell program acknowledged -- uk={}".format(k))
     return len(keys_found)
 
-  def _check_pending_fast_lock_profiles(self):
-    keys_found = []
-    for k in self.fast_lock_load_pending:
-      if self.hw_interface.hwcp.try_get_result(k) is not None:
-        keys_found.append(k)
-    for k in keys_found:
-      self.fast_lock_load_pending.remove(k)
-      self.logger.log(self.logger.LL_INFO, "[sequencer] pending fast lock profile acknowledged -- uk={}".format(k))
-    return len(keys_found)
-
   def _update_hw_dwells(self):
     self._check_pending_hw_tx_instructions()
     self._check_pending_hw_channel_entries()
@@ -488,24 +370,14 @@ class pluto_ecm_sequencer:
       self.dwell_active.append(dwell_entry)
       self.logger.log(self.logger.LL_INFO, "[sequencer] _activate_next_dwells: preparing to start new dwell: {}".format(dwell_entry))
 
-    force_fast_lock_update = False
-    for cal_entry in self.fast_lock_cal_state:
-      force_fast_lock_update |= cal_entry.fast_lock_profile_updated
-      cal_entry.fast_lock_profile_updated = False
-
-    fast_lock_profile_sent = False
-    for cal_entry in self.fast_lock_cal_state:
-      fast_lock_profile_sent |= self._send_fast_lock_profile(cal_entry.fast_lock_profile_index, cal_entry.fast_lock_profile_data, force_fast_lock_update)
-
-    if fast_lock_profile_sent:
-      self._set_fast_lock_recall()
+    self.fast_lock_manager.on_active_next_dwells()
 
   def _update_scan_dwells(self):
     if self.state != "ACTIVE":
       self.dwell_state = "IDLE"
       return
 
-    self._check_pending_fast_lock_profiles()
+    #self._check_pending_fast_lock_profiles() #TODO: remove
     self._check_pending_hw_dwell_programs()
 
     if self.dwell_state == "IDLE":
@@ -517,7 +389,7 @@ class pluto_ecm_sequencer:
 
     if self.dwell_state == "LOAD_PROFILES":
       assert (len(self.dwell_active) > 0)
-      if len(self.fast_lock_load_pending) == 0:
+      if len(self.fast_lock_manager.fast_lock_load_pending) == 0:
         self.dwell_state = "SEND_PROGRAM"
 
         #do channel entry updates -- new thresholds, etc.
@@ -559,7 +431,7 @@ class pluto_ecm_sequencer:
         else:
           self.state = "INITIAL_CAL"
       elif self.state == "INITIAL_CAL":
-        if self.fast_lock_initial_cal_done:
+        if self.fast_lock_manager.fast_lock_initial_cal_done:
           self.state = "LOAD_HW_DWELLS"
       elif self.state == "LOAD_HW_DWELLS":
         if self.initial_hw_dwells_loaded:
@@ -571,11 +443,13 @@ class pluto_ecm_sequencer:
         pass
 
       self._update_data_from_hw()
-      self._update_fast_lock_cal()
       self._update_hw_dwells()
       self._update_scan_dwells()
       self.hw_stats.update()
       self.ecm_controller.update()
+
+      if self.state not in ("FLUSH", "IDLE", "SIM"):
+        self.fast_lock_manager.update()
 
   def process_keystate(self, key_state):
     self.ecm_controller.process_keystate(key_state)
