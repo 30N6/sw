@@ -104,10 +104,13 @@ class pluto_ecm_modulation_analysis:
     loc_a, props = sp.signal.find_peaks(iq_padded_fft_abs, height=(self.lora_peak_threshold * np.max(iq_padded_fft_abs)))
     loc_b, props = sp.signal.find_peaks(iq_dechirped_fft, height=(self.lora_peak_threshold * np.max(iq_dechirped_fft)))
 
-    peak_count_ratio = loc_a.size / loc_b.size
-
     if loc_a.size < 2:
       return 0, 0
+
+    if loc_b.size > 0:
+      peak_count_ratio = loc_a.size / loc_b.size
+    else:
+      peak_count_ratio = 0
 
     if loc_b.size > 1:
       peak_spacing_ratio = np.mean(np.diff(loc_a)) / np.mean(np.diff(loc_b))
