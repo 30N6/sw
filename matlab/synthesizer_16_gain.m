@@ -86,8 +86,10 @@ y_f = 5.5*sqrt(x_f) - 2.75;
 plot(results_num_channels, results_iq_gain, 'o', results_num_channels, results_amp_gain, 'o', x_f, y_f);
 grid on;
 
-%figure(101);
-%plot(results_num_channels, sqrt(results_iq_gain), 'o', results_num_channels, sqrt(results_amp_gain), 'o');
+figure(101);
+plot(results_num_channels, 1./results_iq_gain, 'o', results_num_channels, 1./results_amp_gain, 'o', x_f, 1./y_f, x_f,  2.^-ceil(log2(y_f)), 'o');
+grid on;
+
 
 
 function plot_analysis_data(L, d)
