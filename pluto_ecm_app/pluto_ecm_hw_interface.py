@@ -100,6 +100,7 @@ class pluto_ecm_hw_command_processor_thread:
     self.context            = iio.Context(arg["pluto_uri"])
     self.dev_h2d            = self.context.find_device("axi-iio-dma-h2d")
     self.dev_ad9361         = self.context.find_device("ad9361-phy")
+    self.dev_dac_core       = self.context.find_device("cf-ad9361-dds-core-lpc")
     self.dev_xadc           = self.context.find_device("xadc")
     self.chan_dma_h2d       = self.dev_h2d.find_channel("voltage0", True)
     self.chan_ad9361_rx_phy = self.dev_ad9361.find_channel("voltage0", False)
@@ -109,6 +110,8 @@ class pluto_ecm_hw_command_processor_thread:
     self.chan_ad9361_temp   = self.dev_ad9361.find_channel("temp0", False)
     self.chan_xadc_temp     = self.dev_xadc.find_channel("temp0", False)
 
+    self.dev_dac_core.reg_write(0x418, 2) #ADI_REG_CHAN_CNTRL_7 - channel 0 (I0)
+    self.dev_dac_core.reg_write(0x458, 2) #ADI_REG_CHAN_CNTRL_7 - channel 1 (Q0)
     self.chan_dma_h2d.enabled = True
     self.context.set_timeout(1000)
 
