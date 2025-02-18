@@ -110,8 +110,10 @@ class pluto_ecm_hw_command_processor_thread:
     self.chan_ad9361_temp   = self.dev_ad9361.find_channel("temp0", False)
     self.chan_xadc_temp     = self.dev_xadc.find_channel("temp0", False)
 
+    #select the DMA input as the data source for the DAC
     self.dev_dac_core.reg_write(0x418, 2) #ADI_REG_CHAN_CNTRL_7 - channel 0 (I0)
     self.dev_dac_core.reg_write(0x458, 2) #ADI_REG_CHAN_CNTRL_7 - channel 1 (Q0)
+
     self.chan_dma_h2d.enabled = True
     self.context.set_timeout(1000)
 

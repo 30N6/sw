@@ -106,12 +106,17 @@ class pluto_ecm_ecm_controller:
       next_channel_index  = self.dwell_channels[self.scan_forced_trigger_index]["channel_index"]
       next_entry          = pluto_ecm_hw_dwell.ecm_channel_control_entry.channel_entry_trigger_forced(next_channel_index)
 
-      #self.logger.log(self.logger.LL_INFO, "[ecm_controller] _send_next_forced_triggers: next_index={}; forcing {}/{}".format(self.scan_forced_trigger_index, next_dwell_index, next_channel_index))
+      self.logger.log(self.logger.LL_INFO, "[ecm_controller] _send_next_forced_triggers: next_index={}; forcing {}/{}".format(self.scan_forced_trigger_index, next_dwell_index, next_channel_index))
       self.sequencer.submit_channel_entry(next_dwell_index, next_channel_index, next_entry)
 
       self.scan_pending_forced_triggers.append({"dwell_index": next_dwell_index, "channel_index": next_channel_index, "expected_bytes": next_entry.fields["trigger_duration_max_minus_one"] + 1})
       self.prev_pending_forced_triggers.append({"dwell_index": next_dwell_index, "channel_index": next_channel_index})
       self.scan_forced_trigger_index = (self.scan_forced_trigger_index + 1) % len(self.dwell_channels)
+
+    ##2425.0, 'channel_freq': 2401.96
+    #self._submit_channel_threshold_trigger_with_tx(2425.0, 2, 10000, 3,
+    #                                               1, self.tx_program_loader.tx_programs_by_name["tx_program_elrs_test_1.json"]["address"],
+    #                                               100, 4000)
 
   def submit_report(self, merged_report):
     #self.logger.log(self.logger.LL_INFO, "[ecm_controller] submit_report: {}".format(merged_report))

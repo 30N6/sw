@@ -231,5 +231,6 @@ class pluto_ecm_signal_tracker:
              "duration_max"         : np.max(duration),
              "duration_std"         : np.std(duration),
              "display_metric_mean"  : np.mean(disp_metric),
-             "report_count"         : len(entry["reports"])}
+             "report_count"         : len(entry["reports"]),
+             "last_analysis"        : entry["reports"][-1]["analysis"]}
     return stats

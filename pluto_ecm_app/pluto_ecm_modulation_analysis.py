@@ -9,6 +9,8 @@ class pluto_ecm_modulation_analysis:
     self.fs = ADC_CLOCK_FREQUENCY / (ECM_NUM_CHANNELS / CHANNELIZER_OVERSAMPLING)
     self.dt = 1/self.fs
 
+    self.stft_length = 16
+
     self.lora_num_chunks        = config["analysis_config"]["modulation_analysis"]["elrs-lora"]["parameters"]["lora_num_chunks"]
     self.lora_peak_threshold    = config["analysis_config"]["modulation_analysis"]["elrs-lora"]["parameters"]["lora_peak_threshold"]
     self.cvbs_xcorr_window_inc  = config["analysis_config"]["modulation_analysis"]["cvbs"]["parameters"]["cvbs_xcorr_window_inc"]
@@ -38,6 +40,7 @@ class pluto_ecm_modulation_analysis:
       iq_padded_fft     = np.abs(np.fft.fftshift(np.fft.fft(iq_data_padded)))
       iq_padded_fft_abs = np.abs(iq_padded_fft)
       iq_power          = np.square(np.real(iq_data)) + np.square(np.imag(iq_data))
+      iq_stft           = self._get_stft(iq_data)
 
       r = report.copy()
       r.pop("iq_data")
@@ -52,6 +55,7 @@ class pluto_ecm_modulation_analysis:
       analysis["lfm_r_squared"], analysis["lfm_slope"] = self._analyze_lfm(iq_freq, iq_freq_mean)
       analysis["cvbs_xcorr_1"], analysis["cvbs_xcorr_2"] = self._analyze_cvbs(iq_padded_fft)
       analysis["iq_length"] = report["iq_length"]
+      analysis["iq_stft_abs"] = iq_stft
 
       r["analysis"] = analysis
 
@@ -73,6 +77,14 @@ class pluto_ecm_modulation_analysis:
 
     #print("FSK: {:.3f} {:.1f}".format(fsk_r_squared, fsk_freq_spread))
     #print("FSK: {} {}".format(fsk_r_squared, fsk_freq_spread))
+
+  def _get_stft(self, iq_data):
+    num_ffts = int(iq_data.size // self.stft_length)
+
+    iq_stft = np.empty((num_ffts, self.stft_length), dtype=np.complex64)
+    for i in range(num_ffts):
+      iq_stft[i] = np.fft.fftshift(np.fft.fft(iq_data[i*self.stft_length : (i+1)*self.stft_length]))
+    return np.abs(iq_stft)
 
   def _get_fft_stats(self, iq_padded_fft_abs):
     f = np.arange(-iq_padded_fft_abs.size/2, iq_padded_fft_abs.size/2) * self.fs / iq_padded_fft_abs.size

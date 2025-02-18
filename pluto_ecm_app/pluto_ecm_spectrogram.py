@@ -49,7 +49,10 @@ class pluto_ecm_spectrogram:
     assert (data.shape[0] == data.size)
     data[np.isnan(data)] = 0
     row_max = np.max(data)
-    row_scaled = np.divide(data, row_max)
+    if row_max != 0:
+      row_scaled = np.divide(data, row_max)
+    else:
+      row_scaled = data
     return np.sqrt(row_scaled)
 
     #assert (data.shape[0] == data.size)

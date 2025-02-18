@@ -2,6 +2,7 @@ import pygame
 import time
 import numpy as np
 from pluto_ecm_hw_pkg import *
+import turbo_colormap
 
 class render_signals:
 
@@ -151,14 +152,27 @@ class render_signals:
       text_rect.bottom = self.rect_frame_signals_tx[1] + entry["pos_offset"][1]
       self.surface.blit(text_data, text_rect)
 
-  #def _render_pulsed_emitter_details(self):
-  #  pygame.draw.rect(self.surface, self.colors["border"], self.rect_frame_signals_primary_details, 1)
-  #  pygame.draw.rect(self.surface, self.colors["frame_elements"], self.rect_frame_signals_primary_plot_frame, 1)
-  #
-  #  if len(self.signals_confirmed) < (self.selected_signal + 1):
-  #    return
-  #
-  #  emitter = self.signals_confirmed[self.selected_signal]
+  def _render_confirmed_details(self):
+    pygame.draw.rect(self.surface, self.colors["border"], self.rect_frame_signals_primary_details, 1)
+    pygame.draw.rect(self.surface, self.colors["frame_elements"], self.rect_frame_signals_primary_plot_frame, 1)
+
+    if len(self.signals_confirmed) < (self.selected_signal + 1):
+      return
+
+    signal        = self.signals_confirmed[self.selected_signal]
+    signal_data   = signal["signal_data"]
+    stats         = signal_data["stats"]
+    last_analysis = stats["last_analysis"]
+    stft_data     = last_analysis["iq_stft_abs"]
+
+    stft_max = np.max(stft_data)
+    if stft_max != 0:
+      stft_data = stft_data / stft_max
+
+    surf_original = pygame.surfarray.make_surface(turbo_colormap.interpolate_color(stft_data))
+    surf_scaled   = pygame.transform.scale(surf_original, (self.rect_frame_signals_primary_plot_image[2], self.rect_frame_signals_primary_plot_image[3]))
+    self.surface.blit(surf_scaled, self.rect_frame_signals_primary_plot_image)
+
   #  hist_image, max_pri = emitter["histogram_pri"]
   #
   #  surf = pygame.surfarray.make_surface(hist_image)
@@ -308,10 +322,9 @@ class render_signals:
     pygame.draw.rect(self.surface, self.colors["border"], self.rect_frame_signals_tx, 1)
 
     self._render_confirmed_signal_list()
+    self._render_confirmed_details()
     self._render_scan_signal_list()
     self._render_tx_signal_list()
-    #self._render_pulsed_emitter_details()
-
 
   def update(self):
     now = time.time()

@@ -189,7 +189,10 @@ class pluto_ecm_analysis_processor:
       #if (result["controller_state"] == "SCAN"):
       #  print("pool result ready at {}: {}".format(time.time(), result))
 
-      self.recorder.log(result)
+      result_for_logging = result.copy()
+      result_for_logging["analysis"] = result["analysis"].copy()
+      result_for_logging["analysis"].pop("iq_stft_abs")
+      self.recorder.log(result_for_logging)
       self.pool_results.pop(0)
 
   def _copy_tracked_signals(self):
