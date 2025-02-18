@@ -98,8 +98,12 @@ class pluto_ecm_analysis_processor:
     self.iq_stats_count += 1
     self.iq_stats_samples += len(data["iq_data"])
 
-    result = self.process_pool.apply_async(self.mod_analysis.process_iq_data, (data,))
-    self.pool_results.append(result)
+    try:
+      result = self.process_pool.apply_async(self.mod_analysis.process_iq_data, (data,))
+      self.pool_results.append(result)
+    except Exception as e:
+      self.logger.log(self.logger.LL_WARN, "_process_report_for_iq: exception: {}".format(e))
+      self.logger.flush()
 
   @staticmethod
   def _iq_to_complex(data):
@@ -293,8 +297,9 @@ class pluto_ecm_analysis_processor:
       print(traceback.format_exc())
 
   def shutdown(self, reason):
-    self.logger.log(self.logger.LL_INFO, "[pluto_ecm_analysis_processor]: shutdown started")
+    self.logger.log(self.logger.LL_INFO, "[pluto_ecm_analysis_processor]: shutdown started - reason={}".format(reason))
     self.process_pool.terminate()
+    self.process_pool.join()
     self.recorder.shutdown(reason)
     self.logger.log(self.logger.LL_INFO, "[pluto_ecm_analysis_processor]: shutdown complete")
     self.logger.flush()

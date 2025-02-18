@@ -6,9 +6,7 @@ import multiprocessing
 from multiprocessing import Process, Queue
 import traceback
 import copy
-
-import cProfile, pstats, io
-from pstats import SortKey
+import signal
 
 class pluto_ecm_analysis_thread:
 
@@ -27,48 +25,69 @@ class pluto_ecm_analysis_thread:
   def run(self):
     running = True
 
-    #self.pr = cProfile.Profile()
-
-    while running:
-      #read off data from the queue before calling update() - helps ensure a clean shutdown
-      while not self.input_queue.empty():
-        data = self.input_queue.get()
-        if isinstance(data, dict):
-          #self.logger.log(self.logger.LL_DEBUG, data)
-          self.processor.submit_data(data)
-        else:
-          if data == "CMD_STOP":
-            self.logger.log(self.logger.LL_INFO, "CMD_STOP")
-            running = False
+  #except KeyboardInterrupt:
+  #  main_thread.shutdown()
+  #except Exception as e:
+  #  print("Exception: {}".format(e))
+  #  print(traceback.format_exc())
+  #
+  #processes = multiprocessing.active_children()
+  #for child in processes:
+  #  print("pluto_ecm_app: terminating child process {}".format(child))
+  #  child.terminate()
+    try:
+      while running:
+        #read off data from the queue before calling update() - helps ensure a clean shutdown
+        while not self.input_queue.empty():
+          data = self.input_queue.get()
+          if isinstance(data, dict):
+            self.logger.log(self.logger.LL_INFO, "{}".format(data.keys()))
+            self.logger.flush()
+            #self.logger.log(self.logger.LL_DEBUG, data)
+            self.processor.submit_data(data)
           else:
-            raise RuntimeError("invalid command")
-            running = False
+            if data == "CMD_STOP":
+              self.logger.log(self.logger.LL_INFO, "CMD_STOP")
+              self.logger.flush()
+              running = False
+            else:
+              raise RuntimeError("invalid command")
+              running = False
 
-      #self.pr.enable()
-      self.processor.update()
-      self._send_tracked_signals()
+        self.processor.update()
+        self._send_tracked_signals()
 
-      #self.pr.disable()
-      #s = io.StringIO()
-      #sortby = SortKey.CUMULATIVE
-      #ps = pstats.Stats(self.pr, stream=s).sort_stats(sortby)
-      #ps.print_stats()
-      #print(s.getvalue())
-
-    self.shutdown("graceful exit")
+      self.shutdown("graceful exit")
+    except Exception as e:
+      self.logger.log(self.logger.LL_INFO, "Exception: {}".format(e))
+      self.logger.log(self.logger.LL_INFO, "Traceback: {}".format(traceback.format_exc()))
+      self.logger.flush()
+      self.shutdown("exception")
 
   def shutdown(self, reason):
     self.processor.shutdown(reason)
     self.logger.shutdown(reason)
 
+analysis_thread = 0
 
 def pluto_ecm_analysis_thread_func(arg):
-  thread = pluto_ecm_analysis_thread(arg)
-  try:
-    thread.run()
-  except KeyboardInterrupt:
-    thread.shutdown("interrupted")
+  global analysis_thread
 
+  analysis_thread = pluto_ecm_analysis_thread(arg)
+
+  #signal.signal(signal.SIGINT, pluto_ecm_analysis_thread_sig_handler)
+  signal.signal(signal.SIGTERM, pluto_ecm_analysis_thread_sig_handler)
+
+  try:
+    analysis_thread.run()
+  except KeyboardInterrupt:
+    analysis_thread.shutdown("interrupted")
+  except Exception as e:
+    analysis_thread.shutdown("exception: {}".format(e))
+
+def pluto_ecm_analysis_thread_sig_handler(arg1, arg2):
+  global analysis_thread
+  analysis_thread.shutdown("sig handler: {} {}".format(arg1, arg2))
 
 class pluto_ecm_analysis_runner:
   def __init__(self, logger, sw_config):

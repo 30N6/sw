@@ -223,6 +223,8 @@ class pluto_ecm_signal_tracker:
     power       = [r["analysis"]["power_mean"]        for r in entry["reports"]]
     duration    = [r["analysis"]["iq_length"]         for r in entry["reports"]]
     disp_metric = [r["analysis"][display_metric_name] for r in entry["reports"]]
+    fft_mean    = [r["analysis"]["fft_mean"]          for r in entry["reports"]]
+    fft_std     = [r["analysis"]["fft_std"]           for r in entry["reports"]]
 
     stats = {"power_mean"           : np.mean(power),
              "power_max"            : np.max(power),
@@ -230,6 +232,8 @@ class pluto_ecm_signal_tracker:
              "duration_mean"        : np.mean(duration),
              "duration_max"         : np.max(duration),
              "duration_std"         : np.std(duration),
+             "fft_mean"             : np.mean(fft_mean),
+             "fft_std"              : np.mean(fft_std),
              "display_metric_mean"  : np.mean(disp_metric),
              "report_count"         : len(entry["reports"]),
              "last_analysis"        : entry["reports"][-1]["analysis"]}

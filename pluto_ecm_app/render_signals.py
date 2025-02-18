@@ -30,8 +30,8 @@ class render_signals:
     self.rect_frame_signals_secondary             = [640, 384, 384, 384]
     self.rect_frame_signals_tx                    = [1024,432, 256, 336]
     self.rect_frame_signals_primary_details       = [640, 192, 384, 192]
-    self.rect_frame_signals_primary_plot_frame    = [648, 200, 368, 96]
-    self.rect_frame_signals_primary_plot_image    = [649, 201, 366, 94]
+    self.rect_frame_signals_primary_plot_frame    = [641, 193, 382, 96]
+    self.rect_frame_signals_primary_plot_image    = [642, 194, 380, 94]
 
     self.emitter_text_height            = 16
     self.emitter_stale_threshold        = 10
@@ -173,31 +173,27 @@ class render_signals:
     surf_scaled   = pygame.transform.scale(surf_original, (self.rect_frame_signals_primary_plot_image[2], self.rect_frame_signals_primary_plot_image[3]))
     self.surface.blit(surf_scaled, self.rect_frame_signals_primary_plot_image)
 
-  #  hist_image, max_pri = emitter["histogram_pri"]
-  #
-  #  surf = pygame.surfarray.make_surface(hist_image)
-  #  self.surface.blit(surf, self.rect_frame_signals_primary_plot_image)
-  #
-  #  pri_label_count = 9
-  #  for i in range(pri_label_count):
-  #    pri_frac = (i / (pri_label_count - 1))
-  #    pri_str = "{}".format(round(pri_frac * max_pri))
-  #    if i == 0:
-  #      pri_str += " us"
-  #    text_data = self.font_detail.render(pri_str, True, self.colors["frame_elements"])
-  #    text_data = pygame.transform.rotate(text_data, -90)
-  #
-  #    text_rect = text_data.get_rect()
-  #    text_rect.centerx = self.rect_frame_signals_primary_plot_frame[0] + self.rect_frame_signals_primary_plot_frame[2] * pri_frac
-  #    text_rect.top = self.rect_frame_signals_primary_plot_frame[1] + self.rect_frame_signals_primary_plot_frame[3]
-  #    self.surface.blit(text_data, text_rect)
-  #
-  #  power_mean_dB       = 10*np.log10(emitter["analysis_data"]["power_mean"])
-  #  power_max_dB        = 10*np.log10(emitter["analysis_data"]["power_max"])
-  #  pulse_duration_mean = emitter["analysis_data"]["pulse_duration_mean"]
-  #  pulse_duration_std  = emitter["analysis_data"]["pulse_duration_std"]
-  #  mod_data            = emitter["analysis_data"]["modulation"]
-  #  entries = []
+    power_mean_dB       = 10*np.log10(stats["power_mean"])
+    power_max_dB        = 10*np.log10(stats["power_max"])
+    duration_mean       = stats["duration_mean"]
+    fft_mean_kHz        = stats["fft_mean"] / 1e3
+    fft_std_kHz         = stats["fft_std"] / 1e3
+
+
+    entries = []
+    entries.append("{:<10} pwr_dB={:.1f}/{:.1f} len={:.1f}".format(signal_data["name"],
+      power_mean_dB, power_max_dB, duration_mean))
+    entries.append("fft_kHz={:.1f}/{:.1f}".format(fft_mean_kHz, fft_std_kHz))
+
+    for i in range(len(entries)):
+      entry           = entries[i]
+      text_data       = self.font_detail.render(entry, True, self.colors["signal_entry_active"])
+      text_rect       = text_data.get_rect()
+      text_rect.left  = self.rect_frame_signals_primary_plot_frame[0] + 8
+      text_rect.top   = self.rect_frame_signals_primary_plot_frame[1] + self.rect_frame_signals_primary_plot_frame[3] + 8 + 16 * i
+      self.surface.blit(text_data, text_rect)
+
+
   #
   #  s = "{:<8} freq={:5.1f}".format(emitter["analysis_data"]["name"], emitter["analysis_data"]["freq"])
   #  entries.append({"str": s, "y_pos": self.rect_frame_signals_primary_plot_frame[1] + self.rect_frame_signals_primary_plot_frame[3] + 48 + 16 * 0})
@@ -212,101 +208,7 @@ class render_signals:
   #        mod_data["FM_mean_r_squared"], mod_data["FM_mean_slope"])
   #    entries.append({"str": s, "y_pos": self.rect_frame_signals_primary_plot_frame[1] + self.rect_frame_signals_primary_plot_frame[3] + 48 + 16 * 2})
   #
-  #  for entry in entries:
-  #    text_data = self.font_detail.render(entry["str"], True, self.colors["signal_entry_active"])
-  #    text_rect = text_data.get_rect()
-  #    text_rect.left = self.rect_frame_signals_primary_plot_frame[0]
-  #    text_rect.bottom = entry["y_pos"]
-  #    self.surface.blit(text_data, text_rect)
 
-  #def _render_cw_primary_emitter_list(self):
-  #  emitter_entries = []
-  #  index = 1
-  #  for entry in self.emitters_cw_primary:
-  #    if index > self.max_rendered_emitters_cw:
-  #      break
-  #
-  #    freq          = entry["analysis_data"]["power_mean_freq"]
-  #    bandwidth     = max(entry["analysis_data"]["freq_set"]) - min(entry["analysis_data"]["freq_set"])
-  #    threshold_dB  = 10*np.log10(entry["analysis_data"]["power_mean_threshold"])
-  #    power_mean_dB = 10*np.log10(entry["analysis_data"]["power_mean_value"])
-  #    power_max_dB  = 10*np.log10(entry["analysis_data"]["power_max"])
-  #    emitter_age   = min(999, round(entry["emitter_age"]))
-  #    update_age    = min(99, round(entry["update_age"]))
-  #    num_dwells    = min(99, entry["analysis_data"]["num_dwells"])
-  #    power_ratio   = entry["analysis_data"]["power_mean_value"] / entry["analysis_data"]["power_max"]
-  #    power_ratio_i = min(99, int(round(power_ratio * 100)))
-  #
-  #    if entry["update_age"] < self.emitter_stale_threshold:
-  #      emitter_color = self.colors["signal_entry_active"]
-  #    else:
-  #      emitter_color = self.colors["signal_entry_stale"]
-  #
-  #    name = self._get_cw_signal_name(freq)
-  #
-  #    if bandwidth < 10.0:
-  #      bandwidth_str = "{:3.1f}".format(bandwidth)
-  #    else:
-  #      bandwidth_str = "{:<3}".format(int(round(bandwidth)))
-  #
-  #    s = "{:2} {:6.1f} {:3s}  {:3.0f} {:3.0f} {:3.0f} {:2} {:3.0f} {:>2.0f} {:<8}".format(index, freq, bandwidth_str,
-  #      threshold_dB, power_mean_dB, power_max_dB, power_ratio_i, emitter_age, update_age, name)
-  #    pos_offset = [8, 16 + self.emitter_text_height * (index - 1)]
-  #
-  #    emitter_entries.append({"str": s, "pos_offset": pos_offset, "color": emitter_color})
-  #    index += 1
-  #
-  #  for entry in emitter_entries:
-  #    text_data = self.font_main.render(entry["str"], True, entry["color"])
-  #    text_rect = text_data.get_rect()
-  #    text_rect.left = self.rect_frame_signals_secondary[0] + entry["pos_offset"][0]
-  #    text_rect.bottom = self.rect_frame_signals_secondary[1] + entry["pos_offset"][1]
-  #    self.surface.blit(text_data, text_rect)
-  #
-  #  #if len(self.emitters_cw_primary) > 0:
-  #  #  sel_x = self.rect_frame_signals_secondary[0] + 2
-  #  #  sel_y = self.rect_frame_signals_secondary[1] + 8 + self.emitter_text_height * self.selected_emitter_cw
-  #  #  sel_wh = 8
-  #  #
-  #  #  sel_points = [(sel_x,             sel_y - sel_wh/2),
-  #  #                (sel_x + sel_wh/2,  sel_y),
-  #  #                (sel_x,             sel_y + sel_wh/2)]
-  #  #  pygame.draw.polygon(self.surface, self.colors["emitter_marker"], sel_points)
-
-  #def _render_cw_secondary_emitter_list(self):
-  #  emitter_entries = []
-  #  index = 1
-  #  for entry in self.emitters_cw_secondary:
-  #    if index > self.max_rendered_emitters_cw:
-  #      break
-  #
-  #    freq          = entry["analysis_data"]["power_mean_freq"]
-  #    #bandwidth     = max(entry["analysis_data"]["freq_set"]) - min(entry["analysis_data"]["freq_set"])
-  #    #threshold_dB  = 10*np.log10(entry["analysis_data"]["power_mean_threshold"])
-  #    power_mean_dB = 10*np.log10(entry["analysis_data"]["power_mean_value"])
-  #    power_max_dB  = 10*np.log10(entry["analysis_data"]["power_max"])
-  #    emitter_age   = min(99, round(entry["emitter_age"]))
-  #    update_age    = min(99, round(entry["update_age"]))
-  #
-  #    if entry["update_age"] < self.emitter_stale_threshold:
-  #      emitter_color = self.colors["signal_entry_active"]
-  #    else:
-  #      emitter_color = self.colors["signal_entry_stale"]
-  #
-  #    name = self._get_cw_signal_name(freq)
-  #
-  #    s = "{:2} {:6.1f} {:2.0f} {:2.0f} {:>2.0f} {:>2.0f} {:<8}".format(index, freq, power_mean_dB, power_max_dB, emitter_age, update_age, name)
-  #    pos_offset = [8, 16 + self.emitter_text_height * (index - 1)]
-  #
-  #    emitter_entries.append({"str": s, "pos_offset": pos_offset, "color": emitter_color})
-  #    index += 1
-  #
-  #  for entry in emitter_entries:
-  #    text_data = self.font_main.render(entry["str"], True, entry["color"])
-  #    text_rect = text_data.get_rect()
-  #    text_rect.left = self.rect_frame_signals_tx[0] + entry["pos_offset"][0]
-  #    text_rect.bottom = self.rect_frame_signals_tx[1] + entry["pos_offset"][1]
-  #    self.surface.blit(text_data, text_rect)
 
   def _clamp_selected_emitters(self):
     if self.selected_signal >= self.max_rendered_signals_confirmed:
