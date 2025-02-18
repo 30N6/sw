@@ -100,11 +100,13 @@ class pluto_ecm_main_thread:
       pygame.display.flip()
       self.clock.tick(self.FPS)
 
-    self.shutdown()
+    self.shutdown(False)
 
-  def shutdown(self):
+  def shutdown(self, interrupted):
     #self.hw_interface.shutdown()
-    #self.analysis_thread.shutdown()
+    if not interrupted:
+      self.analysis_thread.shutdown()
+
     self.recorder.shutdown("quit")
     self.logger.log(self.logger.LL_INFO, "[main_thread] shutting down")
     pygame.quit()

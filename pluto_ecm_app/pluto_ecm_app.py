@@ -15,8 +15,9 @@ if __name__ == "__main__":
   try:
     main()
   except KeyboardInterrupt:
-    main_thread.shutdown()
+    main_thread.shutdown(True)
   except Exception as e:
+    main_thread.shutdown(True)
     print("Exception: {}".format(e))
     print(traceback.format_exc())
 
