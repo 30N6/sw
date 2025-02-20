@@ -11,10 +11,11 @@ class pluto_ecm_modulation_analysis:
 
     self.stft_length = 16
 
-    self.lora_num_chunks        = config["analysis_config"]["modulation_analysis"]["elrs-lora"]["parameters"]["lora_num_chunks"]
-    self.lora_peak_threshold    = config["analysis_config"]["modulation_analysis"]["elrs-lora"]["parameters"]["lora_peak_threshold"]
-    self.cvbs_xcorr_window_inc  = config["analysis_config"]["modulation_analysis"]["cvbs"]["parameters"]["cvbs_xcorr_window_inc"]
-    self.cvbs_xcorr_window_exc  = config["analysis_config"]["modulation_analysis"]["cvbs"]["parameters"]["cvbs_xcorr_window_exc"]
+    self.lora_num_chunks            = config["analysis_config"]["modulation_analysis"]["elrs-lora"]["parameters"]["lora_num_chunks"]
+    self.lora_peak_threshold        = config["analysis_config"]["modulation_analysis"]["elrs-lora"]["parameters"]["lora_peak_threshold"]
+    self.cvbs_xcorr_window_inc      = config["analysis_config"]["modulation_analysis"]["cvbs"]["parameters"]["cvbs_xcorr_window_inc"]
+    self.cvbs_xcorr_window_exc      = config["analysis_config"]["modulation_analysis"]["cvbs"]["parameters"]["cvbs_xcorr_window_exc"]
+    self.dji_ocusync4_fsk_short_len = config["analysis_config"]["modulation_analysis"]["dji-ocusync-4"]["parameters"]["fsk_short_len"]
 
     self.cvbs_xcorr_window_inc_by_len = {}
     self.cvbs_xcorr_window_exc_by_len = {}
@@ -51,6 +52,9 @@ class pluto_ecm_modulation_analysis:
       analysis["power_max"] = float(np.max(iq_power))
       analysis["fft_mean"], analysis["fft_std"] = self._get_fft_stats(iq_padded_fft_abs)
       analysis["bfsk_r_squared"], analysis["bfsk_freq_spread"], analysis["bfsk_len_peak"] = self._analyze_bfsk(iq_freq)
+      analysis["bfsk_short_r_squared"], analysis["bfsk_short_freq_spread"] = self._analyze_fsk_short(iq_freq, 2, self.dji_ocusync4_fsk_short_len)
+      analysis["tfsk_short_r_squared"], analysis["tfsk_short_freq_spread"] = self._analyze_fsk_short(iq_freq, 3, self.dji_ocusync4_fsk_short_len)
+      analysis["tfsk_bfsk_short_r_squared_ratio"] = analysis["tfsk_short_r_squared"] / analysis["bfsk_short_r_squared"]
       analysis["lora_r_squared"], analysis["lora_slope"], analysis["lora_peak_count_ratio"], analysis["lora_peak_spacing_ratio"] = self._analyze_lora(iq_data, iq_freq, iq_padded_fft_abs)
       analysis["lfm_r_squared"], analysis["lfm_slope"] = self._analyze_lfm(iq_freq, iq_freq_mean)
       analysis["cvbs_xcorr_1"], analysis["cvbs_xcorr_2"] = self._analyze_cvbs(iq_padded_fft)
@@ -168,24 +172,36 @@ class pluto_ecm_modulation_analysis:
     max_i = np.argmax(r_squared)
     return r_squared[max_i], mean_slope[max_i]
 
-  def _get_bfsk_fit_metrics(self, iq_freq, iq_freq_mean):
-    #y_cluster = np.zeros(iq_freq.size, np.uint32)
-    y_cluster       = iq_freq >= iq_freq_mean
-    y_cluster_diff  = np.diff(y_cluster)
+  def _get_fsk_fit_metrics(self, iq_freq, M):
+    iq_freq_mean = np.mean(iq_freq)
 
-    ss_residual   = np.zeros(2)
-    mu_cluster    = np.zeros(2)
+    y_cluster_2 = iq_freq >= iq_freq_mean
+
+    if M == 2:
+      y_cluster = y_cluster_2
+    elif M == 3:
+      iq_freq_mean_0 = np.mean(iq_freq[y_cluster_2 == 0])
+      iq_freq_mean_1 = np.mean(iq_freq[y_cluster_2 == 1])
+      y_cluster = np.ones(iq_freq.size, np.uint32)
+      y_cluster[iq_freq < iq_freq_mean_0] = 0
+      y_cluster[iq_freq > iq_freq_mean_1] = 2
+    else:
+      raise RuntimeError("invalid M")
+
+    y_cluster_diff  = np.diff(y_cluster)
+    ss_residual   = np.zeros(M)
+    mu_cluster    = np.zeros(M)
     det_len_hist  = np.zeros(iq_freq.size)
     det_len       = 1
 
     for i in range(iq_freq.size-1):
-      if y_cluster_diff[i]:
+      if y_cluster_diff[i] != 0:
         det_len_hist[det_len] += 1
         det_len = 1
       else:
         det_len += 1
 
-    for i in range(2):
+    for i in range(M):
       y_k             = iq_freq[y_cluster == i]
       mu_cluster[i]   = np.mean(y_k)
       ss_residual[i]  = np.sum(np.square(y_k - mu_cluster[i]))
@@ -207,10 +223,15 @@ class pluto_ecm_modulation_analysis:
     input_iq_freq_mean  = [np.mean(input_iq_freq[0]), np.mean(input_iq_freq[1])]
 
     for i in range(2):
-      r_squared[i], freq_spread[i], det_len_peak[i] = self._get_bfsk_fit_metrics(input_iq_freq[i], input_iq_freq_mean[i])
+      r_squared[i], freq_spread[i], det_len_peak[i] = self._get_fsk_fit_metrics(input_iq_freq[i], 2)
 
     max_i = np.argmax(r_squared)
     return r_squared[max_i], freq_spread[max_i], det_len_peak[max_i]
+
+  def _analyze_fsk_short(self, iq_freq, M, data_len):
+    iq_freq_trunc = iq_freq[0:data_len]
+    r_squared, freq_spread, _ = self._get_fsk_fit_metrics(iq_freq_trunc, M)
+    return r_squared, freq_spread
 
   def _analyze_lfm(self, iq_freq, iq_freq_mean):
     freq_x = np.arange(iq_freq.size) * self.dt
