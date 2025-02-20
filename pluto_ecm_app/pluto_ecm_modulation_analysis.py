@@ -11,11 +11,13 @@ class pluto_ecm_modulation_analysis:
 
     self.stft_length = 16
 
-    self.lora_num_chunks            = config["analysis_config"]["modulation_analysis"]["elrs-lora"]["parameters"]["lora_num_chunks"]
-    self.lora_peak_threshold        = config["analysis_config"]["modulation_analysis"]["elrs-lora"]["parameters"]["lora_peak_threshold"]
-    self.cvbs_xcorr_window_inc      = config["analysis_config"]["modulation_analysis"]["cvbs"]["parameters"]["cvbs_xcorr_window_inc"]
-    self.cvbs_xcorr_window_exc      = config["analysis_config"]["modulation_analysis"]["cvbs"]["parameters"]["cvbs_xcorr_window_exc"]
-    self.dji_ocusync4_fsk_short_len = config["analysis_config"]["modulation_analysis"]["dji-ocusync-4"]["parameters"]["fsk_short_len"]
+    self.lora_num_chunks              = config["analysis_config"]["modulation_analysis"]["elrs-lora"]["parameters"]["lora_num_chunks"]
+    self.lora_peak_threshold          = config["analysis_config"]["modulation_analysis"]["elrs-lora"]["parameters"]["lora_peak_threshold"]
+    self.cvbs_xcorr_window_inc        = config["analysis_config"]["modulation_analysis"]["cvbs"]["parameters"]["cvbs_xcorr_window_inc"]
+    self.cvbs_xcorr_window_exc        = config["analysis_config"]["modulation_analysis"]["cvbs"]["parameters"]["cvbs_xcorr_window_exc"]
+    #self.dji_ocusync4_fsk_short_len = config["analysis_config"]["modulation_analysis"]["dji-ocusync-4"]["parameters"]["fsk_short_len"]  #TODO: remove
+    self.ble_trunc_front_samples      = config["analysis_config"]["modulation_analysis"]["ble-bfsk-trunc"]["parameters"]["bfsk_trunc_front_samples"]
+    self.ble_trunc_rear_power_thresh  = 10**(config["analysis_config"]["modulation_analysis"]["ble-bfsk-trunc"]["parameters"]["bfsk_trunc_rear_power_dB"]/10)
 
     self.cvbs_xcorr_window_inc_by_len = {}
     self.cvbs_xcorr_window_exc_by_len = {}
@@ -52,9 +54,11 @@ class pluto_ecm_modulation_analysis:
       analysis["power_max"] = float(np.max(iq_power))
       analysis["fft_mean"], analysis["fft_std"] = self._get_fft_stats(iq_padded_fft_abs)
       analysis["bfsk_r_squared"], analysis["bfsk_freq_spread"], analysis["bfsk_len_peak"] = self._analyze_bfsk(iq_freq)
-      analysis["bfsk_short_r_squared"], analysis["bfsk_short_freq_spread"] = self._analyze_fsk_short(iq_freq, 2, self.dji_ocusync4_fsk_short_len)
-      analysis["tfsk_short_r_squared"], analysis["tfsk_short_freq_spread"] = self._analyze_fsk_short(iq_freq, 3, self.dji_ocusync4_fsk_short_len)
-      analysis["tfsk_bfsk_short_r_squared_ratio"] = analysis["tfsk_short_r_squared"] / analysis["bfsk_short_r_squared"]
+      analysis["bfsk_trunc_r_squared"], analysis["bfsk_trunc_freq_spread"], analysis["bfsk_trunc_len_peak"] = self._analyze_bfsk_trunc(iq_freq, iq_power, self.ble_trunc_front_samples, self.ble_trunc_rear_power_thresh)
+
+      #analysis["bfsk_short_r_squared"], analysis["bfsk_short_freq_spread"] = self._analyze_fsk_short(iq_freq, 2, self.dji_ocusync4_fsk_short_len) #TODO: remove
+      #analysis["tfsk_short_r_squared"], analysis["tfsk_short_freq_spread"] = self._analyze_fsk_short(iq_freq, 3, self.dji_ocusync4_fsk_short_len) #TODO: remove
+      #analysis["tfsk_bfsk_short_r_squared_ratio"] = analysis["tfsk_short_r_squared"] / analysis["bfsk_short_r_squared"] #TODO: remove
       analysis["lora_r_squared"], analysis["lora_slope"], analysis["lora_peak_count_ratio"], analysis["lora_peak_spacing_ratio"] = self._analyze_lora(iq_data, iq_freq, iq_padded_fft_abs)
       analysis["lfm_r_squared"], analysis["lfm_slope"] = self._analyze_lfm(iq_freq, iq_freq_mean)
       analysis["cvbs_xcorr_1"], analysis["cvbs_xcorr_2"] = self._analyze_cvbs(iq_padded_fft)
@@ -227,6 +231,25 @@ class pluto_ecm_modulation_analysis:
 
     max_i = np.argmax(r_squared)
     return r_squared[max_i], freq_spread[max_i], det_len_peak[max_i]
+
+  def _analyze_bfsk_trunc(self, iq_freq, iq_power, front_dropped_samples, rear_dropped_power_threshold):
+    if iq_freq.size < front_dropped_samples*2:
+      return 0, 0, 0
+
+    iq_freq_trunc = iq_freq[front_dropped_samples:-1]
+    iq_power_trunc = iq_power[front_dropped_samples:-1]
+
+    mean_power = np.mean(iq_power_trunc)
+    power_low = iq_power_trunc < (mean_power * rear_dropped_power_threshold)
+
+    first_drop_i = power_low.size - np.argmax(power_low[::-1])
+
+    iq_freq_trunc = iq_freq_trunc[0:first_drop_i]
+    if iq_freq_trunc.size < 16:
+      return 0, 0, 0
+
+    r_squared, freq_spread, det_len_peak = self._get_fsk_fit_metrics(iq_freq_trunc, 2)
+    return r_squared, freq_spread, int(det_len_peak)
 
   def _analyze_fsk_short(self, iq_freq, M, data_len):
     iq_freq_trunc = iq_freq[0:data_len]
