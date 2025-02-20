@@ -14,7 +14,7 @@
   },
   "tx_config": {
     "signals": [
-      {"name": "DJI-OS4",   "freq_range": [2400, 2500], "trigger_duration": [256, 9999], "threshold_dB": 15, "threshold_hyst_dB": 9,   "immediate_tx": 1, "trigger_modulation": "dji-ocusync-4",  "agile": 1, "tx_program": "tx_program_elrs_lora.json"},
+      {"name": "OFDM",      "freq_range": [2400, 2500], "trigger_duration": [256, 9999], "threshold_dB": 15, "threshold_hyst_dB": 9,   "immediate_tx": 1, "trigger_modulation": "ofdm-generic",   "agile": 1, "tx_program": "tx_program_elrs_lora.json"},
       {"name": "ELRS-LoRa", "freq_range": [2400, 2500], "trigger_duration": [256, 9999], "threshold_dB": 15, "threshold_hyst_dB": 12,  "immediate_tx": 0, "trigger_modulation": "elrs-lora",      "agile": 1, "tx_program": "tx_program_elrs_lora.json"},
       {"name": "ELRS-FLRC", "freq_range": [2400, 2500], "trigger_duration": [256, 9999], "threshold_dB": 15, "threshold_hyst_dB": 12,  "immediate_tx": 1, "trigger_modulation": "elrs-bfsk",      "agile": 1, "tx_program": ""},
       {"name": "BLE-2.4",   "freq_range": [2400, 2500], "trigger_duration": [256, 9999], "threshold_dB": 15, "threshold_hyst_dB": 12,  "immediate_tx": 1, "trigger_modulation": "ble-bfsk",       "agile": 1, "tx_program": ""},
@@ -36,7 +36,8 @@
       "lfm"             : {"display_metric": "lfm_r_squared",         "criteria": {"power_mean": [5, 1e9], "iq_length": [64,   1024], "lfm_r_squared": [0.7, 1.0]}},
       "cvbs"            : {"display_metric": "cvbs_xcorr_1",          "criteria": {"power_mean": [5, 1e9], "iq_length": [256, 9999], "cvbs_xcorr_1": [0.2, 1.0], "cvbs_xcorr_2": [0.0, 0.2]}, "parameters": {"cvbs_xcorr_window_inc":  [60e-6, 67e-6], "cvbs_xcorr_window_exc": [55e-6, 72e-6]}},
       "ble-bfsk"        : {"display_metric": "bfsk_r_squared",        "criteria": {"power_mean": [5, 1e9], "iq_length": [256, 9999], "bfsk_r_squared": [0.8, 1.0], "bfsk_len_peak": [10, 999], "bfsk_freq_spread": [370e3, 1e6]}},
-      "ble-bfsk-trunc"  : {"display_metric": "bfsk_trunc_r_squared",  "criteria": {"power_mean": [5, 1e9], "iq_length": [1024, 9999], "bfsk_trunc_r_squared": [0.8, 1.0], "bfsk_trunc_len_peak": [4, 999], "bfsk_freq_spread": [370e3, 1e6]}, "parameters": {"bfsk_trunc_front_samples": 350, "bfsk_trunc_rear_power_dB": -6}}
+      "ble-bfsk-trunc"  : {"display_metric": "bfsk_trunc_r_squared",  "criteria": {"power_mean": [5, 1e9], "iq_length": [1024, 9999], "bfsk_trunc_r_squared": [0.8, 1.0], "bfsk_trunc_len_peak": [4, 999], "bfsk_freq_spread": [370e3, 1e6]}, "parameters": {"bfsk_trunc_front_samples": 350, "bfsk_trunc_rear_power_dB": -6}},
+      "ofdm-generic"    : {"display_metric": "acorr_peak_1_lag_us",   "criteria": {"power_mean": [5, 1e9], "iq_length": [256, 9999], "acorr_peak_1_lag_us": [6, 200], "acorr_peak_1_0_ratio": [0.05, 0.5], "acorr_peak_0_mean_ratio": [10, 1000]}, "parameters": {"ofdm_min_acorr_peak_count": 128}}
     }
   },
   "pluto_dma_reader_path": "../pluto_dma_reader/pluto_dma_reader",

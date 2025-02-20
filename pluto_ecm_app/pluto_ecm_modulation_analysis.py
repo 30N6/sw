@@ -18,6 +18,7 @@ class pluto_ecm_modulation_analysis:
     #self.dji_ocusync4_fsk_short_len = config["analysis_config"]["modulation_analysis"]["dji-ocusync-4"]["parameters"]["fsk_short_len"]  #TODO: remove
     self.ble_trunc_front_samples      = config["analysis_config"]["modulation_analysis"]["ble-bfsk-trunc"]["parameters"]["bfsk_trunc_front_samples"]
     self.ble_trunc_rear_power_thresh  = 10**(config["analysis_config"]["modulation_analysis"]["ble-bfsk-trunc"]["parameters"]["bfsk_trunc_rear_power_dB"]/10)
+    self.ofdm_min_acorr_peak_count    = config["analysis_config"]["modulation_analysis"]["ofdm-generic"]["parameters"]["ofdm_min_acorr_peak_count"]
 
     self.cvbs_xcorr_window_inc_by_len = {}
     self.cvbs_xcorr_window_exc_by_len = {}
@@ -45,6 +46,10 @@ class pluto_ecm_modulation_analysis:
       iq_power          = np.square(np.real(iq_data)) + np.square(np.imag(iq_data))
       iq_stft           = self._get_stft(iq_data)
 
+      iq_padded_fft_conj  = np.conjugate(iq_padded_fft)
+      iq_padded_fft_prod  = iq_padded_fft * iq_padded_fft_conj
+      iq_acorr_abs        = np.abs(np.fft.ifft(iq_padded_fft_prod))
+
       r = report.copy()
       r.pop("iq_data")
       r.pop("iq_length")
@@ -53,15 +58,22 @@ class pluto_ecm_modulation_analysis:
       analysis["power_mean"] = float(np.mean(iq_power))
       analysis["power_max"] = float(np.max(iq_power))
       analysis["fft_mean"], analysis["fft_std"] = self._get_fft_stats(iq_padded_fft_abs)
+
       analysis["bfsk_r_squared"], analysis["bfsk_freq_spread"], analysis["bfsk_len_peak"] = self._analyze_bfsk(iq_freq)
       analysis["bfsk_trunc_r_squared"], analysis["bfsk_trunc_freq_spread"], analysis["bfsk_trunc_len_peak"] = self._analyze_bfsk_trunc(iq_freq, iq_power, self.ble_trunc_front_samples, self.ble_trunc_rear_power_thresh)
 
       #analysis["bfsk_short_r_squared"], analysis["bfsk_short_freq_spread"] = self._analyze_fsk_short(iq_freq, 2, self.dji_ocusync4_fsk_short_len) #TODO: remove
       #analysis["tfsk_short_r_squared"], analysis["tfsk_short_freq_spread"] = self._analyze_fsk_short(iq_freq, 3, self.dji_ocusync4_fsk_short_len) #TODO: remove
       #analysis["tfsk_bfsk_short_r_squared_ratio"] = analysis["tfsk_short_r_squared"] / analysis["bfsk_short_r_squared"] #TODO: remove
+
       analysis["lora_r_squared"], analysis["lora_slope"], analysis["lora_peak_count_ratio"], analysis["lora_peak_spacing_ratio"] = self._analyze_lora(iq_data, iq_freq, iq_padded_fft_abs)
+
       analysis["lfm_r_squared"], analysis["lfm_slope"] = self._analyze_lfm(iq_freq, iq_freq_mean)
-      analysis["cvbs_xcorr_1"], analysis["cvbs_xcorr_2"] = self._analyze_cvbs(iq_padded_fft)
+
+      analysis["cvbs_xcorr_1"], analysis["cvbs_xcorr_2"] = self._analyze_cvbs(iq_acorr_abs)
+
+      analysis["acorr_peak_1_lag_us"], analysis["acorr_peak_1_0_ratio"], analysis["acorr_peak_0_mean_ratio"], analysis["ofdm_data"] = self._analyze_ofdm(iq_acorr_abs, self.ofdm_min_acorr_peak_count)
+
       analysis["iq_length"] = report["iq_length"]
       analysis["iq_stft_abs"] = iq_stft
 
@@ -269,22 +281,42 @@ class pluto_ecm_modulation_analysis:
 
     return r_squared, mean_slope
 
-  def _analyze_cvbs(self, iq_padded_fft):
-    if iq_padded_fft.size not in self.cvbs_xcorr_window_inc_by_len:
+  def _analyze_cvbs(self, iq_acorr_abs):
+    if iq_acorr_abs.size not in self.cvbs_xcorr_window_inc_by_len:
       return 0, 0
 
-    w_inc = self.cvbs_xcorr_window_inc_by_len[iq_padded_fft.size]
-    w_exc = self.cvbs_xcorr_window_exc_by_len[iq_padded_fft.size]
+    w_inc = self.cvbs_xcorr_window_inc_by_len[iq_acorr_abs.size]
+    w_exc = self.cvbs_xcorr_window_exc_by_len[iq_acorr_abs.size]
 
-    fft_conj = np.conjugate(iq_padded_fft)
-    fft_prod = iq_padded_fft * fft_conj
-    xcorr = np.abs(np.fft.ifft(fft_prod))
-
-    v_inc = xcorr[w_inc[0] : w_inc[1]]
-    v_exc = np.concatenate((xcorr[w_exc[0] : w_inc[0]], xcorr[w_inc[1] : w_exc[1]]))
+    v_inc = iq_acorr_abs[w_inc[0] : w_inc[1]]
+    v_exc = np.concatenate((iq_acorr_abs[w_exc[0] : w_inc[0]], iq_acorr_abs[w_inc[1] : w_exc[1]]))
 
     inc_max = np.max(v_inc)
-    cvbs_xcorr_1 = float(inc_max / xcorr[0])
+    cvbs_xcorr_1 = float(inc_max / iq_acorr_abs[0])
     cvbs_xcorr_2 = float(min(np.mean(v_exc) / inc_max, 1))
 
     return cvbs_xcorr_1, cvbs_xcorr_2
+
+  def _analyze_ofdm(self, iq_acorr_abs, min_peak_count):
+    iq_acorr_trunc = iq_acorr_abs[0:iq_acorr_abs.size//2]
+
+    peak_i, _ = sp.signal.find_peaks(iq_acorr_trunc)
+
+    if len(peak_i) < min_peak_count:
+      return 0, 0, 0, []
+
+    peak_v = iq_acorr_trunc[peak_i]
+    peak_t = peak_i * self.dt
+
+    sorted_peak_i = np.argsort(peak_v)[::-1]
+    sorted_peak_v = peak_v[sorted_peak_i]
+    sorted_peak_t = peak_t[sorted_peak_i]
+
+    acorr_peak_1_lag_us = sorted_peak_t[1] / 1e-6
+    acorr_peak_1_0_ratio = sorted_peak_v[1] / sorted_peak_v[0]
+    acorr_peak_0_mean_ratio = sorted_peak_v[0] / np.mean(sorted_peak_v[1:])
+
+    ofdm_data = {"acorr": [float(x) for x in iq_acorr_trunc], "peak_v": [float(x) for x in peak_v], "peak_t": [float(x) for x in peak_t],
+                 "peak_i": [float(x) for x in peak_i], "sorted_peak_i": [float(x) for x in sorted_peak_i], "sorted_peak_v": [float(x) for x in sorted_peak_v], "sorted_peak_t": [float(x) for x in sorted_peak_t]}
+
+    return acorr_peak_1_lag_us, acorr_peak_1_0_ratio, acorr_peak_0_mean_ratio, ofdm_data
