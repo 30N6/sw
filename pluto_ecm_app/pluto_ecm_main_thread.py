@@ -21,13 +21,14 @@ class pluto_ecm_main_thread:
   VERSION = "v0.01 2025-02-01"
 
   def __init__(self):
-    if len(sys.argv) < 5:
-      raise RuntimeError("insufficient number of arguments, expected format: pluto_ecm_app.py [config_file] [log_dir] [local_ip] [pluto_uri]")
+    if len(sys.argv) < 6:
+      raise RuntimeError("insufficient number of arguments, expected format: pluto_ecm_app.py [config_file] [log_dir] [local_ip] [pluto_uri] [udp_mode]")
 
     self.config_file  = sys.argv[1]
     self.log_dir      = sys.argv[2]
     self.local_ip     = sys.argv[3]
     self.pluto_uri    = sys.argv[4]
+    self.udp_mode     = int(sys.argv[5])
 
     if not os.path.exists(self.log_dir):
       os.makedirs(self.log_dir)
@@ -57,7 +58,7 @@ class pluto_ecm_main_thread:
     else:
       self.sim_loader = None
 
-    self.hw_interface     = pluto_ecm_hw_interface.pluto_ecm_hw_interface(self.logger, self.pluto_uri, self.local_ip, self.sw_config.config["pluto_dma_reader_path"], self.sw_config.config["pluto_credentials"], self.sw_config.config["simulation"]["playback_enable"])
+    self.hw_interface     = pluto_ecm_hw_interface.pluto_ecm_hw_interface(self.logger, self.pluto_uri, self.local_ip, self.sw_config.config["pluto_dma_reader_path"], self.sw_config.config["pluto_credentials"], self.sw_config.config["simulation"]["playback_enable"], self.udp_mode)
     self.analysis_thread  = pluto_ecm_analysis_thread.pluto_ecm_analysis_runner(self.logger, self.sw_config)
     self.sequencer        = pluto_ecm_sequencer.pluto_ecm_sequencer(self.logger, self.recorder, self.sw_config,
                                                                     self.hw_interface, self.analysis_thread, self.sim_loader)

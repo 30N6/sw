@@ -6,6 +6,8 @@ PACKED_INT16  = "h"
 PACKED_UINT32 = "I"
 PACKED_UINT64 = "Q"
 
+UDP_FILTER_PORT                                 = 65200
+
 ECM_CONTROL_MAGIC_NUM                           = 0x45434D43
 ECM_REPORT_MAGIC_NUM                            = 0x45434D52
 

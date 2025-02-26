@@ -10,8 +10,8 @@ import subprocess
 import multiprocessing
 from multiprocessing import Process, Queue
 
-UDP_PORT          = 50055
-UDP_PAYLOAD_SIZE  = DMA_TRANSFER_SIZE + 4 #includes seq num
+
+UDP_PAYLOAD_SIZE = DMA_TRANSFER_SIZE + 4 #includes seq num
 
 class pluto_ecm_hw_dma_reader_thread:
   WORD_SIZE = 4
@@ -25,12 +25,18 @@ class pluto_ecm_hw_dma_reader_thread:
     self.request_queue  = arg["request_queue"]
     self.result_queue   = arg["result_queue"]
     self.use_udp_dma_rx = arg["use_udp_dma_rx"]
+    self.direct_udp_tx  = arg["direct_udp_tx"]
+
+    if self.direct_udp_tx:
+      self.udp_port = UDP_FILTER_PORT
+    else:
+      self.udp_port = 50055
 
     if self.use_udp_dma_rx:
       self.next_udp_seq_num = 0
       assert ("ip:" in arg["pluto_uri"])
       self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-      self.sock.bind((arg["local_ip"], UDP_PORT))
+      self.sock.bind((arg["local_ip"], self.udp_port))
       self.sock.settimeout(0.1)
       self.logger.log(self.logger.LL_INFO, "init: [UDP mode] queues={}/{} sock={}, current_process={}".format(self.request_queue, self.result_queue, self.sock, multiprocessing.current_process()))
     else:
@@ -123,7 +129,9 @@ class pluto_ecm_hw_dma_reader_runner_thread:
   def __init__(self, arg):
     self.logger         = pluto_ecm_logger.pluto_ecm_logger(arg["log_dir"], "pluto_ecm_hw_dma_reader_runner_thread", arg["log_level"])
     self.request_queue  = arg["request_queue"]
+    self.result_queue   = arg["result_queue"]
     self.use_udp_dma_rx = arg["use_udp_dma_rx"]
+    self.direct_udp_tx  = arg["direct_udp_tx"]
     self.reader_path    = arg["pluto_dma_reader_path"]
     self.reader_file    = os.path.split(self.reader_path)[-1]
     self.credentials    = arg["pluto_credentials"]
@@ -131,17 +139,41 @@ class pluto_ecm_hw_dma_reader_runner_thread:
 
     self.dma_reader_process = None
 
-    if self.use_udp_dma_rx:
+    if self.direct_udp_tx:
       assert ("ip:" in arg["pluto_uri"])
       self.local_ip   = arg["local_ip"]
       self.remote_ip  = arg["pluto_uri"].split(":")[1]
-      self.logger.log(self.logger.LL_INFO, "init: [UDP mode] local_ip={} remote_ip={} queue={} current_process={}".format(self.local_ip, self.remote_ip, self.request_queue, multiprocessing.current_process()))
+      self.logger.log(self.logger.LL_INFO, "init: [UDP mode - direct] local_ip={} remote_ip={} queue={} current_process={}".format(self.local_ip, self.remote_ip, self.request_queue, multiprocessing.current_process()))
+
+      self._get_remote_mac()
+
+    elif self.use_udp_dma_rx:
+      assert ("ip:" in arg["pluto_uri"])
+      self.local_ip   = arg["local_ip"]
+      self.remote_ip  = arg["pluto_uri"].split(":")[1]
+      self.logger.log(self.logger.LL_INFO, "init: [UDP mode - indirect] local_ip={} remote_ip={} queue={} current_process={}".format(self.local_ip, self.remote_ip, self.request_queue, multiprocessing.current_process()))
 
       self._kill_dma_reader()
       self._transfer_dma_reader()
 
     else:
       self.logger.log(self.logger.LL_INFO, "init: [IIO mode] nothing to do...")
+
+  def _get_remote_mac(self):
+    if self.os_type == "Windows":
+      command_list = ["plink", "-pw", self.credentials["password"], "{}@{}".format(self.credentials["username"], self.remote_ip), "fw_printenv ethaddr"]
+    elif self.os_type == "Linux":
+      command_list = ["sshpass", "-p", self.credentials["password"], "ssh", "-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null",
+        "{}@{}".format(self.credentials["username"], self.remote_ip), "fw_printenv ethaddr"]
+    else:
+      raise RuntimeError("unsupported OS: {}".format(os_type))
+
+    self.logger.log(self.logger.LL_INFO, "retrieving remote MAC address, command={}".format(command_list))
+    r = subprocess.run(command_list, input="n", text=True, capture_output=True) #stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    self.logger.log(self.logger.LL_INFO, "retrieving remote MAC address, returncode={} stdout={}".format(r.returncode, r.stdout))
+    self.logger.flush()
+
+    self.result_queue.put(r.stdout.strip())
 
   def _kill_dma_reader(self):
     if self.os_type == "Windows":
@@ -175,6 +207,10 @@ class pluto_ecm_hw_dma_reader_runner_thread:
   def run(self):
     if not self.use_udp_dma_rx:
       self.shutdown("use_udp_dma_rx=False")
+      return
+
+    if self.direct_udp_tx:
+      self.shutdown("direct_udp_tx=True")
       return
 
     if self.os_type == "Windows":
@@ -233,13 +269,15 @@ def pluto_ecm_hw_dma_reader_runner_thread_func(arg):
 
 
 class pluto_ecm_hw_dma_reader:
-  def __init__(self, logger, pluto_uri, local_ip, pluto_dma_reader_path, pluto_credentials):
+  def __init__(self, logger, pluto_uri, local_ip, pluto_dma_reader_path, pluto_credentials, udp_mode):
     self.received_data = []
     self.pluto_uri = pluto_uri
     self.logger = logger
+    self.udp_mode = udp_mode
     self.hwdr_request_queue = Queue()
     self.hwdr_result_queue = Queue()
     self.runner_request_queue = Queue()
+    self.runner_result_queue = Queue()
     self.running = True
     self.num_dma_reads = 0
     self.num_status_reports = 0
@@ -249,20 +287,30 @@ class pluto_ecm_hw_dma_reader:
     self.output_data_status = []
 
     self.use_udp_dma_rx = True
+    self.remote_mac = None
 
     self.runner_process = Process(target=pluto_ecm_hw_dma_reader_runner_thread_func,
-                               args=({"pluto_uri": pluto_uri, "local_ip": local_ip,
-                                      "request_queue": self.runner_request_queue,
-                                      "log_dir": logger.path, "log_level": logger.min_level,
-                                      "use_udp_dma_rx": self.use_udp_dma_rx,
-                                      "pluto_dma_reader_path": pluto_dma_reader_path, "pluto_credentials": pluto_credentials}, ))
+                               args=({"pluto_uri"             : pluto_uri,
+                                      "local_ip"              : local_ip,
+                                      "request_queue"         : self.runner_request_queue,
+                                      "result_queue"          : self.runner_result_queue,
+                                      "log_dir"               : logger.path,
+                                      "log_level"             : logger.min_level,
+                                      "use_udp_dma_rx"        : self.use_udp_dma_rx,
+                                      "direct_udp_tx"         : self.udp_mode,
+                                      "pluto_dma_reader_path" : pluto_dma_reader_path,
+                                      "pluto_credentials"     : pluto_credentials}, ))
     self.runner_process.start()
 
     self.hwdr_process = Process(target=pluto_ecm_hw_dma_reader_thread_func,
-                               args=({"pluto_uri": pluto_uri, "local_ip": local_ip,
-                                      "request_queue": self.hwdr_request_queue, "result_queue": self.hwdr_result_queue,
-                                      "log_dir": logger.path, "log_level": logger.min_level,
-                                      "use_udp_dma_rx": self.use_udp_dma_rx}, ))
+                               args=({"pluto_uri"       : pluto_uri,
+                                      "local_ip"        : local_ip,
+                                      "request_queue"   : self.hwdr_request_queue,
+                                      "result_queue"    : self.hwdr_result_queue,
+                                      "log_dir"         : logger.path,
+                                      "log_level"       : logger.min_level,
+                                      "use_udp_dma_rx"  : self.use_udp_dma_rx,
+                                      "direct_udp_tx"   : self.udp_mode,}, ))
     self.hwdr_process.start()
 
   def _update_receive_queue(self):
@@ -271,6 +319,14 @@ class pluto_ecm_hw_dma_reader:
       self.num_dma_reads += 1
       self.received_data.append(data)
       self.logger.log(self.logger.LL_DEBUG, "[hwdr] _update_receive_queue: received data: len={} uk={} udp_seq_num={}".format(len(data), data["unique_key"], data["udp_seq_num"]))
+
+    if self.udp_mode and (self.remote_mac is None):
+      while not self.runner_result_queue.empty():
+        data = self.runner_result_queue.get(block=False)
+        self.logger.log(self.logger.LL_INFO, "[hwdr] _update_receive_queue: data from DMA runner: {}".format(data))
+        self.logger.flush()
+        assert (data.startswith("ethaddr="))
+        self.remote_mac = data.split("=")[1]
 
   def _update_output_queues(self):
     while len(self.received_data) > 0:
