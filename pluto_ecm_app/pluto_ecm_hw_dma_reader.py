@@ -18,7 +18,6 @@ class pluto_ecm_hw_dma_reader_thread:
   TRANSFERS_PER_BUFFER = 1 #8 #optimal size unclear -- doesn't matter now with UDP
   BUFFER_SIZE = TRANSFERS_PER_BUFFER*DMA_TRANSFER_SIZE // WORD_SIZE
 
-  PACKED_UDP_HEADER = struct.Struct("<" + PACKED_UINT32)
 
   def __init__(self, arg):
     self.logger         = pluto_ecm_logger.pluto_ecm_logger(arg["log_dir"], "pluto_ecm_hw_dma_reader_thread", arg["log_level"])
@@ -29,8 +28,10 @@ class pluto_ecm_hw_dma_reader_thread:
 
     if self.direct_udp_tx:
       self.udp_port = UDP_FILTER_PORT
+      self.PACKED_UDP_HEADER = struct.Struct(">" + PACKED_UINT32)
     else:
       self.udp_port = 50055
+      self.PACKED_UDP_HEADER = struct.Struct("<" + PACKED_UINT32)
 
     if self.use_udp_dma_rx:
       self.next_udp_seq_num = 0
@@ -50,12 +51,15 @@ class pluto_ecm_hw_dma_reader_thread:
       self.buffer.set_blocking_mode(True)
       self.logger.log(self.logger.LL_INFO, "init: [IIO mode] queues={}/{} context={} dma_d2h={} buffer={}, current_process={}".format(self.request_queue, self.result_queue, self.context, self.chan_dma_d2h, self.buffer, multiprocessing.current_process()))
 
+    self.logger.flush()
+
   def _read(self):
     data = []
     udp_seq_num = -1
     if self.use_udp_dma_rx:
       try:
         data, addr = self.sock.recvfrom(8192)
+        #self.logger.log(self.logger.LL_INFO, "_read: data received: addr={} len={}".format(addr, len(data)))
         assert (len(data) == UDP_PAYLOAD_SIZE)
         unpacked_header = self.PACKED_UDP_HEADER.unpack(data[:self.PACKED_UDP_HEADER.size])
         udp_seq_num = unpacked_header[0]
@@ -84,7 +88,7 @@ class pluto_ecm_hw_dma_reader_thread:
   def run(self):
     running = True
     unique_key = 0
-    startup_flush = True
+    startup_flush = not self.direct_udp_tx  #not needed for direct UDP
 
     while running:
       seq_num, data = self._read()

@@ -62,7 +62,7 @@ ECM_CHANNEL_TRIGGER_MODE_FORCE_TRIGGER          = 1
 ECM_CHANNEL_TRIGGER_MODE_THRESHOLD_TRIGGER      = 2
 ECM_NUM_CHANNEL_TX_PROGRAM_ENTRIES              = 4
 
-ECM_DRFM_MEM_DEPTH                              = 1024 * 24
+ECM_DRFM_MEM_DEPTH                              = 1024 * 32
 ECM_DRFM_MAX_PACKET_IQ_SAMPLES_PER_REPORT       = 116
 ECM_DRFM_SEGMENT_HYST_SHIFT_WIDTH               = 4 #TODO: better name
 
@@ -73,6 +73,10 @@ CHANNELIZER_OVERSAMPLING                        = 2.0
 
 ECM_WORDS_PER_DMA_PACKET                        = 128
 DMA_TRANSFER_SIZE                               = ECM_WORDS_PER_DMA_PACKET * 4
+
+ETH_MAC_HEADER_LENGTH                           = 14
+ETH_IPV4_HEADER_LENGTH                          = 20
+ETH_UDP_HEADER_LENGTH                           = 8
 
 PACKED_ECM_REPORT_COMMON_HEADER   = struct.Struct("<" + PACKED_UINT32 + PACKED_UINT32 + "xx" + PACKED_UINT8 + PACKED_UINT8)
 PACKED_ECM_CONFIG_HEADER          = struct.Struct("<" + PACKED_UINT32 + PACKED_UINT32 + PACKED_UINT16 + PACKED_UINT8 + PACKED_UINT8 + "xxxx")

@@ -26,15 +26,7 @@ class pluto_ecm_hw_dma_writer_udp:
       raise Exception("failed to write buffer")
 
     #TODO: remove data from log line
-    self.logger.log(self.logger.LL_DEBUG, "[hw_dma_writer_udp] wrote {} to buffer = {} bytes".format(data, bytes_written))
-
-    #bytes_written = self.buffer.write(bytearray(data))
-    #if bytes_written == 0:
-    #  raise Exception("failed to write buffer")
-    #
-    #num_words = (bytes_written + 3) // 4
-    #self.buffer.push(num_words)
-    #self.logger.log(self.logger.LL_DEBUG, "[hw_dma_writer] wrote {} to buffer ({} bytes -> {} words)".format(data, bytes_written, num_words))
+    #self.logger.log(self.logger.LL_DEBUG, "[hw_dma_writer_udp] wrote {} to buffer = {} bytes".format(data, bytes_written))
 
   def initialize_hardware_tx(self, remote_mac):
     local_mac = get_mac_address(ip=self.local_ip)
@@ -48,7 +40,8 @@ class pluto_ecm_hw_dma_writer_udp:
     remote_ip_b   = bytearray.fromhex("".join(["{:02x}".format(int(b)) for b in self.remote_ip.split(".")]))
     udp_port_b    = bytearray.fromhex("{:04x}".format(UDP_FILTER_PORT))
 
-    tx_setup_packet = bytearray("UDPSETUP", "ascii")
+    #tx_setup_packet = bytearray("UDPSETUP", "ascii")
+    tx_setup_packet = bytearray()
     tx_setup_packet.extend(local_mac_b)         #dest mac
     tx_setup_packet.extend(remote_mac_b)        #source mac
     tx_setup_packet.extend(b"\x08\x00")         #eth type
@@ -62,9 +55,25 @@ class pluto_ecm_hw_dma_writer_udp:
     tx_setup_packet.extend(b"\x00\x00")         #UDP length
     tx_setup_packet.extend(b"\x00\x00")         #UDP checksum
 
-    #TODO: partial IP checksum
+    ip_partial_checksum = self._get_ip_checksum(tx_setup_packet)
+    tx_setup_packet[24] = (ip_partial_checksum >> 8) & 0xFF
+    tx_setup_packet[25] = ip_partial_checksum & 0xFF
+
+    tx_setup_packet = bytearray("UDPSETUP", "ascii") + tx_setup_packet
 
     self.logger.log(self.logger.LL_INFO, "[hw_dma_writer_udp] initialize_hardware_tx: local_mac={} remote_mac={}".format(local_mac, remote_mac))
     self.logger.log(self.logger.LL_INFO, "[hw_dma_writer_udp] initialize_hardware_tx: tx_setup_packet={}".format(tx_setup_packet))
 
     self.write(tx_setup_packet)
+
+  @staticmethod
+  def _get_ip_checksum(packet_data):
+    cs = 0
+    for i in range(ETH_MAC_HEADER_LENGTH//2, (ETH_MAC_HEADER_LENGTH + ETH_IPV4_HEADER_LENGTH)//2):
+      data_word = (packet_data[2*i] << 8) + packet_data[2*i + 1]
+      cs += data_word
+
+    while (cs > 0xFFFF):
+      cs = (cs & 0xFFFF) + ((cs >> 16) & 0xFFFF)
+
+    return cs
