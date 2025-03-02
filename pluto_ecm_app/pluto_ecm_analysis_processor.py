@@ -39,6 +39,7 @@ class pluto_ecm_analysis_processor:
 
     self.process_pool = multiprocessing.Pool(4) #TODO: config
     self.pool_results = []
+    self.pool_timestamp = []
 
     self.data_to_render = []
     self.signal_processing_delay = 0
@@ -90,7 +91,11 @@ class pluto_ecm_analysis_processor:
   def _process_report_for_iq(self, data):
     now = time.time()
     if (now - self.iq_stats_time) > 1.0:
-      self.logger.log(self.logger.LL_INFO, "_process_report_for_iq: count={} samples={}".format(self.iq_stats_count, self.iq_stats_samples))
+      if len(self.pool_timestamp) > 0:
+        oldest_age = now - self.pool_timestamp[0]
+      else:
+        oldest_age = 0
+      self.logger.log(self.logger.LL_INFO, "_process_report_for_iq: count={} samples={} pool_results={} oldest_age={:.3f}".format(self.iq_stats_count, self.iq_stats_samples, len(self.pool_results), oldest_age))
       self.iq_stats_time = now
       self.iq_stats_count = 0
       self.iq_stats_samples = 0
@@ -101,6 +106,7 @@ class pluto_ecm_analysis_processor:
     try:
       result = self.process_pool.apply_async(self.mod_analysis.process_iq_data, (data,))
       self.pool_results.append(result)
+      self.pool_timestamp.append(now)
     except Exception as e:
       self.logger.log(self.logger.LL_WARN, "_process_report_for_iq: exception: {}".format(e))
       self.logger.flush()
@@ -198,6 +204,7 @@ class pluto_ecm_analysis_processor:
       result_for_logging["analysis"].pop("iq_stft_abs")
       self.recorder.log(result_for_logging)
       self.pool_results.pop(0)
+      self.pool_timestamp.pop(0)
 
   def _copy_tracked_signals(self):
     now = time.time()

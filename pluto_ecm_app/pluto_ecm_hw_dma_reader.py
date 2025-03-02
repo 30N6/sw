@@ -39,7 +39,12 @@ class pluto_ecm_hw_dma_reader_thread:
       self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
       self.sock.bind((arg["local_ip"], self.udp_port))
       self.sock.settimeout(0.1)
-      self.logger.log(self.logger.LL_INFO, "init: [UDP mode] queues={}/{} sock={}, current_process={}".format(self.request_queue, self.result_queue, self.sock, multiprocessing.current_process()))
+
+      recv_buffer_size = self.sock.getsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF)
+      self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 1048576)
+      recv_buffer_size_m = self.sock.getsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF)
+
+      self.logger.log(self.logger.LL_INFO, "init: [UDP mode] queues={}/{} sock={}, current_process={} buf_size={}->{}".format(self.request_queue, self.result_queue, self.sock, multiprocessing.current_process(), recv_buffer_size, recv_buffer_size_m))
     else:
       self.context        = iio.Context(arg["pluto_uri"])
       self.dev_d2h        = self.context.find_device("axi-iio-dma-d2h")
