@@ -63,11 +63,14 @@ class pluto_ecm_hw_dwell_reporter:
     report["actual_total_duration"]               = unpacked_header[19] & 0x7FFFFFFF
     report["dwell_tx_active"]                     = (unpacked_header[19] & 0x80000000) != 0
     report["ts_dwell_start"]                      = (unpacked_header[20] << 32) | unpacked_header[21]
+    report["cycles_total"]                        = (unpacked_header[22] << 32) | unpacked_header[23]
+    report["cycles_active_meas"]                  = (unpacked_header[24] << 32) | unpacked_header[25]
+    report["cycles_active_tx"]                    = (unpacked_header[26] << 32) | unpacked_header[27]
 
     report["channel_data"] = [{"cycles": 1, "accum": 0, "max": 0} for i in range(ECM_NUM_CHANNELS)]
 
-    if report["dwell_tx_active"]:
-      print("dwell_tx_active=1")
+    #if report["dwell_tx_active"]:
+    #  print("dwell_tx_active=1")
 
     for channel_index_hw in range(ECM_NUM_CHANNELS):
       channel_index = pluto_ecm_hw_dwell.ecm_channel_index_hw_to_sw(channel_index_hw)

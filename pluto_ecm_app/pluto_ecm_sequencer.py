@@ -76,9 +76,7 @@ class pluto_ecm_sequencer:
     self.hw_dwell_program_pending       = []
 
     self.dwell_state                    = "IDLE"
-    self.dwell_active                   = []
-    self.dwell_active_first             = []
-    self.dwell_active_last              = []
+    self.dwell_reports_pending          = []
     self.dwell_history                  = {}
     self.dwell_rows_to_render           = []
 
@@ -94,7 +92,8 @@ class pluto_ecm_sequencer:
 
     self.scans_per_frame                  = sw_config.config["dwell_config"]["scans_per_frame"]
     self.scan_length                      = len(sw_config.config["dwell_config"]["dwell_pattern"])
-    assert (self.scans_per_frame > 0)
+    self.reporting_threshold_drfm         = sw_config.config["dwell_config"]["reporting_threshold_drfm"]
+    self.reporting_threshold_dwell        = sw_config.config["dwell_config"]["reporting_threshold_dwell"]
 
     for entry in sw_config.config["dwell_config"]["dwell_freqs"]:
       assert (entry["index"] == len(self.dwell_freqs))
@@ -186,7 +185,8 @@ class pluto_ecm_sequencer:
     while len(self.hw_interface.hwdr.output_data_dwell) > 0:
       packed_report = self.hw_interface.hwdr.output_data_dwell.pop(0)
       r = self.dwell_reporter.process_message(packed_report)
-      expected_dwell_data = self.dwell_active[0]
+
+      expected_dwell_data = self.dwell_reports_pending[0]
 
       if (r["dwell_entry_frequency"] != int(round(expected_dwell_data.frequency))):
         self.logger.log(self.logger.LL_WARN, "[sequencer] _process_dwell_reports_from_hw: dwell frequency mismatch: received={} expected={}".format(r["dwell_entry_frequency"], int(round(expected_dwell_data.frequency))))
@@ -196,7 +196,7 @@ class pluto_ecm_sequencer:
 
       report = {"dwell_data": expected_dwell_data, "dwell_report": r, "first_in_sequence": expected_dwell_data.first_dwell, "last_in_sequence": expected_dwell_data.last_dwell}
       self.recorder.log({"dwell_report": report})
-      self.dwell_active.pop(0)
+      self.dwell_reports_pending.pop(0)
       self._process_dwell_report(report)
       self.report_merge_queue_dwell_summary.append(report)
 
@@ -364,24 +364,30 @@ class pluto_ecm_sequencer:
           self.initial_hw_dwells_loaded = True
 
   def _compute_next_dwell_program(self):
-    assert (len(self.dwell_active) > 0)
+    assert (len(self.dwell_reports_pending) > 0)
 
-    if self.ecm_controller.state in ("TX_LISTEN", "TX_ACTIVE"):
-      reporting_threshold = self.scan_length
-    else:
-      reporting_threshold = 0xFFFF
+    reporting_threshold_drfm  = self.scan_length * self.reporting_threshold_drfm[self.ecm_controller.state]
+    reporting_threshold_dwell = self.scan_length * self.reporting_threshold_dwell[self.ecm_controller.state]
 
-    #reporting_threshold = 2
+    if reporting_threshold_drfm < 0:
+      reporting_threshold_drfm = 0xFFFF
+    if reporting_threshold_dwell < 0:
+      reporting_threshold_dwell = 0xFFFF
 
-    return pluto_ecm_hw_dwell.ecm_dwell_program_entry(1, 0, len(self.dwell_active), reporting_threshold, 0xFFFF, self.ecm_controller.dwell_program_tag)
+    return pluto_ecm_hw_dwell.ecm_dwell_program_entry(1, 0, len(self.dwell_reports_pending), reporting_threshold_drfm, reporting_threshold_dwell, self.ecm_controller.dwell_program_tag)
 
   def _activate_next_dwells(self):
-    assert (len(self.dwell_active) == 0)
+    assert (len(self.dwell_reports_pending) == 0)
 
-    for i in range(self.scans_per_frame):
+    reported_scans = self.reporting_threshold_dwell[self.ecm_controller.state]
+    if reported_scans < 0:
+      reported_scans = self.scans_per_frame[self.ecm_controller.state]
+    assert (reported_scans > 0)
+
+    for i in range(reported_scans):
       for dwell_entry in self.dwell_entries:
-        self.dwell_active.append(dwell_entry)
-        self.logger.log(self.logger.LL_INFO, "[sequencer] _activate_next_dwells: [scan {}] preparing to start new dwell: {}".format(i, dwell_entry))
+        self.dwell_reports_pending.append(dwell_entry)
+        self.logger.log(self.logger.LL_INFO, "[sequencer] _activate_next_dwells: [state {}] [scan {}] preparing to start new dwell: {}".format(self.ecm_controller.state, i, dwell_entry))
 
     self.fast_lock_manager.on_active_next_dwells()
 
@@ -401,7 +407,7 @@ class pluto_ecm_sequencer:
       self.dwell_state = "LOAD_PROFILES"
 
     if self.dwell_state == "LOAD_PROFILES":
-      assert (len(self.dwell_active) > 0)
+      assert (len(self.dwell_reports_pending) > 0)
       if len(self.fast_lock_manager.fast_lock_load_pending) == 0:
         self.dwell_state = "SEND_PROGRAM"
 
@@ -419,7 +425,7 @@ class pluto_ecm_sequencer:
         self.dwell_state = "HW_ACTIVE"
 
     if self.dwell_state == "HW_ACTIVE":
-      if (len(self.dwell_active) == 0):
+      if (len(self.dwell_reports_pending) == 0):
         self.logger.log(self.logger.LL_INFO, "[sequencer] _update_scan_dwells [HW_ACTIVE]: dwells completed")
         self.dwell_state = "DWELLS_COMPLETE"
 

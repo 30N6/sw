@@ -22,6 +22,11 @@ class pluto_ecm_hw_stats:
     self.stats["dwell_time_active_total"]               = 0
     self.stats["dwell_time_gap_total"]                  = 0
     self.stats["dwell_time_total"]                      = 0
+    self.stats["dwell_cycles_meas"]                     = 0
+    self.stats["dwell_cycles_tx"]                       = 0
+    self.stats["dwell_cycles_total"]                    = 0
+    self.stats["dwell_cycles_tx_sec"]                   = 0
+
     self.stats["drfm_summary_report_total"]             = 0
     self.stats["drfm_dwells_with_writes"]               = 0
     self.stats["drfm_dwells_with_reads"]                = 0
@@ -37,6 +42,9 @@ class pluto_ecm_hw_stats:
     self.stats["dwell_coverage_meas_active"]            = 0
     self.stats["dwell_coverage_total_meas"]             = 0
     self.stats["dwell_coverage_total_all"]              = 0
+    self.stats["dwell_cycles_meas_frac"]                = 0
+    self.stats["dwell_cycles_tx_frac"]                  = 0
+
 
     self.stats["drfm_total_channel_write_report_delay_sec"] = 0
     self.stats["drfm_total_summary_write_report_delay_sec"] = 0
@@ -50,6 +58,9 @@ class pluto_ecm_hw_stats:
     self.stats["dwell_coverage_total_meas"]   = self.stats["dwell_time_active_meas"]  / max(1, self.stats["dwell_time_total"])
     self.stats["dwell_coverage_total_all"]    = self.stats["dwell_time_active_total"] / max(1, self.stats["dwell_time_total"])
     self.stats["dwell_gap_fraction"]          = self.stats["dwell_time_gap_total"]    / max(1, self.stats["dwell_time_total"])
+    self.stats["dwell_cycles_meas_frac"]      = self.stats["dwell_cycles_meas"]       / max(1, self.stats["dwell_cycles_total"])
+    self.stats["dwell_cycles_tx_frac"]        = self.stats["dwell_cycles_tx"]         / max(1, self.stats["dwell_cycles_total"])
+    self.stats["dwell_cycles_tx_sec"]         = self.stats["dwell_cycles_tx"] * FAST_CLOCK_PERIOD
 
     self.stats["dwell_time_total_sec"]                       = FAST_CLOCK_PERIOD * self.stats["dwell_time_total"]
     self.stats["drfm_total_channel_write_report_delay_frac"] = FAST_CLOCK_PERIOD * self.stats["drfm_total_channel_write_report_delay"] #/ max(1, self.stats["dwell_time_total"])
@@ -98,6 +109,10 @@ class pluto_ecm_hw_stats:
     self.stats["dwell_time_total"]                    += (ts_dwell_end - self.ts_prev_dwell_end)
 
     self.ts_prev_dwell_end = ts_dwell_end
+
+    self.stats["dwell_cycles_total"]  += dwell_report["cycles_total"]
+    self.stats["dwell_cycles_meas"]   += dwell_report["cycles_active_meas"]
+    self.stats["dwell_cycles_tx"]     += dwell_report["cycles_active_tx"]
 
   def _process_drfm_summary_report(self, report):
 

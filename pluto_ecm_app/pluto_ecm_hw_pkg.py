@@ -128,7 +128,10 @@ PACKED_DWELL_STATS_HEADER = struct.Struct("<" + PACKED_UINT32 + PACKED_UINT32 + 
                                                 PACKED_UINT16 + PACKED_UINT16 +                                         #program tag, global counter
                                                 PACKED_UINT32 +                                                         #actual_measurement_duration
                                                 PACKED_UINT32 +                                                         #tx active flag (31), actual_total_duration (30:0)
-                                                PACKED_UINT32 + PACKED_UINT32)                                          #ts_dwell_start
+                                                PACKED_UINT32 + PACKED_UINT32 +                                         #ts_dwell_start
+                                                PACKED_UINT32 + PACKED_UINT32 +                                         #total cycles since last report
+                                                PACKED_UINT32 + PACKED_UINT32 +                                         #active measurement cycles since last report
+                                                PACKED_UINT32 + PACKED_UINT32)                                          #active tx cycles since last report
 
 PACKED_DWELL_STATS_CHANNEL_ENTRY = struct.Struct("<" + PACKED_UINT32 + PACKED_UINT32 + PACKED_UINT32 + PACKED_UINT32)
 
