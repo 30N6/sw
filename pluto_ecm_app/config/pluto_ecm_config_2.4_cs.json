@@ -7,7 +7,9 @@
       {"index": 1, "freq": 2475.0, "dwell_measurement_time": 0.001000, "dwell_total_time_max": 0.020000, "min_trigger_duration": 256, "tx_enabled": 1}
     ],
     "dwell_pattern": [0, 1, 0, 1, 0, 1, 0, 1],
-    "scans_per_frame": 32,
+    "scans_per_frame"                   : 1,
+    "reporting_scan_start_index_drfm"   : 0,
+    "reporting_scan_start_index_dwell"  : 0,
     "exclude_freqs": [
       {"freq_range": [174, 216], "comment": ""}
     ]
@@ -25,6 +27,7 @@
     ]
   },
   "analysis_config": {
+    "enable_analysis_recording": 0,
     "signal_tracker": {
       "update_interval" : 0.1,
       "max_report_age"  : 60,

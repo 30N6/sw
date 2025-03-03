@@ -92,6 +92,9 @@ class pluto_ecm_sequencer:
     self.report_merge_queue_drfm_summary  = {}
     self.report_merge_queue_drfm_channel  = {}
 
+    self.scans_per_frame                  = sw_config.config["dwell_config"]["scans_per_frame"]
+    assert (self.scans_per_frame > 0)
+
     for entry in sw_config.config["dwell_config"]["dwell_freqs"]:
       assert (entry["index"] == len(self.dwell_freqs))
       self.dwell_freqs.append(entry["freq"])
@@ -366,9 +369,10 @@ class pluto_ecm_sequencer:
   def _activate_next_dwells(self):
     assert (len(self.dwell_active) == 0)
 
-    for dwell_entry in self.dwell_entries:
-      self.dwell_active.append(dwell_entry)
-      self.logger.log(self.logger.LL_INFO, "[sequencer] _activate_next_dwells: preparing to start new dwell: {}".format(dwell_entry))
+    for i in range(self.scans_per_frame):
+      for dwell_entry in self.dwell_entries:
+        self.dwell_active.append(dwell_entry)
+        self.logger.log(self.logger.LL_INFO, "[sequencer] _activate_next_dwells: [scan {}] preparing to start new dwell: {}".format(i, dwell_entry))
 
     self.fast_lock_manager.on_active_next_dwells()
 
