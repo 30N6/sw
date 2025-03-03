@@ -53,15 +53,16 @@ class pluto_ecm_hw_drfm_reporter:
     report["msg_type"]            = unpacked_header[2]
     report["dwell_seq_num"]       = unpacked_header[4]
 
-    report["channel_index_hw"]    = unpacked_header[6]
-    report["channel_index"]       = pluto_ecm_hw_dwell.ecm_channel_index_hw_to_sw(unpacked_header[6])
-    report["max_iq_bits"]         = unpacked_header[5]
-    report["segment_seq_num"]     = unpacked_header[7]
-    report["segment_timestamp"]   = (unpacked_header[8] << 32) | unpacked_header[9]
-    report["segment_addr_first"]  = unpacked_header[11]
-    report["segment_addr_last"]   = unpacked_header[10]
-    report["slice_addr"]          = unpacked_header[13]
-    report["slice_length"]        = unpacked_header[12]
+    report["trigger_forced"]      = unpacked_header[5]
+    report["channel_index_hw"]    = unpacked_header[7]
+    report["channel_index"]       = pluto_ecm_hw_dwell.ecm_channel_index_hw_to_sw(unpacked_header[7])
+    report["max_iq_bits"]         = unpacked_header[6]
+    report["segment_seq_num"]     = unpacked_header[8]
+    report["segment_timestamp"]   = (unpacked_header[9] << 32) | unpacked_header[10]
+    report["segment_addr_first"]  = unpacked_header[12]
+    report["segment_addr_last"]   = unpacked_header[11]
+    report["slice_addr"]          = unpacked_header[14]
+    report["slice_length"]        = unpacked_header[13]
 
     assert (report["slice_length"] <= ECM_DRFM_MAX_PACKET_IQ_SAMPLES_PER_REPORT)
     assert (report["slice_length"] > 0)

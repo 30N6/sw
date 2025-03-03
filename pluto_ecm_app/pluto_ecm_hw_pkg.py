@@ -87,7 +87,9 @@ PACKED_ECM_CONFIG_CONTROL         = struct.Struct("<" + PACKED_UINT32 + PACKED_U
 PACKED_STATUS_REPORT = struct.Struct("<" + PACKED_UINT32 + PACKED_UINT32 + "xx" + PACKED_UINT8 + PACKED_UINT8 +
                                            PACKED_UINT32 + PACKED_UINT32 + PACKED_UINT32 + PACKED_UINT32 + PACKED_UINT32)
 
-PACKED_ECM_DWELL_PROGRAM_ENTRY = struct.Struct("<" + PACKED_UINT8 + PACKED_UINT8 + PACKED_UINT16 + PACKED_UINT16 + "xx")  #enable, initial_dwell_index, global_counter_init, tag, padding
+PACKED_ECM_DWELL_PROGRAM_ENTRY = struct.Struct("<" + PACKED_UINT8 + PACKED_UINT8 + PACKED_UINT16 +          #enable, initial_dwell_index, global_counter_init,
+                                                     PACKED_UINT16 + PACKED_UINT16 +                        #reporting_threshold_drfm, reporting_threshold_stats
+                                                     PACKED_UINT16 + "xxxxxx")                              #tag, padding
 
 PACKED_ECM_DWELL_ENTRY  = struct.Struct("<" + PACKED_UINT8 + PACKED_UINT8 + PACKED_UINT8 + PACKED_UINT8 +   #flags, repeat_count, fast_lock_profile, next_dwell_index
                                               PACKED_UINT16 + PACKED_UINT16 +                               #pre lock, post lock delay
@@ -139,7 +141,7 @@ PACKED_DRFM_SUMMARY_REPORT_HEADER = struct.Struct("<" + PACKED_UINT32 + PACKED_U
 
 PACKED_DRFM_CHANNEL_REPORT_HEADER = struct.Struct("<" + PACKED_UINT32 + PACKED_UINT32 + "xx" + PACKED_UINT8 + PACKED_UINT8 +    #common report header
                                                         PACKED_UINT32 +                                                         #dwell_seq_num
-                                                        "xx" + PACKED_UINT8 + PACKED_UINT8 +                                    #padding, channel_index, max_iq_bits
+                                                        "x" + PACKED_UINT8 + PACKED_UINT8 + PACKED_UINT8 +                      #padding, trigger_forced, channel_index, max_iq_bits
                                                         PACKED_UINT32 +                                                         #segment_seq_num
                                                         PACKED_UINT32 + PACKED_UINT32 +                                         #segment_timestamp
                                                         PACKED_UINT16 + PACKED_UINT16 +                                         #segment_addr_first, segment_addr_last

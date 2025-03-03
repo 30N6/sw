@@ -93,6 +93,7 @@ class pluto_ecm_sequencer:
     self.report_merge_queue_drfm_channel  = {}
 
     self.scans_per_frame                  = sw_config.config["dwell_config"]["scans_per_frame"]
+    self.scan_length                      = len(sw_config.config["dwell_config"]["dwell_pattern"])
     assert (self.scans_per_frame > 0)
 
     for entry in sw_config.config["dwell_config"]["dwell_freqs"]:
@@ -206,8 +207,8 @@ class pluto_ecm_sequencer:
       dwell_seq_num = r["dwell_seq_num"]
 
       if r["msg_type"] == ECM_REPORT_MESSAGE_TYPE_DRFM_CHANNEL_DATA:
-        self.logger.log(self.logger.LL_INFO, "[sequencer] _process_drfm_reports_from_hw: drfm channel report: msg_seq={} dwell_seq={} channel={} iq_bits={} seg_seq={} slice_addr={} slice_len={}".format(
-          r["msg_seq_num"], dwell_seq_num, r["channel_index"], r["max_iq_bits"], r["segment_seq_num"], r["slice_addr"], r["slice_length"]))
+        self.logger.log(self.logger.LL_INFO, "[sequencer] _process_drfm_reports_from_hw: drfm channel report: msg_seq={} dwell_seq={} channel={} iq_bits={} forced={} seg_seq={} slice_addr={} slice_len={}".format(
+          r["msg_seq_num"], dwell_seq_num, r["channel_index"], r["max_iq_bits"], r["trigger_forced"], r["segment_seq_num"], r["slice_addr"], r["slice_length"]))
 
         report = {"drfm_channel_report": r}
         self.recorder.log(report)
@@ -362,9 +363,17 @@ class pluto_ecm_sequencer:
         if (len(self.hw_dwell_entry_pending) == 0) and (len(self.hw_channel_entry_pending) == 0):
           self.initial_hw_dwells_loaded = True
 
-  def _compute_next_dwell_program(self, tag):
+  def _compute_next_dwell_program(self):
     assert (len(self.dwell_active) > 0)
-    return pluto_ecm_hw_dwell.ecm_dwell_program_entry(1, 0, len(self.dwell_active), tag)
+
+    if self.ecm_controller.state in ("TX_LISTEN", "TX_ACTIVE"):
+      reporting_threshold = self.scan_length
+    else:
+      reporting_threshold = 0xFFFF
+
+    #reporting_threshold = 2
+
+    return pluto_ecm_hw_dwell.ecm_dwell_program_entry(1, 0, len(self.dwell_active), reporting_threshold, 0xFFFF, self.ecm_controller.dwell_program_tag)
 
   def _activate_next_dwells(self):
     assert (len(self.dwell_active) == 0)
@@ -400,7 +409,7 @@ class pluto_ecm_sequencer:
         self._flush_channel_entry_queue()
         self._flush_tx_program_queue()
 
-        dwell_program = self._compute_next_dwell_program(self.ecm_controller.dwell_program_tag)
+        dwell_program = self._compute_next_dwell_program()
         self._send_hw_dwell_program(dwell_program)
         self.logger.log(self.logger.LL_INFO, "[sequencer] _update_scan_dwells [LOAD_PROFILES]: profiles loaded, sending dwell program - tag={}".format(self.ecm_controller.dwell_program_tag))
 

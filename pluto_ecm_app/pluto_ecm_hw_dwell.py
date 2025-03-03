@@ -31,19 +31,22 @@ from pluto_ecm_hw_pkg import *
 
 
 class ecm_dwell_program_entry:
-  def __init__(self, enable, initial_dwell_index, global_counter_init, tag):
+  def __init__(self, enable, initial_dwell_index, global_counter_init, reporting_threshold_drfm, reporting_threshold_stats, tag):
     assert (enable <= 1)
     assert (initial_dwell_index < ECM_NUM_DWELL_ENTRIES)
     assert (global_counter_init <= 0xFFFF)
 
-    self.fields                         = {}
-    self.fields["enable"]               = enable
-    self.fields["initial_dwell_index"]  = initial_dwell_index
-    self.fields["global_counter_init"]  = global_counter_init
-    self.fields["tag"]                  = tag
+    self.fields                               = {}
+    self.fields["enable"]                     = enable
+    self.fields["initial_dwell_index"]        = initial_dwell_index
+    self.fields["global_counter_init"]        = global_counter_init
+    self.fields["reporting_threshold_drfm"]   = reporting_threshold_drfm
+    self.fields["reporting_threshold_stats"]  = reporting_threshold_stats
+    self.fields["tag"]                        = tag
 
   def pack(self):
-    return PACKED_ECM_DWELL_PROGRAM_ENTRY.pack(self.fields["enable"], self.fields["initial_dwell_index"], self.fields["global_counter_init"], self.fields["tag"])
+    return PACKED_ECM_DWELL_PROGRAM_ENTRY.pack(self.fields["enable"], self.fields["initial_dwell_index"], self.fields["global_counter_init"],
+                                               self.fields["reporting_threshold_drfm"], self.fields["reporting_threshold_stats"], self.fields["tag"])
 
   def __str__(self):
     return "[dwell_program: fields={}]".format(self.fields)
