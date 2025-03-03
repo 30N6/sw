@@ -3,10 +3,12 @@ import pluto_ecm_analysis_processor
 from pluto_ecm_hw_pkg import *
 import time
 import multiprocessing
-from multiprocessing import Process, Queue
+from multiprocessing import Process, Queue, Manager
 import traceback
 import copy
 import signal
+
+import tracemalloc
 
 class pluto_ecm_analysis_thread:
 
@@ -18,6 +20,8 @@ class pluto_ecm_analysis_thread:
 
     self.logger.log(self.logger.LL_INFO, "init: queues={}/{}, current_process={}".format(self.input_queue, self.output_queue, multiprocessing.current_process()))
 
+    #tracemalloc.start()
+
   def _send_tracked_signals(self):
     while len(self.processor.data_to_render) > 0:
       self.output_queue.put(self.processor.data_to_render.pop(0))
@@ -25,25 +29,14 @@ class pluto_ecm_analysis_thread:
   def run(self):
     running = True
 
-  #except KeyboardInterrupt:
-  #  main_thread.shutdown()
-  #except Exception as e:
-  #  print("Exception: {}".format(e))
-  #  print(traceback.format_exc())
-  #
-  #processes = multiprocessing.active_children()
-  #for child in processes:
-  #  print("pluto_ecm_app: terminating child process {}".format(child))
-  #  child.terminate()
     try:
       while running:
         #read off data from the queue before calling update() - helps ensure a clean shutdown
         while not self.input_queue.empty():
+          #self.logger.log(self.logger.LL_INFO, "input_queue.get()")
           data = self.input_queue.get()
           if isinstance(data, dict):
-            self.logger.log(self.logger.LL_INFO, "{}".format(data.keys()))
-            self.logger.flush()
-            #self.logger.log(self.logger.LL_DEBUG, data)
+            #self.logger.log(self.logger.LL_INFO, "input_queue: got dict: time_diff={:.3f}".format(time.time() - data["timestamp"]))
             self.processor.submit_data(data)
           else:
             if data == "CMD_STOP":
@@ -67,6 +60,8 @@ class pluto_ecm_analysis_thread:
   def shutdown(self, reason):
     self.processor.shutdown(reason)
     self.logger.shutdown(reason)
+    #self.input_queue.cancel_join_thread()
+    #self.output_queue.cancel_join_thread()
 
 analysis_thread = 0
 
@@ -85,6 +80,8 @@ def pluto_ecm_analysis_thread_func(arg):
   except Exception as e:
     analysis_thread.shutdown("exception: {}".format(e))
 
+  print("pluto_ecm_analysis_thread_func: done")
+
 def pluto_ecm_analysis_thread_sig_handler(arg1, arg2):
   global analysis_thread
   analysis_thread.shutdown("sig handler: {} {}".format(arg1, arg2))
@@ -92,8 +89,9 @@ def pluto_ecm_analysis_thread_sig_handler(arg1, arg2):
 class pluto_ecm_analysis_runner:
   def __init__(self, logger, sw_config):
     self.logger       = logger
-    self.input_queue  = Queue()
-    self.output_queue = Queue()
+    self.mp_manager   = Manager()
+    self.input_queue  = self.mp_manager.Queue()
+    self.output_queue = self.mp_manager.Queue()
     self.running      = True
 
     self.scan_results             = {}
@@ -132,6 +130,7 @@ class pluto_ecm_analysis_runner:
 
   def submit_data(self, report):
     if self.running:
+      self.logger.log(self.logger.LL_INFO, "[analysis] submit_data - report")
       self.input_queue.put(report, block=False)
     else:
       self.logger.log(self.logger.LL_INFO, "[analysis] submit_data: shutting down -- report dropped: {}".format(report))
@@ -143,11 +142,16 @@ class pluto_ecm_analysis_runner:
     self.running = False
     self.logger.log(self.logger.LL_INFO, "[analysis] shutdown")
     if self.analysis_process.is_alive():
-      self.input_queue.put("CMD_STOP", block=False)
-      self.analysis_process.join(1.0)
-      self.logger.log(self.logger.LL_INFO, "[analysis] shutdown: analysis_process.exitcode={} is_alive={}".format(self.analysis_process.exitcode, self.analysis_process.is_alive()))
+      for i in range(100):
+        self.logger.log(self.logger.LL_INFO, "[analysis] sending CMD_STOP to analysis thread")
+        self.input_queue.put("CMD_STOP", block=False)
+        self.analysis_process.join(1.0)
+        self.logger.log(self.logger.LL_INFO, "[analysis] shutdown: analysis_process.exitcode={} is_alive={}".format(self.analysis_process.exitcode, self.analysis_process.is_alive()))
+        if not self.analysis_process.is_alive():
+          break
     else:
       self.logger.log(self.logger.LL_INFO, "[analysis] shutdown: analysis_process already dead, exitcode={}".format(self.analysis_process.exitcode))
+
     self.logger.flush()
 
     while not self.input_queue.empty():

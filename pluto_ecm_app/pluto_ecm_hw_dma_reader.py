@@ -8,7 +8,7 @@ import time
 import platform
 import subprocess
 import multiprocessing
-from multiprocessing import Process, Queue
+from multiprocessing import Process, Queue, Manager
 
 
 UDP_PAYLOAD_SIZE = DMA_TRANSFER_SIZE + 4 #includes seq num
@@ -283,10 +283,11 @@ class pluto_ecm_hw_dma_reader:
     self.pluto_uri = pluto_uri
     self.logger = logger
     self.udp_mode = udp_mode
-    self.hwdr_request_queue = Queue()
-    self.hwdr_result_queue = Queue()
-    self.runner_request_queue = Queue()
-    self.runner_result_queue = Queue()
+    self.mp_manager           = Manager()
+    self.hwdr_request_queue   = self.mp_manager.Queue()
+    self.hwdr_result_queue    = self.mp_manager.Queue()
+    self.runner_request_queue = self.mp_manager.Queue()
+    self.runner_result_queue  = self.mp_manager.Queue()
     self.running = True
     self.num_dma_reads = 0
     self.num_status_reports = 0

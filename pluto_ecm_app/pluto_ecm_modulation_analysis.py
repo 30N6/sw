@@ -78,11 +78,11 @@ class pluto_ecm_modulation_analysis:
       analysis["iq_stft_abs"] = iq_stft
 
       r["analysis"] = analysis
+      r["iq_data"] = [[float(np.real(report["iq_data"][i])), float(np.imag(report["iq_data"][i]))] for i in range(report["iq_data"].size)]
 
       t_end = time.time()
       r["processing_time"] = t_end - t_start
       r["time_since_read"] = t_end - timestamp
-      r["iq_data"] = [[float(np.real(report["iq_data"][i])), float(np.imag(report["iq_data"][i]))] for i in range(report["iq_data"].size)]
 
       #if (analysis["lora_r_squared"] > 0.7):
       #  print("LORA: [{}] {:.3f} {:.1f} {:.2f} {:.2f} -- {:.6f} {:.6f}".format(r["hw_timestamp"], analysis["lora_r_squared"], analysis["lora_slope"] / (1e3/1e-6), analysis["lora_peak_count_ratio"], analysis["lora_peak_spacing_ratio"], t_end - t_start, t_end - timestamp))

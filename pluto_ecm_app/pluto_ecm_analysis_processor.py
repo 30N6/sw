@@ -54,25 +54,6 @@ class pluto_ecm_analysis_processor:
                                         "summary_power_history" : [[] for i in range(ECM_NUM_CHANNELS)]}
     self.scan_seq_num += 1
 
-  #TODO: remove
-  #def _update_scan_stats_iq(self, data):
-  #  dwell_freq    = data["dwell_freq"]
-  #  stats         = self.scan_stats[dwell_freq]
-  #  iq_data       = data["iq_data"]
-  #  channel_index = data["channel_index"]
-  #
-  #  channel_power = np.square(np.real(iq_data)) + np.square(np.imag(iq_data))
-  #  stats["iq_power_history"][channel_index].append(channel_power)
-  #
-  #  print("channel={}: power={} history={}".format(channel_index, channel_power, stats["iq_power_history"][channel_index]))
-  #
-  #
-  #  stats["iq_power_mean"][channel_index]   = np.mean(stats["iq_power_history"][channel_index])
-  #  stats["iq_power_median"][channel_index] = np.median(stats["iq_power_history"][channel_index])
-  #
-  #  self.logger.log(self.logger.LL_DEBUG, "_update_scan_stats_iq: dwell_freq={} channel_index={} power_mean={:.1f} power_median={:.1f}".format(dwell_freq, channel_index,
-  #    stats["iq_power_mean"][channel_index], stats["iq_power_median"][channel_index]))
-
   def _update_scan_stats_summary(self, data):
     dwell_freq    = data["dwell"]["dwell_data"].frequency
     channel_data  = data["dwell"]["dwell_report"]["channel_data"]
@@ -95,7 +76,9 @@ class pluto_ecm_analysis_processor:
         oldest_age = now - self.pool_timestamp[0]
       else:
         oldest_age = 0
+
       self.logger.log(self.logger.LL_INFO, "_process_report_for_iq: count={} samples={} pool_results={} oldest_age={:.3f}".format(self.iq_stats_count, self.iq_stats_samples, len(self.pool_results), oldest_age))
+
       self.iq_stats_time = now
       self.iq_stats_count = 0
       self.iq_stats_samples = 0
@@ -104,11 +87,16 @@ class pluto_ecm_analysis_processor:
     self.iq_stats_samples += len(data["iq_data"])
 
     try:
-      result = self.process_pool.apply_async(self.mod_analysis.process_iq_data, (data,))
-      self.pool_results.append(result)
-      self.pool_timestamp.append(now)
+      if len(self.pool_results) < 100:
+        result = self.process_pool.apply_async(self.mod_analysis.process_iq_data, (data,))
+        self.pool_results.append(result)
+        self.pool_timestamp.append(now)
+      else:
+        self.logger.log(self.logger.LL_INFO, "_process_report_for_iq: dropping data - too many items in queue")
+
     except Exception as e:
       self.logger.log(self.logger.LL_WARN, "_process_report_for_iq: exception: {}".format(e))
+      self.logger.log(self.logger.LL_WARN, "_process_report_for_iq: traceback: {}".format(traceback.format_exc()))
       self.logger.flush()
 
   @staticmethod
@@ -191,18 +179,34 @@ class pluto_ecm_analysis_processor:
         break
       result = self.pool_results[0].get()
 
-      if "sw_timestamp" not in result:
-        print("result: {}".format(result))
+      #if "sw_timestamp" not in result:
+      #  print("result: {}".format(result))
+
+      now = time.time()
 
       self.signal_tracker.submit_analysis_report(result)
-      self.signal_processing_delay = time.time() - result["sw_timestamp"]
-      #if (result["controller_state"] == "SCAN"):
-      #  print("pool result ready at {}: {}".format(time.time(), result))
+      self.signal_processing_delay = now - result["sw_timestamp"]
+
+      self.logger.log(self.logger.LL_INFO, "_process_pool_results: full processing delay: {:.3f}  from submission delay: {:.3f} processing_time: {:.3f} time_since_read:{:.3f}".format(self.signal_processing_delay, now - self.pool_timestamp[0], result["processing_time"], result["time_since_read"]))
 
       result_for_logging = result.copy()
       result_for_logging["analysis"] = result["analysis"].copy()
       result_for_logging["analysis"].pop("iq_stft_abs")
       self.recorder.log(result_for_logging)
+      self.pool_results.pop(0)
+      self.pool_timestamp.pop(0)
+
+  def _shutdown_pool(self):
+    self.logger.log(self.logger.LL_INFO, "_shutdown_pool: {} items in queue".format(len(self.pool_results)))
+
+    while len(self.pool_results) > 0:
+      if not self.pool_results[0].ready():
+        self.logger.log(self.logger.LL_INFO, "_shutdown_pool: waiting for result...")
+        time.sleep(0.1)
+        continue
+      result = self.pool_results[0].get()
+      self.logger.log(self.logger.LL_INFO, "_shutdown_pool: result done, {} remaining".format(len(self.pool_results) - 1))
+
       self.pool_results.pop(0)
       self.pool_timestamp.pop(0)
 
@@ -305,6 +309,7 @@ class pluto_ecm_analysis_processor:
 
   def shutdown(self, reason):
     self.logger.log(self.logger.LL_INFO, "[pluto_ecm_analysis_processor]: shutdown started - reason={}".format(reason))
+    self._shutdown_pool()
     self.process_pool.terminate()
     self.process_pool.join()
     self.recorder.shutdown(reason)

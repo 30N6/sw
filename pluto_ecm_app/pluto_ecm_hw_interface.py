@@ -7,7 +7,7 @@ from pluto_ecm_hw_pkg import *
 import iio
 import time
 import multiprocessing
-from multiprocessing import Process, Queue
+from multiprocessing import Process, Queue, Manager
 
 class hw_command:
   CMD_WRITE_ATTR_RX_PHY   = 0
@@ -223,8 +223,9 @@ class pluto_ecm_hw_command_processor:
     self.udp_mode = udp_mode
     self.logger = logger
     self.hwdr = hwdr
-    self.request_queue = Queue()
-    self.result_queue = Queue()
+    self.mp_manager     = Manager()
+    self.request_queue  = self.mp_manager.Queue()
+    self.result_queue   = self.mp_manager.Queue()
     self.running = True
     self.num_commands = 0
     self.num_dma_writes = 0
