@@ -137,7 +137,7 @@ end
 
 function H_f = get_analysis_sub_filters(L, output_width)
     %L = 64;         % subbands
-    M = 8;          % taps per subband
+    M = 12;          % taps per subband
     N = M*L;        % total taps
     alpha = 0.8;    %broadening factor
     beta = 0.8;     %shape factor
@@ -160,9 +160,9 @@ end
 
 function H_f = get_synthesis_sub_filters(L, output_width)
     %L = 64;         % subbands
-    M = 6;          % taps per subband
+    M = 8;          % taps per subband
     N = M*L;        % total taps
-    alpha = 0.950;    %broadening factor
+    alpha = 0.980;    %broadening factor
     beta = 0.8;     %shape factor
     H = kaiser(N,beta*M)' .* sinc(((-N/2:N/2-1))/(alpha*L));
     
