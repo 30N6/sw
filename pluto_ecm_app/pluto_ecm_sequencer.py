@@ -77,8 +77,10 @@ class pluto_ecm_sequencer:
 
     self.dwell_state                    = "IDLE"
     self.dwell_reports_pending          = []
+
     self.dwell_history                  = {}
     self.dwell_rows_to_render           = []
+    self.merged_reports_to_render       = []
 
     self.dwell_freqs                      = []
     self.dwell_entries                    = []
@@ -259,6 +261,7 @@ class pluto_ecm_sequencer:
 
       merged_report = {"dwell": dwell_summary, "drfm_summary_report": drfm_summary, "drfm_channel_reports": drfm_channel_reports}
       self.ecm_controller.submit_report(merged_report)
+      self.merged_reports_to_render.append(merged_report)
 
   def _update_data_from_hw(self):
     if self.state == "FLUSH":

@@ -13,7 +13,7 @@ class render_spectrum:
   def __init__(self, surface, sw_config, sequencer):
     self.rect_width                       = 600
     self.rect_left                        = 24
-    self.rect_dwell_display               = [self.rect_left, 4,   self.rect_width, 16]
+    self.rect_dwell_display               = [self.rect_left, 4,   self.rect_width, 32]
     self.rect_spectrum_display_primary    = [self.rect_left, 56,  self.rect_width, 320]
     self.rect_spectrum_display_secondary  = [self.rect_left, 400, self.rect_width, 288]
 
@@ -25,6 +25,14 @@ class render_spectrum:
     else:
       self.div_coords = []
     self.freq_coords = [self.rect_left + self.dwell_pane_width * (i + 0.5) for i in range(self.dwell_count)]
+
+    self.channel_width = int(self.dwell_pane_width // ECM_NUM_CHANNELS)
+    self.channel_coords = {}
+    self.drfm_reports = {}
+    for i in range(self.dwell_count):
+      freq = self.dwell_freqs[i]
+      self.channel_coords[freq] = [self.rect_left  + i * self.dwell_pane_width + j * self.channel_width for j in range(ECM_NUM_CHANNELS)]
+      self.drfm_reports[freq] = [{"trigger_thresh": 0, "trigger_forced": 0, "tx_active": 0} for j in range(ECM_NUM_CHANNELS)]
 
     self.surface    = surface
     self.sw_config  = sw_config
@@ -44,11 +52,11 @@ class render_spectrum:
     self.colors["frame_elements"] = (0, 128, 128)
     self.colors["grid_lines"]     = (0, 128, 128)
     self.colors["zoom_marker"]    = (0, 192, 192)
+    self.colors["trigger_thresh"] = (192, 192, 0)
+    self.colors["trigger_forced"] = (0, 64, 192)
 
     self.dwell_cal_interval   = sw_config.config["fast_lock_config"]["recalibration_interval"]
 
-    self.dwell_cal_height     = 0.5
-    self.dwell_scan_height    = 1 - self.dwell_cal_height
     self.dwell_scan_fade_time = 0.5
 
     self.font = pygame.font.SysFont('Consolas', 12)
@@ -94,7 +102,7 @@ class render_spectrum:
     # calibration status
     for i in range(len(self.sequencer.fast_lock_manager.fast_lock_cal_state)):
       cal_state = self.sequencer.fast_lock_manager.fast_lock_cal_state[i]
-      dwell_rect = [self.freq_coords[i] - self.dwell_pane_width/2, self.rect_dwell_display[1], self.dwell_pane_width, self.rect_dwell_display[3] * self.dwell_cal_height]
+      dwell_rect = [self.freq_coords[i] - self.dwell_pane_width/2, self.rect_dwell_display[1], self.dwell_pane_width, self.rect_dwell_display[3] * 0.33]
 
       if not cal_state.fast_lock_profile_valid:
         cal_color = self.colors["cal_old"]
@@ -109,9 +117,32 @@ class render_spectrum:
         continue
 
       dwell_completion_time = self.sequencer.dwell_history[freq]
-      dwell_rect = [self.freq_coords[i] - self.dwell_pane_width/2, self.rect_dwell_display[1] + self.rect_dwell_display[3] * (1 - self.dwell_scan_height), self.dwell_pane_width, self.rect_dwell_display[3] * self.dwell_scan_height]
+      dwell_rect = [self.freq_coords[i] - self.dwell_pane_width/2, self.rect_dwell_display[1] + self.rect_dwell_display[3] * 0.33, self.dwell_pane_width, self.rect_dwell_display[3] * 0.33]
       dwell_color = self._color_interp(self.colors["dwell_new"], self.colors["dwell_old"], (now - dwell_completion_time) / self.dwell_scan_fade_time)
       pygame.draw.rect(self.surface, dwell_color, dwell_rect, 0)
+
+    #
+    #self.drfm_reports[freq][channel_index]["trigger_thresh"]
+    for i in range(self.dwell_count):
+      freq = self.dwell_freqs[i]
+
+      for j in range(ECM_NUM_CHANNELS):
+        report_count = self.drfm_reports[freq][j]
+        if report_count["trigger_thresh"] > 0:
+          trigger_color = self.colors["trigger_thresh"]
+        elif report_count["trigger_forced"] > 0:
+          trigger_color = self.colors["trigger_forced"]
+        else:
+          continue
+
+        report_count["trigger_thresh"] = 0
+        report_count["trigger_forced"] = 0
+
+        trigger_coords = self.channel_coords[freq][j]
+        #print("freq={} channel={} c={}".format(freq, j, trigger_coords))
+
+        trigger_rect = [trigger_coords, self.rect_dwell_display[1] + self.rect_dwell_display[3] * 0.66, self.channel_width, self.rect_dwell_display[3] * 0.33]
+        pygame.draw.rect(self.surface, trigger_color, trigger_rect, 0)
 
     for i in range(self.dwell_count - 1):
       pygame.draw.line(self.surface, self.colors["frame_elements"], [self.div_coords[i], self.rect_dwell_display[1]], [self.div_coords[i], self.rect_dwell_display[1] + self.rect_dwell_display[3] - 1], 1)
@@ -228,6 +259,20 @@ class render_spectrum:
       #self.pr.enable()
       for freq in self.dwell_freqs:
         self.spectrogram[freq].process_new_row(self.sequencer.dwell_buffer)
+
+    while len(self.sequencer.merged_reports_to_render) > 0:
+      data = self.sequencer.merged_reports_to_render.pop(0)
+      if (data["drfm_channel_reports"] is None) or (len(data["drfm_channel_reports"]) == 0):
+        continue
+
+      freq = data["dwell"]["dwell_data"].frequency
+      for report in data["drfm_channel_reports"]:
+        channel_index = report["channel_index"]
+        if report["trigger_forced"]:
+          self.drfm_reports[freq][channel_index]["trigger_forced"] += 1
+        else:
+          self.drfm_reports[freq][channel_index]["trigger_thresh"] += 1
+
 
       #self.pr.disable()
       #s = io.StringIO()
