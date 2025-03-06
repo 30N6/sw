@@ -18,23 +18,28 @@ class pluto_ecm_ecm_controller:
     self.state            = "IDLE"
     self.hardware_active  = False
     self.tx_key_active    = False
+    self.tx_calibration   = sw_config.config["tx_calibration"]
 
-    self.dwell_channels               = []
+    self.dwell_channels                 = []
 
-    self.start_time_scan              = 0
-    self.start_time_tx_listen         = 0
-    self.start_time_tx_active         = 0
-    self.duration_scan                = 2
-    self.duration_tx_listen           = 50 #TODO: config
+    self.start_time_scan                = 0
+    self.start_time_tx_listen           = 0
+    self.start_time_tx_active           = 0
+    self.duration_scan                  = 2
+    self.duration_tx_listen             = 50 #TODO: config
 
-    self.forced_triggers_per_cycle    = 8   #TODO: config
-    self.prev_pending_forced_triggers = []
-    self.scan_pending_forced_triggers = []
-    self.scan_forced_trigger_index    = 0
+    self.prev_pending_forced_triggers   = []
 
-    self.map_state_to_tag             = {"IDLE": 0, "SCAN": 10, "TX_LISTEN": 20, "TX_ACTIVE": 30}
-    self.map_tag_to_state             = {0: "IDLE", 10: "SCAN", 20: "TX_LISTEN", 30: "TX_ACTIVE"}
-    self.dwell_program_tag            = self.map_state_to_tag[self.state]
+    self.scan_forced_triggers_per_cycle = 8   #TODO: config
+    self.scan_pending_forced_triggers   = []
+    self.scan_forced_trigger_index      = 0
+
+    self.tx_cal_pending_forced_triggers = []
+    self.tx_cal_forced_trigger_index    = 0
+
+    self.map_state_to_tag               = {"IDLE": 0, "SCAN": 10, "TX_LISTEN": 20, "TX_ACTIVE": 30, "TX_CAL": 40}
+    self.map_tag_to_state               = {0: "IDLE", 10: "SCAN", 20: "TX_LISTEN", 30: "TX_ACTIVE", 40: "TX_CAL"}
+    self.dwell_program_tag              = self.map_state_to_tag[self.state]
 
     self.last_scan_seq_num              = -1
     self.dwell_trigger_threshold_level  = {}
@@ -92,21 +97,21 @@ class pluto_ecm_ecm_controller:
 
   def _clear_prev_forced_triggers(self):
     for entry in self.prev_pending_forced_triggers:
-      #self.logger.log(self.logger.LL_INFO, "[ecm_controller] _send_next_forced_triggers: clearing {}/{}".format(entry["dwell_index"], entry["channel_index"]))
+      #self.logger.log(self.logger.LL_INFO, "[ecm_controller] _send_next_scan_forced_triggers: clearing {}/{}".format(entry["dwell_index"], entry["channel_index"]))
       self.sequencer.submit_channel_entry(entry["dwell_index"], entry["channel_index"], pluto_ecm_hw_dwell.ecm_channel_control_entry.channel_entry_trigger_none(entry["channel_index"]))
     self.prev_pending_forced_triggers = []
 
-  def _send_next_forced_triggers(self):
+  def _send_next_scan_forced_triggers(self):
     assert (len(self.scan_pending_forced_triggers) == 0)
 
     self._clear_prev_forced_triggers()
 
-    for i in range(self.forced_triggers_per_cycle):
+    for i in range(self.scan_forced_triggers_per_cycle):
       next_dwell_index    = self.dwell_channels[self.scan_forced_trigger_index]["dwell_index"]
       next_channel_index  = self.dwell_channels[self.scan_forced_trigger_index]["channel_index"]
-      next_entry          = pluto_ecm_hw_dwell.ecm_channel_control_entry.channel_entry_trigger_forced(next_channel_index)
+      next_entry          = pluto_ecm_hw_dwell.ecm_channel_control_entry.channel_entry_trigger_forced_scan(next_channel_index)
 
-      self.logger.log(self.logger.LL_INFO, "[ecm_controller] _send_next_forced_triggers: next_index={}; forcing {}/{}".format(self.scan_forced_trigger_index, next_dwell_index, next_channel_index))
+      self.logger.log(self.logger.LL_INFO, "[ecm_controller] _send_next_scan_forced_triggers: next_index={}; forcing {}/{}".format(self.scan_forced_trigger_index, next_dwell_index, next_channel_index))
       self.sequencer.submit_channel_entry(next_dwell_index, next_channel_index, next_entry)
 
       self.scan_pending_forced_triggers.append({"dwell_index": next_dwell_index, "channel_index": next_channel_index, "expected_bytes": next_entry.fields["trigger_duration_max_minus_one"] + 1})
@@ -117,6 +122,28 @@ class pluto_ecm_ecm_controller:
     #self._submit_channel_threshold_trigger_with_tx(2425.0, 2, 10000, 3,
     #                                               1, self.tx_program_loader.tx_programs_by_name["tx_program_elrs_test_1.json"]["address"],
     #                                               100, 4000)
+
+  def _send_next_tx_cal_forced_triggers(self):
+    assert (len(self.tx_cal_pending_forced_triggers) == 0)
+
+    self._clear_prev_forced_triggers()
+
+    #for i in range(self.forced_triggers_per_cycle):  #TODO: more complex patterns
+    for i in range(1):
+      next_dwell_index    = self.dwell_channels[self.tx_cal_forced_trigger_index]["dwell_index"]
+      next_channel_index  = self.dwell_channels[self.tx_cal_forced_trigger_index]["channel_index"]
+
+      tx_instruction_index  = self.tx_program_loader.tx_programs_by_name[self.tx_calibration["forced_tx_program"]]["address"]
+      #TODO: automatically set the min_trigger_duration below
+      next_entry            = pluto_ecm_hw_dwell.ecm_channel_control_entry.channel_entry_trigger_forced_tx(next_channel_index, 256, tx_instruction_index)
+
+      self.logger.log(self.logger.LL_INFO, "[ecm_controller] _send_next_tx_cal_forced_triggers: next_index={}; forcing {}/{}".format(self.tx_cal_forced_trigger_index, next_dwell_index, next_channel_index))
+      self.sequencer.submit_channel_entry(next_dwell_index, next_channel_index, next_entry)
+
+      self.tx_cal_pending_forced_triggers.append({"dwell_index": next_dwell_index, "channel_index": next_channel_index, "expected_bytes": next_entry.fields["trigger_duration_max_minus_one"] + 1})
+      self.prev_pending_forced_triggers.append({"dwell_index": next_dwell_index, "channel_index": next_channel_index})
+      self.tx_cal_forced_trigger_index = (self.tx_cal_forced_trigger_index + 1) % len(self.dwell_channels)
+
 
   def submit_report(self, merged_report):
     #self.logger.log(self.logger.LL_INFO, "[ecm_controller] submit_report: {}".format(merged_report))
@@ -151,9 +178,9 @@ class pluto_ecm_ecm_controller:
             expected_trigger["expected_bytes"] -= entry["slice_length"]
             partial_match = True
             if expected_trigger["expected_bytes"] <= 0:
-              self.logger.log(self.logger.LL_INFO, "[ecm_controller] submit_report: matched -- len={} expected_trigger={} entry={}".format(len(self.scan_pending_forced_triggers), expected_trigger, entry))
+              self.logger.log(self.logger.LL_INFO, "[ecm_controller] submit_report: [scan] matched -- len={} expected_trigger={} entry={}".format(len(self.scan_pending_forced_triggers), expected_trigger, entry))
               full_match = True
-              self.logger.log(self.logger.LL_INFO, "[ecm_controller] submit_report: matched dwell_index={} channel_index={}".format(expected_dwell_index, expected_channel_index))
+              self.logger.log(self.logger.LL_INFO, "[ecm_controller] submit_report: [scan] matched dwell_index={} channel_index={}".format(expected_dwell_index, expected_channel_index))
 
               self.scan_pending_forced_triggers.pop(0)
               if len(self.scan_pending_forced_triggers) > 0:
@@ -165,7 +192,35 @@ class pluto_ecm_ecm_controller:
 
         #assert (not partial_match or full_match)
         if not full_match:
-          self.logger.log(self.logger.LL_INFO, "[ecm_controller] submit_report: match failed: expected={}/{}, report={}".format(expected_dwell_index, expected_channel_index, merged_report))
+          self.logger.log(self.logger.LL_INFO, "[ecm_controller] submit_report: [scan] match failed: expected={}/{}, report={}".format(expected_dwell_index, expected_channel_index, merged_report))
+
+
+      elif (self.state == "TX_CAL"):
+        if len(self.tx_cal_pending_forced_triggers) == 0:
+          return
+
+        expected_trigger        = self.tx_cal_pending_forced_triggers[0]
+        expected_dwell_index    = expected_trigger["dwell_index"]
+        expected_channel_index  = expected_trigger["channel_index"]
+
+        if merged_report["dwell"]["dwell_data"].dwell_index != expected_dwell_index:
+          return
+
+        partial_match = False
+        full_match = False
+        for entry in merged_report["drfm_channel_reports"]:
+          if entry["channel_index"] != expected_channel_index:
+            continue
+
+          self.logger.log(self.logger.LL_INFO, "[ecm_controller] submit_report: [tx_cal] matched dwell_index={} channel_index={}".format(expected_dwell_index, expected_channel_index))
+          self.tx_cal_pending_forced_triggers.pop(0)
+
+          if len(self.tx_cal_pending_forced_triggers) > 0:
+            expected_trigger        = self.tx_cal_pending_forced_triggers[0]
+            expected_dwell_index    = expected_trigger["dwell_index"]
+            expected_channel_index  = expected_trigger["channel_index"]
+          else:
+            break
 
       else:
         self.logger.log(self.logger.LL_INFO, "[ecm_controller] submit_report: dropped, state={}".format(self.state))
@@ -173,13 +228,11 @@ class pluto_ecm_ecm_controller:
   def on_sequencer_active(self):
     self.hardware_active = True
     self._write_tx_programs_to_hw()
-    self.state_start_scan()
 
-  def on_dwell_row_done(self):
-    pass
-
-  def on_dwell_state_update(self, dwell_state):
-    pass
+    if self.tx_calibration["enable"]:
+      self._state_start_tx_cal()
+    else:
+      self._state_start_scan()
 
   def _set_new_state(self, new_state):
     self.state              = new_state
@@ -311,20 +364,20 @@ class pluto_ecm_ecm_controller:
           self._clear_prev_forced_triggers()
           self.logger.log(self.logger.LL_INFO, "[ecm_controller] scan complete - starting TX_LISTEN")
           self.analysis_thread.submit_data({"command": "SCAN_END", "timestamp": time.time()})
-          self.state_start_tx_listen()
+          self._state_start_tx_listen()
 
         else:
-          self._send_next_forced_triggers()
+          self._send_next_scan_forced_triggers()
 
     elif self.state == "TX_LISTEN":
       if self.tx_key_active:
         self.logger.log(self.logger.LL_INFO, "[ecm_controller] exiting tx_listen - starting tx_active")
         self.analysis_thread.submit_data({"command": "TX_LISTEN_END", "timestamp": time.time()})
-        self.state_start_tx_active()
+        self._state_start_tx_active()
       elif (time.time() - self.start_time_tx_listen) > self.duration_tx_listen:
         self.logger.log(self.logger.LL_INFO, "[ecm_controller] exiting tx_listen - starting scan")
         self.analysis_thread.submit_data({"command": "TX_LISTEN_END", "timestamp": time.time()})
-        self.state_start_scan()
+        self._state_start_scan()
 
     elif self.state == "TX_ACTIVE":
       if not self.tx_key_active:
@@ -332,19 +385,26 @@ class pluto_ecm_ecm_controller:
         self._update_hardware_tx_active_end()
         self.logger.log(self.logger.LL_INFO, "[ecm_controller] exiting tx_active - starting tx_listen")
         self.analysis_thread.submit_data({"command": "TX_ACTIVE_END", "timestamp": time.time()})
-        self.state_start_tx_listen()
+        self._state_start_tx_listen()
 
-  def state_start_scan(self):
+    elif self.state == "TX_CAL":
+      if len(self.tx_cal_pending_forced_triggers) == 0:
+        self._send_next_tx_cal_forced_triggers()
+
+  def _state_start_tx_cal(self):
+    self._set_new_state("TX_CAL")
+
+  def _state_start_scan(self):
     self._set_new_state("SCAN")
     self.start_time_scan = time.time()
     self.analysis_thread.submit_data({"command": "SCAN_START", "timestamp": time.time()})
 
-  def state_start_tx_listen(self):
+  def _state_start_tx_listen(self):
     self._set_new_state("TX_LISTEN")
     self.start_time_tx_listen = time.time()
     self.analysis_thread.submit_data({"command": "TX_LISTEN_START", "timestamp": time.time()})
 
-  def state_start_tx_active(self):
+  def _state_start_tx_active(self):
     now = time.time()
     self.signals_for_tx = []
     for entry in self.analysis_thread.signals_confirmed:

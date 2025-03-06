@@ -40,8 +40,10 @@ class pluto_ecm_tx_program:
     raw_program_data = {}
     total_instruction_count = 0
 
-    for entry in self.config["tx_config"]["signals"]:
-      program_name = entry["tx_program"]
+    tx_programs = [entry["tx_program"] for entry in self.config["tx_config"]["signals"]]
+    tx_programs.append(self.config["tx_calibration"]["forced_tx_program"])
+
+    for program_name in tx_programs:
       if len(program_name) == 0:
         continue
 

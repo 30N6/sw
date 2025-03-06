@@ -164,9 +164,20 @@ class ecm_channel_control_entry:
     return ecm_channel_control_entry(enable, ECM_CHANNEL_TRIGGER_MODE_NONE, 0, 0xFFFFFFFF, 1, 0, 0, program_entries)
 
   @staticmethod
-  def channel_entry_trigger_forced(channel_index_sw):
+  def channel_entry_trigger_forced_scan(channel_index_sw):
     enable = (ECM_CHANNEL_MASK & (1 << channel_index_sw)) != 0
     program_entries = [ecm_channel_tx_program_entry(0, 0, 0, 0, 0) for i in range(ECM_NUM_CHANNEL_TX_PROGRAM_ENTRIES)]
+
+    recording_length = (ECM_DRFM_MEM_DEPTH // ECM_NUM_CHANNELS_ACTIVE)
+    recording_addr = recording_length * ECM_ACTIVE_CHANNEL_DRFM_SEGMENT_MAP[channel_index_sw]
+    return ecm_channel_control_entry(enable, ECM_CHANNEL_TRIGGER_MODE_FORCE_TRIGGER, recording_length - 1, 0xFFFFFFFF, 1, 0, recording_addr, program_entries)
+
+  @staticmethod
+  def channel_entry_trigger_forced_tx(channel_index_sw, min_trigger_duration, tx_instruction_index):
+    program_entries = [ecm_channel_tx_program_entry(0, 0, 0, 0, 0) for i in range(ECM_NUM_CHANNEL_TX_PROGRAM_ENTRIES)]
+    program_entries[0] = ecm_channel_tx_program_entry(1, 1, tx_instruction_index, min_trigger_duration, 2047)
+
+    enable = (ECM_CHANNEL_MASK & (1 << channel_index_sw)) != 0
 
     recording_length = (ECM_DRFM_MEM_DEPTH // ECM_NUM_CHANNELS_ACTIVE)
     recording_addr = recording_length * ECM_ACTIVE_CHANNEL_DRFM_SEGMENT_MAP[channel_index_sw]
