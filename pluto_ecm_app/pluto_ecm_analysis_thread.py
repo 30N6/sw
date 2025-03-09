@@ -9,6 +9,8 @@ import copy
 import signal
 
 import tracemalloc
+import cProfile, pstats, io
+from pstats import SortKey
 
 class pluto_ecm_analysis_thread:
 
@@ -17,6 +19,8 @@ class pluto_ecm_analysis_thread:
     self.output_queue = arg["output_queue"]
     self.logger       = pluto_ecm_logger.pluto_ecm_logger(arg["log_dir"], "pluto_ecm_analysis_thread", arg["log_level"])
     self.processor    = pluto_ecm_analysis_processor.pluto_ecm_analysis_processor(self.logger, arg["log_dir"], arg["config"], self.output_queue)
+
+    self.pr = cProfile.Profile()
 
     self.logger.log(self.logger.LL_INFO, "init: queues={}/{}, current_process={}".format(self.input_queue, self.output_queue, multiprocessing.current_process()))
 
@@ -31,6 +35,9 @@ class pluto_ecm_analysis_thread:
 
     try:
       while running:
+        #self.pr.enable()
+        #start = time.time()
+
         #read off data from the queue before calling update() - helps ensure a clean shutdown
         while not self.input_queue.empty():
           #self.logger.log(self.logger.LL_INFO, "input_queue.get()")
@@ -49,6 +56,14 @@ class pluto_ecm_analysis_thread:
 
         self.processor.update()
         self._send_tracked_signals()
+
+        #print("analysis_thread: {:.3f}".format(time.time() - start))
+        #self.pr.disable()
+        #s = io.StringIO()
+        #sortby = SortKey.CUMULATIVE
+        #ps = pstats.Stats(self.pr, stream=s).sort_stats(sortby)
+        #ps.print_stats()
+        #print(s.getvalue())
 
       self.shutdown("graceful exit")
     except Exception as e:
@@ -136,7 +151,9 @@ class pluto_ecm_analysis_runner:
       self.logger.log(self.logger.LL_INFO, "[analysis] submit_data: shutting down -- report dropped: {}".format(report))
 
   def update(self):
+    #start = time.time()
     self._update_output_queue()
+    #print("pluto_ecm_analysis_thread: {:.3f}".format(time.time() - start))
 
   def shutdown(self):
     self.running = False

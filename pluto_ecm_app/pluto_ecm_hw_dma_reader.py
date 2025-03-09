@@ -284,8 +284,8 @@ class pluto_ecm_hw_dma_reader:
     self.logger = logger
     self.udp_mode = udp_mode
     self.mp_manager           = Manager()
-    self.hwdr_request_queue   = self.mp_manager.Queue()
-    self.hwdr_result_queue    = self.mp_manager.Queue()
+    self.hwdr_request_queue   = Queue() # faster than self.mp_manager.Queue()
+    self.hwdr_result_queue    = Queue() # faster than self.mp_manager.Queue()
     self.runner_request_queue = self.mp_manager.Queue()
     self.runner_result_queue  = self.mp_manager.Queue()
     self.running = True

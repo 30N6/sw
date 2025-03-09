@@ -84,6 +84,8 @@ class pluto_ecm_modulation_analysis:
       r["processing_time"] = t_end - t_start
       r["time_since_read"] = t_end - timestamp
 
+      #print("mod_analysis: {:.3f}".format(time.time() - t_start))
+
       #if (analysis["lora_r_squared"] > 0.7):
       #  print("LORA: [{}] {:.3f} {:.1f} {:.2f} {:.2f} -- {:.6f} {:.6f}".format(r["hw_timestamp"], analysis["lora_r_squared"], analysis["lora_slope"] / (1e3/1e-6), analysis["lora_peak_count_ratio"], analysis["lora_peak_spacing_ratio"], t_end - t_start, t_end - timestamp))
       #if (analysis["lfm_r_squared"] > 0.7):

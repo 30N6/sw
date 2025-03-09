@@ -88,6 +88,7 @@ class pluto_ecm_analysis_processor:
 
     try:
       if len(self.pool_results) < 100:
+        #self.logger.log(self.logger.LL_INFO, "_process_report_for_iq: submitting data")
         result = self.process_pool.apply_async(self.mod_analysis.process_iq_data, (data,))
         self.pool_results.append(result)
         self.pool_timestamp.append(now)
@@ -101,8 +102,11 @@ class pluto_ecm_analysis_processor:
 
   @staticmethod
   def _iq_to_complex(data):
-    data_c = [data[i][0] + 1j * data[i][1] for i in range(len(data))]
-    return np.asarray(data_c, dtype=np.complex64)
+    #data_c = data[:, 0] + 1j * data[:, 1]
+    data_c = np.empty(data.shape[0], dtype=np.complex64)
+    data_c.real = data[:,0]
+    data_c.imag = data[:,1]
+    return data_c
 
   @staticmethod
   def _remove_dc_offset(data):

@@ -6,6 +6,9 @@ from pluto_ecm_hw_pkg import *
 import pluto_ecm_hw_dwell
 import pluto_ecm_tx_program
 
+import cProfile, pstats, io
+from pstats import SortKey
+
 class pluto_ecm_ecm_controller:
 
   def __init__(self, logger, sw_config, sequencer, analysis_thread):
@@ -52,6 +55,8 @@ class pluto_ecm_ecm_controller:
 
     self.signals_for_tx                 = []
     self.tx_channels_active             = []
+
+    self.pr = cProfile.Profile()
 
     for channel_index in range(ECM_NUM_CHANNELS):
       for dwell_index in range(len(sw_config.config["dwell_config"]["dwell_pattern"])):
@@ -438,8 +443,19 @@ class pluto_ecm_ecm_controller:
     self._update_hardware_tx_active_start()
 
   def update(self):
+    #self.pr.enable()
+    #start = time.time()
+
     self._update_state()
     self._update_thresholds_from_scan()
+
+    #self.pr.disable()
+    #s = io.StringIO()
+    #sortby = SortKey.CUMULATIVE
+    #ps = pstats.Stats(self.pr, stream=s).sort_stats(sortby)
+    #ps.print_stats()
+    #print(s.getvalue())
+    #print("pluto_ecm_ecm_controller: {:.3f}".format(time.time() - start))
 
   def process_keystate(self, key_state):
     self.tx_key_active = key_state[pygame.K_TAB]

@@ -11,6 +11,9 @@ import pluto_ecm_dwell_stats_buffer
 import pluto_ecm_ecm_controller
 import pluto_ecm_fast_lock_manager
 
+import cProfile, pstats, io
+from pstats import SortKey
+
 class dwell_data:
   def __init__(self, dwell_index, next_dwell_index, is_first, is_last, freq_entry):
     self.dwell_index                = dwell_index
@@ -96,6 +99,8 @@ class pluto_ecm_sequencer:
     self.scan_length                      = len(sw_config.config["dwell_config"]["dwell_pattern"])
     self.reporting_threshold_drfm         = sw_config.config["dwell_config"]["reporting_threshold_drfm"]
     self.reporting_threshold_dwell        = sw_config.config["dwell_config"]["reporting_threshold_dwell"]
+
+    self.pr = cProfile.Profile()
 
     for entry in sw_config.config["dwell_config"]["dwell_freqs"]:
       assert (entry["index"] == len(self.dwell_freqs))
@@ -203,6 +208,8 @@ class pluto_ecm_sequencer:
       self.report_merge_queue_dwell_summary.append(report)
 
   def _process_drfm_reports_from_hw(self):
+    #self.pr.enable()
+
     while len(self.hw_interface.hwdr.output_data_drfm) > 0:
       packed_report = self.hw_interface.hwdr.output_data_drfm.pop(0)
       r = self.drfm_reporter.process_message(packed_report)
@@ -232,6 +239,14 @@ class pluto_ecm_sequencer:
 
       else:
         raise RuntimeError("invalid message type")
+
+    #self.pr.disable()
+    #s = io.StringIO()
+    #sortby = SortKey.CUMULATIVE
+    #ps = pstats.Stats(self.pr, stream=s).sort_stats(sortby)
+    #ps.print_stats()
+    #print(s.getvalue())
+
 
   def _process_dwell_report(self, report):
     #data for rendering the dwell indicator
@@ -439,6 +454,9 @@ class pluto_ecm_sequencer:
       self.dwell_state = "LOAD_DWELLS"
 
   def update(self):
+    #start = time.time()
+    #self.pr.enable()
+
     cycles_per_update = 5
 
     for i in range(cycles_per_update):
@@ -472,6 +490,14 @@ class pluto_ecm_sequencer:
 
       if self.state not in ("FLUSH", "IDLE", "SIM"):
         self.fast_lock_manager.update()
+
+    #print("pluto_ecm_sequencer: {:.3f}".format(time.time() - start))
+    #self.pr.disable()
+    #s = io.StringIO()
+    #sortby = SortKey.CUMULATIVE
+    #ps = pstats.Stats(self.pr, stream=s).sort_stats(sortby)
+    #ps.print_stats()
+    #print(s.getvalue())
 
   def process_keystate(self, key_state):
     self.ecm_controller.process_keystate(key_state)

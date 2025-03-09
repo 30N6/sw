@@ -252,6 +252,7 @@ class render_spectrum:
     pygame.draw.rect(self.surface, (0, 0, 255), [0, 0, 640, 768], 1)
 
   def update(self):
+    #start = time.time()
     #self.pr.enable()
 
     while len(self.sequencer.dwell_rows_to_render) > 0:
@@ -274,12 +275,13 @@ class render_spectrum:
           self.drfm_reports[freq][channel_index]["trigger_thresh"] += 1
 
 
-      #self.pr.disable()
-      #s = io.StringIO()
-      #sortby = SortKey.CUMULATIVE
-      #ps = pstats.Stats(self.pr, stream=s).sort_stats(sortby)
-      #ps.print_stats()
-      #print(s.getvalue())
+    #self.pr.disable()
+    #s = io.StringIO()
+    #sortby = SortKey.CUMULATIVE
+    #ps = pstats.Stats(self.pr, stream=s).sort_stats(sortby)
+    #ps.print_stats()
+    #print(s.getvalue())
+    #print("render_spectrum: {:.3f}".format(time.time() - start))
 
   def process_keydown(self, key):
     pass

@@ -1,5 +1,8 @@
+import numpy as np
+
 from pluto_ecm_hw_pkg import *
 import pluto_ecm_hw_dwell
+
 
 class pluto_ecm_hw_drfm_reporter:
   def __init__(self, logger):
@@ -67,14 +70,23 @@ class pluto_ecm_hw_drfm_reporter:
     assert (report["slice_length"] <= ECM_DRFM_MAX_PACKET_IQ_SAMPLES_PER_REPORT)
     assert (report["slice_length"] > 0)
 
-    iq_data = [[0, 0] for i in range(report["slice_length"])]
+    # fast method
+    report_data = np.frombuffer(data, dtype=np.int16)
+    iq_data = report_data[(PACKED_DRFM_CHANNEL_REPORT_HEADER.size//2) : (PACKED_DRFM_CHANNEL_REPORT_HEADER.size//2 + 2 * report["slice_length"])]
+    iq_data = iq_data.reshape((report["slice_length"], 2))
+    iq_data = iq_data[:, -1::-1]
 
-    for i in range(report["slice_length"]):
-      unpacked_word = PACKED_DRFM_IQ_WORD.unpack(data[(PACKED_DRFM_CHANNEL_REPORT_HEADER.size + PACKED_DRFM_IQ_WORD.size * i) :
-                                                      (PACKED_DRFM_CHANNEL_REPORT_HEADER.size + PACKED_DRFM_IQ_WORD.size * (i + 1))])
-      #TODO: verify IQ order
-      iq_data[i][1] = unpacked_word[0]
-      iq_data[i][0] = unpacked_word[1]
+    # slow method - TODO: remove
+    #iq_data = [[0, 0] for i in range(report["slice_length"])]
+    #for i in range(report["slice_length"]):
+    #  unpacked_word = PACKED_DRFM_IQ_WORD.unpack(data[(PACKED_DRFM_CHANNEL_REPORT_HEADER.size + PACKED_DRFM_IQ_WORD.size * i) :
+    #                                                  (PACKED_DRFM_CHANNEL_REPORT_HEADER.size + PACKED_DRFM_IQ_WORD.size * (i + 1))])
+    #  #TODO: verify IQ order
+    #  iq_data[i][1] = unpacked_word[0]
+    #  iq_data[i][0] = unpacked_word[1]
+
+
+    #print("np={} p={}".format(iq_data_np[0:4], iq_data[0:4]))
 
     report["iq_data"] = iq_data
 

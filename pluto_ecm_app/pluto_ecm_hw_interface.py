@@ -9,6 +9,9 @@ import time
 import multiprocessing
 from multiprocessing import Process, Queue, Manager
 
+import cProfile, pstats, io
+from pstats import SortKey
+
 class hw_command:
   CMD_WRITE_ATTR_RX_PHY   = 0
   CMD_WRITE_ATTR_TX_PHY   = 1
@@ -372,6 +375,8 @@ class pluto_ecm_hw_interface:
     self.temp_9361              = 0
     self.temp_fpga              = 0
 
+    self.pr = cProfile.Profile()
+
     self._initial_ad9361_setup()
     self.hw_cfg.send_reset()
     self.hw_cfg.send_enables(0, 0, 1)
@@ -452,10 +457,21 @@ class pluto_ecm_hw_interface:
     self.hw_cfg.send_enables(255, 255, 255)
 
   def update(self):
+    #start = time.time()
+    #self.pr.enable()
+
     self._update_temp()
     self.hwcp.update()
     self.hwdr.update()
     self.status_reporter.update()
+
+    #self.pr.disable()
+    #s = io.StringIO()
+    #sortby = SortKey.CUMULATIVE
+    #ps = pstats.Stats(self.pr, stream=s).sort_stats(sortby)
+    #ps.print_stats()
+    #print(s.getvalue())
+    #print("pluto_ecm_hw_interface: {:.3f}".format(time.time() - start))
 
   def shutdown(self):
     self.hw_cfg.send_reset()
