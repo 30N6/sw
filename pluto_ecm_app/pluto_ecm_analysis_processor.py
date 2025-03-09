@@ -130,14 +130,14 @@ class pluto_ecm_analysis_processor:
         if (r["channel_index"] != channel_index):
           scan_data.append({"sw_timestamp": report["timestamp"], "controller_state": report["state"],
                             "dwell_freq": dwell_freq, "channel_index": channel_index, "channel_freq": self._get_channel_freq(dwell_freq, channel_index),
-                            "hw_timestamp": r["segment_timestamp"], "iq_length": len(iq_data), "iq_data": np.asarray(iq_data)})
+                            "hw_timestamp": r["segment_timestamp"], "iq_bits": r["max_iq_bits"], "iq_length": len(iq_data), "iq_data": np.asarray(iq_data)})
           iq_data = []
           channel_index = r["channel_index"]
 
         iq_data.extend(self._iq_to_complex(r["iq_data"]))
       scan_data.append({"sw_timestamp": report["timestamp"], "controller_state": report["state"],
                         "dwell_freq": dwell_freq, "channel_index": channel_index, "channel_freq": self._get_channel_freq(dwell_freq, channel_index),
-                        "hw_timestamp": r["segment_timestamp"], "iq_length": len(iq_data), "iq_data": np.asarray(iq_data)})
+                        "hw_timestamp": r["segment_timestamp"], "iq_bits": r["max_iq_bits"], "iq_length": len(iq_data), "iq_data": np.asarray(iq_data)})
 
       for sd in scan_data:
         sd["iq_data"] = self._remove_dc_offset(sd["iq_data"])
@@ -192,6 +192,7 @@ class pluto_ecm_analysis_processor:
       result_for_logging = result.copy()
       result_for_logging["analysis"] = result["analysis"].copy()
       result_for_logging["analysis"].pop("iq_stft_abs")
+      result_for_logging["analysis"].pop("ofdm_data")
       self.recorder.log(result_for_logging)
       self.pool_results.pop(0)
       self.pool_timestamp.pop(0)

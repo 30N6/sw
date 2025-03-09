@@ -11,7 +11,9 @@ import render_status
 import render_spectrum
 import render_signals
 
-#TODO: find source of numpy warnings
+import cProfile, pstats, io
+from pstats import SortKey
+
 import warnings
 warnings.filterwarnings('error', category=RuntimeWarning)
 
@@ -66,6 +68,8 @@ class pluto_ecm_main_thread:
     self.render_spectrum  = render_spectrum.render_spectrum(self.surface, self.sw_config, self.sequencer)
     self.render_signals   = render_signals.render_signals(self.surface, self.sw_config, self.analysis_thread, self.sequencer)
 
+    self.pr = cProfile.Profile()
+
   def run(self):
     keydown_handlers  = [self.render_spectrum, self.render_signals]
     keystate_handlers = [self.sequencer]
@@ -91,8 +95,17 @@ class pluto_ecm_main_thread:
       self.logger.flush()
       self.recorder.flush()
 
+      #self.pr.enable()
+
       for mod in update_calls:
         mod.update()
+
+      #self.pr.disable()
+      #s = io.StringIO()
+      #sortby = SortKey.CUMULATIVE
+      #ps = pstats.Stats(self.pr, stream=s).sort_stats(sortby)
+      #ps.print_stats()
+      #print(s.getvalue())
 
       self.surface.fill((0,0,0))
       for mod in render_calls:

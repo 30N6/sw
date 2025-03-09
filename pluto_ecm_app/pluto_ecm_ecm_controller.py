@@ -46,6 +46,7 @@ class pluto_ecm_ecm_controller:
     self.dwell_trigger_threshold_shift  = {}
     self.dwell_trigger_offset_dB        = {}
     self.dwell_trigger_hyst_dB          = {}
+    self.dwell_trigger_min_dB           = {}
     self.dwell_channel_freq             = {}
     self.dwell_tx_enabled               = {}
 
@@ -68,6 +69,7 @@ class pluto_ecm_ecm_controller:
       self.dwell_trigger_threshold_shift[freq_entry["freq"]]  = [1 for i in range(ECM_NUM_CHANNELS)]
       self.dwell_trigger_offset_dB[freq_entry["freq"]]        = [None for i in range(ECM_NUM_CHANNELS)]
       self.dwell_trigger_hyst_dB[freq_entry["freq"]]          = [None for i in range(ECM_NUM_CHANNELS)]
+      self.dwell_trigger_min_dB[freq_entry["freq"]]           = [None for i in range(ECM_NUM_CHANNELS)]
       self.dwell_channel_freq[freq_entry["freq"]]             = [freq_entry["freq"] + 1e-6 * (ADC_CLOCK_FREQUENCY / ECM_NUM_CHANNELS) * (i - ECM_NUM_CHANNELS/2) for i in range(ECM_NUM_CHANNELS)]
       self.dwell_tx_enabled[freq_entry["freq"]]               = freq_entry["tx_enabled"]
 
@@ -76,19 +78,27 @@ class pluto_ecm_ecm_controller:
 
         min_threshold = None
         max_hyst = None
+        max_threshold_min = None
         for signal_entry in sw_config.config["tx_config"]["signals"]:
           if (channel_freq >= signal_entry["freq_range"][0]) and (channel_freq <= signal_entry["freq_range"][1]):
             if min_threshold is None:
               min_threshold = signal_entry["threshold_dB"]
             else:
               min_threshold = min(signal_entry["threshold_dB"], min_threshold)
+
             if max_hyst is None:
               max_hyst = signal_entry["threshold_hyst_dB"]
             else:
               max_hyst = max(signal_entry["threshold_hyst_dB"], max_hyst)
 
+            if max_threshold_min is None:
+              max_threshold_min = signal_entry["threshold_min_dB"]
+            else:
+              max_threshold_min = max(signal_entry["threshold_min_dB"], max_threshold_min)
+
         self.dwell_trigger_offset_dB[freq_entry["freq"]][channel_index] = min_threshold
-        self.dwell_trigger_hyst_dB[freq_entry["freq"]][channel_index] = max_hyst
+        self.dwell_trigger_hyst_dB[freq_entry["freq"]][channel_index]   = max_hyst
+        self.dwell_trigger_min_dB[freq_entry["freq"]][channel_index]    = max_threshold_min
 
   def _write_tx_programs_to_hw(self):
     for name, entry in self.tx_program_loader.tx_programs_by_name.items():
@@ -291,9 +301,13 @@ class pluto_ecm_ecm_controller:
 
         threshold_offset_dB   = self.dwell_trigger_offset_dB[dwell_freq][i]
         threshold_hyst_dB     = self.dwell_trigger_hyst_dB[dwell_freq][i]
+        threshold_min         = int(round(10**(self.dwell_trigger_min_dB[dwell_freq][i]/10)))
         channel_power         = self.analysis_thread.scan_results[dwell_freq]["summary_power_median"][i]
-        threshold_power       = int(round(channel_power * 10**(threshold_offset_dB/10)))
+        threshold_power       = max(threshold_min, int(round(channel_power * 10**(threshold_offset_dB/10))))
         threshold_hyst_shift  = self._get_hyst_shift(threshold_hyst_dB)
+
+        self.logger.log(self.logger.LL_INFO, "[ecm_controller] _update_thresholds_from_scan: dwell_freq={} channel={} threshold_offset_dB={} channel_power={} threshold_power={} threshold_hyst_dB={} threshold_hyst_shift={}".format(
+          dwell_freq, i, threshold_offset_dB, channel_power, threshold_power, threshold_hyst_dB, threshold_hyst_shift))
 
         self.dwell_trigger_threshold_level[dwell_freq][i] = threshold_power
         self.dwell_trigger_threshold_shift[dwell_freq][i] = threshold_hyst_shift

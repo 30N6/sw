@@ -1,0 +1,52 @@
+{
+  "simulation": {"recording_enable": 0, "playback_enable": 0, "playback_filename": "./log/recorded_data-20241125-174304.log", "playback_speed": 1.0},
+  "tx_calibration": {"enable": 0, "forced_tx_program": "tx_program_cal_1_cw.json"},
+  "fast_lock_config": {"recalibration_interval": 60.0, "recalibration_pause": 5.0},
+  "dwell_config": {
+    "dwell_freqs": [
+      {"index": 0, "freq": 2425.0, "dwell_measurement_time": 0.000250, "dwell_total_time_max": 0.020000, "min_trigger_duration": 128, "tx_enabled": 1},
+      {"index": 1, "freq": 2475.0, "dwell_measurement_time": 0.000250, "dwell_total_time_max": 0.020000, "min_trigger_duration": 128, "tx_enabled": 1}
+    ],
+    "dwell_pattern": [0, 1, 0, 1, 0, 1, 0, 1],
+    "scans_per_frame"           : {"SCAN": 1,  "TX_LISTEN": 1,  "TX_ACTIVE": 1024,  "TX_CAL": 1},
+    "reporting_threshold_drfm"  : {"SCAN": -1, "TX_LISTEN": -1,  "TX_ACTIVE": 1,    "TX_CAL": -1},
+    "reporting_threshold_dwell" : {"SCAN": -1, "TX_LISTEN": -1,  "TX_ACTIVE": 1,    "TX_CAL": -1},
+    "exclude_freqs": [
+      {"freq_range": [174, 216], "comment": ""}
+    ]
+  },
+  "tx_config": {
+    "signals": [
+      {"name": "OFDM",      "freq_range": [2400, 2500], "trigger_duration": [128, 9999],  "threshold_dB": 10, "threshold_hyst_dB": 9,   "threshold_min_dB": 15.0, "immediate_tx": 1, "trigger_modulation": "ofdm-generic",   "agile": 1, "tx_program": "tx_program_elrs_test_1.json"},
+      {"name": "OFDM-5.8",  "freq_range": [5600, 5900], "trigger_duration": [128, 9999],  "threshold_dB": 10, "threshold_hyst_dB": 9,   "threshold_min_dB": 15.0, "immediate_tx": 1, "trigger_modulation": "ofdm-generic",   "agile": 1, "tx_program": "tx_program_elrs_lora.json"},
+      {"name": "ELRS-LoRa", "freq_range": [2400, 2500], "trigger_duration": [128, 9999],  "threshold_dB": 10, "threshold_hyst_dB": 12,  "threshold_min_dB": 15.0, "immediate_tx": 0, "trigger_modulation": "elrs-lora",      "agile": 1, "tx_program": "tx_program_elrs_lora.json"},
+      {"name": "ELRS-FLRC", "freq_range": [2400, 2500], "trigger_duration": [128, 9999],  "threshold_dB": 10, "threshold_hyst_dB": 12,  "threshold_min_dB": 15.0, "immediate_tx": 1, "trigger_modulation": "elrs-bfsk",      "agile": 1, "tx_program": ""},
+      {"name": "BLE-2.4",   "freq_range": [2400, 2500], "trigger_duration": [128, 9999],  "threshold_dB": 10, "threshold_hyst_dB": 12,  "threshold_min_dB": 15.0, "immediate_tx": 1, "trigger_modulation": "ble-bfsk",       "agile": 1, "tx_program":  "tx_program_elrs_test_1.json"},
+      {"name": "BLE-2.4t",  "freq_range": [2400, 2500], "trigger_duration": [128, 9999],  "threshold_dB": 10, "threshold_hyst_dB": 12,  "threshold_min_dB": 15.0, "immediate_tx": 1, "trigger_modulation": "ble-bfsk-trunc", "agile": 1, "tx_program":  "tx_program_elrs_test_1.json"},
+      {"name": "vid-CVBS",  "freq_range": [5600, 5950], "trigger_duration": [128, 9999],  "threshold_dB": 10, "threshold_hyst_dB": 9,   "threshold_min_dB": 15.0, "immediate_tx": 0, "trigger_modulation": "cvbs",           "agile": 0, "tx_program": ""},
+      {"name": "ARSR",      "freq_range": [1200, 1400], "trigger_duration": [128,  600],  "threshold_dB": 10, "threshold_hyst_dB": 9,   "threshold_min_dB": 15.0, "immediate_tx": 0, "trigger_modulation": "lfm",            "agile": 0, "tx_program": "tx_program_elrs_test_1.json"},
+      {"name": "LoRa",      "freq_range": [902, 926],   "trigger_duration": [128, 9999],  "threshold_dB": 10, "threshold_hyst_dB": 9,   "threshold_min_dB": 15.0, "immediate_tx": 1, "trigger_modulation": "lora",           "agile": 1, "tx_program": "tx_program_elrs_lora.json"}
+    ]
+  },
+  "analysis_config": {
+    "enable_analysis_recording": 1,
+    "signal_tracker": {
+      "update_interval" : 0.1,
+      "max_report_age"  : 60,
+      "max_signal_age"  : 30
+    },
+    "modulation_analysis": {
+      "elrs-bfsk"       : {"display_metric": "bfsk_r_squared",        "criteria": {"power_mean": [5, 1e9], "iq_length": [256, 9999], "bfsk_r_squared": [0.8, 1.0], "bfsk_len_peak": [6, 999], "bfsk_freq_spread": [100e3, 350e3]}},
+      "elrs-lora"       : {"display_metric": "lora_r_squared",        "criteria": {"power_mean": [5, 1e9], "iq_length": [256, 9999], "lora_r_squared": [0.8, 1.0], "lora_peak_count_ratio": [2.0, 999], "lora_peak_spacing_ratio": [0, 0.5]}, "parameters": {"lora_num_chunks": [4, 16], "lora_peak_threshold": 0.25}},
+      "lfm"             : {"display_metric": "lfm_r_squared",         "criteria": {"power_mean": [5, 1e9], "iq_length": [64,   1024], "lfm_r_squared": [0.7, 1.0]}},
+      "cvbs"            : {"display_metric": "cvbs_xcorr_1",          "criteria": {"power_mean": [5, 1e9], "iq_length": [256, 9999], "cvbs_xcorr_1": [0.2, 1.0], "cvbs_xcorr_2": [0.0, 0.2]}, "parameters": {"cvbs_xcorr_window_inc":  [60e-6, 67e-6], "cvbs_xcorr_window_exc": [55e-6, 72e-6]}},
+      "ble-bfsk"        : {"display_metric": "bfsk_r_squared",        "criteria": {"power_mean": [5, 1e9], "iq_length": [256, 9999], "bfsk_r_squared": [0.8, 1.0], "bfsk_len_peak": [10, 999], "bfsk_freq_spread": [370e3, 1e6]}},
+      "ble-bfsk-trunc"  : {"display_metric": "bfsk_trunc_r_squared",  "criteria": {"power_mean": [5, 1e9], "iq_length": [1024, 9999], "bfsk_trunc_r_squared": [0.8, 1.0], "bfsk_trunc_len_peak": [4, 999], "bfsk_freq_spread": [370e3, 1e6]}, "parameters": {"bfsk_trunc_front_samples": 350, "bfsk_trunc_rear_power_dB": -6}},
+      "ofdm-generic"    : {"display_metric": "acorr_peak_1_lag_us",   "criteria": {"power_mean": [5, 1e9], "iq_length": [256, 9999], "acorr_peak_1_lag_us": [6, 200], "acorr_peak_1_0_ratio": [0.05, 0.5], "acorr_peak_0_mean_ratio": [10, 1000]}, "parameters": {"ofdm_min_acorr_peak_count": 128}}
+    }
+  },
+  "pluto_dma_reader_path": "../pluto_dma_reader/pluto_dma_reader",
+  "pluto_credentials": {"username": "root", "password": "analog"},
+  "graphics": {"fullscreen": 0, "noframe": 0},
+  "debug_log": 1
+}
