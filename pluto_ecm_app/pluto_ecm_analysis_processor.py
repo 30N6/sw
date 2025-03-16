@@ -144,9 +144,12 @@ class pluto_ecm_analysis_processor:
                         "hw_timestamp": r["segment_timestamp"], "iq_bits": r["max_iq_bits"], "iq_length": len(iq_data), "iq_data": np.asarray(iq_data)})
 
       for sd in scan_data:
-        sd["iq_data"] = self._remove_dc_offset(sd["iq_data"])
         if sd["channel_index"] % 2 == 1:
-          sd["iq_data"] = self._apply_basebanding(sd["iq_data"])
+          sd["iq_data_basebanded"] = self._apply_basebanding(sd["iq_data"])
+        else:
+          sd["iq_data_basebanded"] = sd["iq_data"]
+
+        sd["iq_data"] = self._remove_dc_offset(sd["iq_data_basebanded"])
 
         if sd["controller_state"] == "SCAN":
           #self._update_scan_stats_iq(sd)

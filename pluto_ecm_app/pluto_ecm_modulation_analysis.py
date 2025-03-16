@@ -78,7 +78,8 @@ class pluto_ecm_modulation_analysis:
       analysis["iq_stft_abs"] = iq_stft
 
       r["analysis"] = analysis
-      r["iq_data"] = [[float(np.real(report["iq_data"][i])), float(np.imag(report["iq_data"][i]))] for i in range(report["iq_data"].size)]
+      r["iq_data"] = [[float(np.real(report["iq_data_basebanded"][i])), float(np.imag(report["iq_data_basebanded"][i]))] for i in range(report["iq_data_basebanded"].size)]
+      r.pop("iq_data_basebanded")
 
       t_end = time.time()
       r["processing_time"] = t_end - t_start
