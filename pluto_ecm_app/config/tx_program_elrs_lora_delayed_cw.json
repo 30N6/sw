@@ -1,7 +1,7 @@
 {
   "instructions": [
   {"valid": 1, "address": 0,  "type": "wait",               "output_control": {"valid": 1, "output_sel": "disabled"}, "dds_control": {"valid": 1, "sin_phase_inc_sel": "sweep", "output_sel": "none"}, "base_duration": 3840, "rand_offset_mask": 0, "comment": "wait for 500 us"},
-  {"valid": 1, "address": 1,  "type": "dds_setup_cw_sweep", "output_control": {"valid": 1, "output_sel": "dds"},      "dds_control": {"valid": 1, "sin_phase_inc_sel": "sweep", "output_sel": "sweep"}, "sin_sweep_phase_inc_start": 49536, "sin_sweep_phase_inc_stop": 16000, "sin_sweep_phase_inc_step": 10, "comment": ""},
+  {"valid": 1, "address": 1,  "type": "dds_setup_cw_sweep", "output_control": {"valid": 1, "output_sel": "dds"},      "dds_control": {"valid": 1, "sin_phase_inc_sel": "sweep", "output_sel": "sweep"}, "sin_sweep_phase_inc_start": 64536, "sin_sweep_phase_inc_stop": 1000, "sin_sweep_phase_inc_step": 10, "comment": ""},
   {"valid": 1, "address": 2,  "type": "wait",               "output_control": {"valid": 1, "output_sel": "dds"},      "dds_control": {"valid": 1, "sin_phase_inc_sel": "sweep", "output_sel": "sweep"}, "base_duration": 38400, "rand_offset_mask": 0, "comment": "sweep for 5000 us"},
   {"valid": 1, "address": 3,  "type": "jump",               "output_control": {"valid": 1, "output_sel": "disabled"}, "dds_control": {"valid": 1, "sin_phase_inc_sel": "sweep", "output_sel": "none"}, "target_address": 0, "counter_check": 1, "counter_value": 100, "comment": "repeat loop 100x"},
   {"valid": 0, "address": 4,  "type": "nop",                "output_control": {"valid": 1, "output_sel": "disabled"}, "dds_control": {"valid": 0, "sin_phase_inc_sel": "sweep", "output_sel": "none"}, "comment": "invalid - end of program"},

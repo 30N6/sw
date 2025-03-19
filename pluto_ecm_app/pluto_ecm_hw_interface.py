@@ -17,14 +17,15 @@ class hw_command:
   CMD_WRITE_ATTR_TX_PHY   = 1
   CMD_WRITE_ATTR_RX_LO    = 2
   CMD_WRITE_ATTR_TX_LO    = 3
-  CMD_WRITE_ATTR_DBG      = 4
-  CMD_READ_ATTR_RX_PHY    = 5
-  CMD_READ_ATTR_TX_PHY    = 6
-  CMD_READ_ATTR_RX_LO     = 7
-  CMD_READ_ATTR_TX_LO     = 8
-  CMD_WRITE_DMA_H2D       = 9
-  CMD_READ_ATTR_9361_TEMP = 10
-  CMD_READ_ATTR_FPGA_TEMP = 11
+  CMD_WRITE_ATTR_DEV      = 4
+  CMD_WRITE_ATTR_DBG      = 5
+  CMD_READ_ATTR_RX_PHY    = 6
+  CMD_READ_ATTR_TX_PHY    = 7
+  CMD_READ_ATTR_RX_LO     = 8
+  CMD_READ_ATTR_TX_LO     = 9
+  CMD_WRITE_DMA_H2D       = 10
+  CMD_READ_ATTR_9361_TEMP = 11
+  CMD_READ_ATTR_FPGA_TEMP = 12
   CMD_SET_REMOTE_MAC      = 98
   CMD_STOP                = 99
 
@@ -45,6 +46,10 @@ class hw_command:
   @staticmethod
   def gen_write_attr_tx_lo(unique_key, attr, data):
     return {"unique_key": unique_key, "command_type": hw_command.CMD_WRITE_ATTR_TX_LO, "attr": attr, "data": data}
+
+  @staticmethod
+  def gen_write_attr_dev(unique_key, attr, data):
+    return {"unique_key": unique_key, "command_type": hw_command.CMD_WRITE_ATTR_DEV, "attr": attr, "data": data}
 
   @staticmethod
   def gen_write_attr_dbg(unique_key, attr, data):
@@ -146,6 +151,11 @@ class pluto_ecm_hw_command_processor_thread:
         self.chan_ad9361_tx_lo.attrs[cmd["attr"]].value = cmd["data"]
         self.result_queue.put({"unique_key": cmd["unique_key"], "data": None}, block=False)
         self.logger.log(self.logger.LL_DEBUG, "write tx_lo[{}]={}: uk={}".format(cmd["attr"], cmd["data"], cmd["unique_key"]))
+
+      elif cmd["command_type"] == hw_command.CMD_WRITE_ATTR_DEV:
+        self.dev_ad9361.attrs[cmd["attr"]].value = cmd["data"]
+        self.result_queue.put({"unique_key": cmd["unique_key"], "data": None}, block=False)
+        self.logger.log(self.logger.LL_DEBUG, "write dev[{}]={}: uk={}".format(cmd["attr"], cmd["data"], cmd["unique_key"]))
 
       elif cmd["command_type"] == hw_command.CMD_WRITE_ATTR_DBG:
         self.dev_ad9361.debug_attrs[cmd["attr"]].value = cmd["data"]
@@ -398,7 +408,10 @@ class pluto_ecm_hw_interface:
                            ("sampling_frequency",        "61440000")]
 
     attributes_dev_dbg  = [("adi,rx-fastlock-pincontrol-enable", "1"),
-                           ("adi,tx-fastlock-pincontrol-enable", "1")]
+                           ("adi,tx-fastlock-pincontrol-enable", "1"),
+                           ("adi,frequency-division-duplex-independent-mode-enable", "1")]
+
+    attributes_dev = [("ensm_mode", "pinctrl_fdd_indep")]
 
     for entry in attributes_rx_phy:
       cmd = hw_command.gen_write_attr_rx_phy(self.hwcp.get_next_unique_key(), entry[0], entry[1])
@@ -410,6 +423,10 @@ class pluto_ecm_hw_interface:
 
     for entry in attributes_dev_dbg:
       cmd = hw_command.gen_write_attr_dbg(self.hwcp.get_next_unique_key(), entry[0], entry[1])
+      self.hwcp.send_command(cmd, False)
+
+    for entry in attributes_dev:
+      cmd = hw_command.gen_write_attr_dev(self.hwcp.get_next_unique_key(), entry[0], entry[1])
       self.hwcp.send_command(cmd, False)
 
   def _send_temp_read(self):

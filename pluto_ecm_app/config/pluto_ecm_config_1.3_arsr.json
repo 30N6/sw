@@ -4,7 +4,7 @@
   "fast_lock_config": {"recalibration_interval": 60.0, "recalibration_pause": 5.0},
   "dwell_config": {
     "dwell_freqs": [
-      {"index": 0, "freq": 1360.0, "dwell_measurement_time": 0.001000, "dwell_total_time_max": 0.01000, "min_trigger_duration": 128, "tx_enabled": 1}
+      {"index": 0, "freq": 1360.0, "dwell_measurement_time": 0.001000, "dwell_total_time_max": 0.005000, "min_trigger_duration": 128, "tx_enabled": 1}
     ],
     "dwell_pattern": [0, 0, 0, 0, 0, 0, 0, 0],
     "scans_per_frame"           : {"SCAN": 1,  "TX_LISTEN": 1,  "TX_ACTIVE": 1024,  "TX_CAL": 1},
