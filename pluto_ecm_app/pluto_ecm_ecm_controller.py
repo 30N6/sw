@@ -329,13 +329,20 @@ class pluto_ecm_ecm_controller:
 
       for i in range(ECM_NUM_CHANNELS):
         if (ECM_CHANNEL_MASK & (1 << i)) == 0:
+          self.logger.log(self.logger.LL_INFO, "[ecm_controller] _update_hardware_tx_active_start: dwell_freq={} skipping channel {}".format(dwell_freq, i))
           continue
 
         if (self.dwell_trigger_offset_dB[dwell_freq][i] is None) or (self.dwell_trigger_hyst_dB[dwell_freq][i] is None):
+          self.logger.log(self.logger.LL_INFO, "[ecm_controller] _update_hardware_tx_active_start: dwell_freq={} channel={} - no trigger offset/hyst".format(dwell_freq, i))
           continue
 
         channel_match = False
         for signal_entry in self.signals_for_tx:
+          self.logger.log(self.logger.LL_INFO, "[ecm_controller] _update_hardware_tx_active_start: dwell_freq={} channel={} -- signal_entry: name={} agile={} freq={}".format(dwell_freq, i, signal_entry["name"], signal_entry["agile"], signal_entry["freq"]))
+
+          if len(signal_entry["tx_parameters"]["tx_program"]) == 0:
+            continue
+
           if signal_entry["agile"]:
             if signal_entry["freq"] == dwell_freq:
               channel_match = True
@@ -346,14 +353,14 @@ class pluto_ecm_ecm_controller:
               break
 
         if not channel_match:
+          self.logger.log(self.logger.LL_INFO, "[ecm_controller] _update_hardware_tx_active_start: dwell_freq={} channel={} - no channel match".format(dwell_freq, i))
           continue
 
         threshold_level = self.dwell_trigger_threshold_level[dwell_freq][i]
         threshold_shift = self.dwell_trigger_threshold_shift[dwell_freq][i]
 
         tx_parameters = signal_entry["tx_parameters"]
-        if len(tx_parameters["tx_program"]) == 0:
-          continue
+        assert (len(tx_parameters["tx_program"]) > 0)
 
         trigger_duration_min_minus_one = min(tx_parameters["trigger_duration"][0] - 1, 4095)
         trigger_duration_max_minus_one = min(tx_parameters["trigger_duration"][1] - 1, 4095)
