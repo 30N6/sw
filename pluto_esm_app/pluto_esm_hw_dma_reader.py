@@ -11,15 +11,15 @@ import multiprocessing
 from multiprocessing import Process, Queue, Manager
 
 
-UDP_PAYLOAD_SIZE  = TRANSFER_SIZE + 4 #includes seq num
+UDP_PAYLOAD_SIZE  = DMA_TRANSFER_SIZE + 4 #includes seq num
 
 class pluto_esm_hw_dma_reader_thread:
   WORD_SIZE = 4
   TRANSFERS_PER_BUFFER = 1 #8 #optimal size unclear -- doesn't matter now with UDP
-  BUFFER_SIZE = TRANSFERS_PER_BUFFER*TRANSFER_SIZE // WORD_SIZE
+  BUFFER_SIZE = TRANSFERS_PER_BUFFER*DMA_TRANSFER_SIZE // WORD_SIZE
 
   def __init__(self, arg):
-    self.logger         = pluto_esm_logger.pluto_esm_logger(arg["log_dir"], "pluto_esm_hw_dma_rea4der_thread", arg["log_level"])
+    self.logger         = pluto_esm_logger.pluto_esm_logger(arg["log_dir"], "pluto_esm_hw_dma_reader_thread", arg["log_level"])
     self.request_queue  = arg["request_queue"]
     self.result_queue   = arg["result_queue"]
 

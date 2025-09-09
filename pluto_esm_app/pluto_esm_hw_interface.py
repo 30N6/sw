@@ -1,7 +1,7 @@
 import pluto_esm_logger
 import pluto_esm_hw_dma_reader
 import pluto_esm_status_reporter
-import pluto_ecm_hw_dma_writer_udp
+import pluto_esm_hw_dma_writer_udp
 from pluto_esm_hw_pkg import *
 import iio
 import time
@@ -79,7 +79,7 @@ class pluto_esm_hw_command_processor_thread:
 
     self.context.set_timeout(1000)
 
-    self.dma_writer = pluto_ecm_hw_dma_writer_udp.pluto_ecm_hw_dma_writer_udp(self.logger, arg["pluto_uri"], arg["local_ip"])
+    self.dma_writer = pluto_esm_hw_dma_writer_udp.pluto_esm_hw_dma_writer_udp(self.logger, arg["pluto_uri"], arg["local_ip"])
 
     self.logger.log(self.logger.LL_INFO, "init: queues={}/{} context={} rx_phy={} rx_lo={}, current_process={}".format(
         self.request_queue, self.result_queue, self.context, self.chan_ad9361_rx_phy, self.chan_ad9361_rx_lo, multiprocessing.current_process()))
@@ -236,6 +236,7 @@ class pluto_esm_hw_command_processor:
 
   def update(self):
     self._update_receive_queue()
+    self._update_remote_mac()
 
   def shutdown(self):
     self.logger.log(self.logger.LL_INFO, "[hwcp] shutdown")
@@ -283,7 +284,7 @@ class pluto_esm_hw_config:
     return self._send_data(packed_data, False)
 
   def send_module_data(self, mod_id, msg_type, addr, data, expect_ack):
-    self.logger.log(self.logger.LL_DEBUG, "[hw_cfg] send_module_data: mod_id={} msg_type={} len(data)={}".format(mod_id, msg_type, len(data)))
+    self.logger.log(self.logger.LL_DEBUG, "[hw_cfg] send_module_data: mod_id={} msg_type={} addr={} len(data)={}".format(mod_id, msg_type, addr, len(data)))
     packed_header = PACKED_ESM_CONFIG_HEADER.pack(ESM_CONTROL_MAGIC_NUM, self.seq_num, addr, msg_type, mod_id)
     self.seq_num += 1
     combined_data = packed_header + data

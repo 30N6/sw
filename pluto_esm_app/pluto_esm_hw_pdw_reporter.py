@@ -8,7 +8,7 @@ class pluto_esm_hw_pdw_reporter:
     self.logger.log(self.logger.LL_INFO, "[pluto_esm_hw_pdw_reporter] init")
 
   def _process_common_header(self, data):
-    assert (len(data) == TRANSFER_SIZE)
+    assert (len(data) == DMA_TRANSFER_SIZE)
     unpacked_header = PACKED_ESM_REPORT_COMMON_HEADER.unpack(data[:PACKED_ESM_REPORT_COMMON_HEADER.size])
 
     magic_num   = unpacked_header[0]

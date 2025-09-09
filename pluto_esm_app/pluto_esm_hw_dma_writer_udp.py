@@ -26,7 +26,7 @@ class pluto_esm_hw_dma_writer_udp:
       raise Exception("failed to write buffer")
 
     #TODO: remove data from log line
-    #self.logger.log(self.logger.LL_DEBUG, "[hw_dma_writer_udp] wrote {} to buffer = {} bytes".format(data, bytes_written))
+    self.logger.log(self.logger.LL_DEBUG, "[hw_dma_writer_udp] wrote {} to buffer = {} bytes".format(data, bytes_written))
 
   def initialize_hardware_tx(self, remote_mac):
     local_mac = get_mac_address(ip=self.local_ip)

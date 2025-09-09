@@ -140,8 +140,8 @@ class esm_dwell_controller:
 
   def send_dwell_entry(self, dwell_entry):
     self.dwells_by_tag[dwell_entry.tag] = dwell_entry
-    return self.config_writer.send_module_data(ESM_MODULE_ID_DWELL_CONTROLLER, ESM_CONTROL_MESSAGE_TYPE_DWELL_ENTRY, dwell_entry.pack(), True)
+    return self.config_writer.send_module_data(ESM_MODULE_ID_DWELL_CONTROLLER, ESM_CONTROL_MESSAGE_TYPE_DWELL_ENTRY, 0, dwell_entry.pack(), True)
 
   def send_dwell_program(self, dwell_program):
     self.current_dwell_program = dwell_program
-    return self.config_writer.send_module_data(ESM_MODULE_ID_DWELL_CONTROLLER, ESM_CONTROL_MESSAGE_TYPE_DWELL_PROGRAM, dwell_program.pack(), True)
+    return self.config_writer.send_module_data(ESM_MODULE_ID_DWELL_CONTROLLER, ESM_CONTROL_MESSAGE_TYPE_DWELL_PROGRAM, 0, dwell_program.pack(), True)
