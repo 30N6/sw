@@ -14,7 +14,7 @@ import render_emitters
 class pluto_esm_main_thread:
   SCREEN_SIZE = (1280, 800)
   FPS = 60
-  VERSION = "v0.91 2024-12-28"
+  VERSION = "v0.92 2025-09-08"
 
   def __init__(self):
     if len(sys.argv) < 5:
@@ -53,7 +53,7 @@ class pluto_esm_main_thread:
     else:
       self.sim_loader = None
 
-    self.hw_interface     = pluto_esm_hw_interface.pluto_esm_hw_interface(self.logger, self.pluto_uri, self.local_ip, self.sw_config.pluto_dma_reader_path, self.sw_config.pluto_credentials, self.sw_config.sim_enabled)
+    self.hw_interface     = pluto_esm_hw_interface.pluto_esm_hw_interface(self.logger, self.pluto_uri, self.local_ip, self.sw_config.pluto_credentials, self.sw_config.sim_enabled)
     self.analysis_thread  = pluto_esm_analysis_thread.pluto_esm_analysis_runner(self.logger, self.sw_config)
     self.sequencer        = pluto_esm_sequencer.pluto_esm_sequencer(self.logger, self.recorder, self.sw_config,
                                                                     self.hw_interface, self.analysis_thread, self.sim_loader)
@@ -91,9 +91,11 @@ class pluto_esm_main_thread:
       pygame.display.flip()
       self.clock.tick(self.FPS)
 
-    self.shutdown()
+    self.shutdown(False)
 
-  def shutdown(self):
+  def shutdown(self, interrupted):
+    #TODO: skip analysis if interrupted?
+
     self.hw_interface.shutdown()
     self.analysis_thread.shutdown()
     self.recorder.shutdown("quit")

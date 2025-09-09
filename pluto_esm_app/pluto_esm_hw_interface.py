@@ -1,26 +1,28 @@
 import pluto_esm_logger
 import pluto_esm_hw_dma_reader
 import pluto_esm_status_reporter
+import pluto_ecm_hw_dma_writer_udp
 from pluto_esm_hw_pkg import *
 import iio
 import time
 import multiprocessing
-from multiprocessing import Process, Queue
+from multiprocessing import Process, Queue, Manager
 
 class hw_command:
-  CMD_WRITE_ATTR_PHY      = 0
+  CMD_WRITE_ATTR_RX_PHY   = 0
   CMD_WRITE_ATTR_RX_LO    = 1
   CMD_WRITE_ATTR_DBG      = 2
-  CMD_READ_ATTR_PHY       = 3
+  CMD_READ_ATTR_RX_PHY    = 3
   CMD_READ_ATTR_RX_LO     = 4
   CMD_WRITE_DMA_H2D       = 5
   CMD_READ_ATTR_9361_TEMP = 6
   CMD_READ_ATTR_FPGA_TEMP = 7
+  CMD_SET_REMOTE_MAC      = 98
   CMD_STOP                = 99
 
   @staticmethod
-  def gen_write_attr_phy(unique_key, attr, data):
-    cmd = {"unique_key": unique_key, "command_type": hw_command.CMD_WRITE_ATTR_PHY, "attr": attr, "data": data}
+  def gen_write_attr_rx_phy(unique_key, attr, data):
+    cmd = {"unique_key": unique_key, "command_type": hw_command.CMD_WRITE_ATTR_RX_PHY, "attr": attr, "data": data}
     return cmd
 
   @staticmethod
@@ -33,7 +35,7 @@ class hw_command:
 
   @staticmethod
   def gen_read_attr_phy(unique_key, attr):
-    return {"unique_key": unique_key, "command_type": hw_command.CMD_READ_ATTR_PHY, "attr": attr, "data": None}
+    return {"unique_key": unique_key, "command_type": hw_command.CMD_READ_ATTR_RX_PHY, "attr": attr, "data": None}
 
   @staticmethod
   def gen_read_attr_rx_lo(unique_key, attr):
@@ -52,23 +54,12 @@ class hw_command:
     return {"unique_key": unique_key, "command_type": hw_command.CMD_READ_ATTR_FPGA_TEMP, "attr": attr, "data": None}
 
   @staticmethod
+  def gen_set_remote_mac(data):
+    return {"unique_key": 0, "command_type": hw_command.CMD_SET_REMOTE_MAC, "attr": None, "data": data}
+
+  @staticmethod
   def gen_stop():
     return {"unique_key": 0, "command_type": hw_command.CMD_STOP, "attr": None, "data": None}
-
-class pluto_esm_hw_dma_writer:
-  def __init__(self, logger, chan_dma_h2d):
-    self.logger = logger
-    self.buffer = iio.Buffer(chan_dma_h2d.device, TRANSFER_SIZE, False)  #one full buffer per transfer
-    self.logger.log(self.logger.LL_INFO, "[hw_dma_writer] init, buffer={}".format(self.buffer))
-
-  def write(self, data):
-    bytes_written = self.buffer.write(bytearray(data))
-    if bytes_written == 0:
-      raise Exception("failed to write buffer")
-
-    num_words = (bytes_written + 3) // 4
-    self.buffer.push(num_words)
-    self.logger.log(self.logger.LL_DEBUG, "[hw_dma_writer] wrote {} to buffer ({} bytes -> {} words)".format(data, bytes_written, num_words))
 
 class pluto_esm_hw_command_processor_thread:
   def __init__(self, arg):
@@ -77,21 +68,21 @@ class pluto_esm_hw_command_processor_thread:
     self.request_queue      = arg["request_queue"]
     self.result_queue       = arg["result_queue"]
     self.context            = iio.Context(arg["pluto_uri"])
-    self.dev_h2d            = self.context.find_device("axi-iio-dma-h2d")
     self.dev_ad9361         = self.context.find_device("ad9361-phy")
     self.dev_xadc           = self.context.find_device("xadc")
-    self.chan_dma_h2d       = self.dev_h2d.find_channel("voltage0", True)
-    self.chan_ad9361_phy    = self.dev_ad9361.find_channel("voltage0", False)
+    self.chan_ad9361_rx_phy = self.dev_ad9361.find_channel("voltage0", False)
     self.chan_ad9361_rx_lo  = self.dev_ad9361.find_channel("altvoltage0", True)
     self.chan_ad9361_temp   = self.dev_ad9361.find_channel("temp0", False)
     self.chan_xadc_temp     = self.dev_xadc.find_channel("temp0", False)
 
-    self.chan_dma_h2d.enabled = True
+    self.remote_mac         = None
+
     self.context.set_timeout(1000)
 
-    self.dma_writer = pluto_esm_hw_dma_writer(self.logger, self.chan_dma_h2d)
+    self.dma_writer = pluto_ecm_hw_dma_writer_udp.pluto_ecm_hw_dma_writer_udp(self.logger, arg["pluto_uri"], arg["local_ip"])
 
-    self.logger.log(self.logger.LL_INFO, "init: queues={}/{} context={} dma_h2d={} phy={} rx_lo={}, current_process={}".format(self.request_queue, self.result_queue, self.context, self.chan_dma_h2d, self.chan_ad9361_phy, self.chan_ad9361_rx_lo, multiprocessing.current_process()))
+    self.logger.log(self.logger.LL_INFO, "init: queues={}/{} context={} rx_phy={} rx_lo={}, current_process={}".format(
+        self.request_queue, self.result_queue, self.context, self.chan_ad9361_rx_phy, self.chan_ad9361_rx_lo, multiprocessing.current_process()))
 
   def run(self):
     running = True
@@ -100,10 +91,10 @@ class pluto_esm_hw_command_processor_thread:
       cmd = self.request_queue.get()
       t_start = time.time()
       self.logger.log(self.logger.LL_DEBUG, "command_start")
-      if cmd["command_type"] == hw_command.CMD_WRITE_ATTR_PHY:
-        self.chan_ad9361_phy.attrs[cmd["attr"]].value = cmd["data"]
+      if cmd["command_type"] == hw_command.CMD_WRITE_ATTR_RX_PHY:
+        self.chan_ad9361_rx_phy.attrs[cmd["attr"]].value = cmd["data"]
         self.result_queue.put({"unique_key": cmd["unique_key"], "data": None}, block=False)
-        self.logger.log(self.logger.LL_DEBUG, "write phy[{}]={}: uk={}".format(cmd["attr"], cmd["data"], cmd["unique_key"]))
+        self.logger.log(self.logger.LL_DEBUG, "write rx_phy[{}]={}: uk={}".format(cmd["attr"], cmd["data"], cmd["unique_key"]))
 
       elif cmd["command_type"] == hw_command.CMD_WRITE_ATTR_RX_LO:
         self.chan_ad9361_rx_lo.attrs[cmd["attr"]].value = cmd["data"]
@@ -115,10 +106,10 @@ class pluto_esm_hw_command_processor_thread:
         self.result_queue.put({"unique_key": cmd["unique_key"], "data": None}, block=False)
         self.logger.log(self.logger.LL_DEBUG, "write dbg[{}]={}: uk={}".format(cmd["attr"], cmd["data"], cmd["unique_key"]))
 
-      elif cmd["command_type"] == hw_command.CMD_READ_ATTR_PHY:
-        data = self.chan_ad9361_phy.attrs[cmd["attr"]].value
+      elif cmd["command_type"] == hw_command.CMD_READ_ATTR_RX_PHY:
+        data = self.chan_ad9361_rx_phy.attrs[cmd["attr"]].value
         self.result_queue.put({"unique_key": cmd["unique_key"], "data": data}, block=False)
-        self.logger.log(self.logger.LL_DEBUG, "read phy[{}]={}: uk={}".format(cmd["attr"], data, cmd["unique_key"]))
+        self.logger.log(self.logger.LL_DEBUG, "read rx_phy[{}]={}: uk={}".format(cmd["attr"], data, cmd["unique_key"]))
 
       elif cmd["command_type"] == hw_command.CMD_READ_ATTR_RX_LO:
         data = self.chan_ad9361_rx_lo.attrs[cmd["attr"]].value
@@ -140,12 +131,17 @@ class pluto_esm_hw_command_processor_thread:
         self.result_queue.put({"unique_key": cmd["unique_key"], "data": data}, block=False)
         self.logger.log(self.logger.LL_DEBUG, "read chan_xadc_temp[{}]={}: uk={}".format(cmd["attr"], data, cmd["unique_key"]))
 
+      elif cmd["command_type"] == hw_command.CMD_SET_REMOTE_MAC:
+        self.remote_mac = cmd["data"]
+        self.logger.log(self.logger.LL_INFO, "CMD_SET_REMOTE_MAC: {}".format(self.remote_mac))
+        self.dma_writer.initialize_hardware_tx(self.remote_mac)
+
       elif cmd["command_type"] == hw_command.CMD_STOP:
         self.logger.log(self.logger.LL_DEBUG, "CMD_STOP")
         running = False
 
       else:
-        raise RuntimeError("invalid command")
+        raise RuntimeError("invalid command: {}".format(cmd["command_type"]))
         running = False
 
       self.logger.log(self.logger.LL_DEBUG, "command_end: diff={}".format(time.time() - t_start))
@@ -164,19 +160,28 @@ def pluto_esm_hw_command_processor_thread_func(arg):
 
 
 class pluto_esm_hw_command_processor:
-  def __init__(self, logger, pluto_uri):
+  def __init__(self, logger, hwdr, pluto_uri, local_ip):
     self.unique_key = 0
     self.received_data = {}
     self.ack_not_expected = []
     self.pluto_uri = pluto_uri
+    self.local_ip = local_ip
     self.logger = logger
-    self.request_queue = Queue()
-    self.result_queue = Queue()
+    self.hwdr = hwdr
+    self.mp_manager     = Manager()
+    self.request_queue  = self.mp_manager.Queue()
+    self.result_queue   = self.mp_manager.Queue()
     self.running = True
     self.num_commands = 0
     self.num_dma_writes = 0
+    self.remote_mac_set = False
 
-    self.hwc_process = Process(target=pluto_esm_hw_command_processor_thread_func, args=({"pluto_uri": pluto_uri, "request_queue": self.request_queue, "result_queue": self.result_queue, "log_dir": logger.path, "log_level": logger.min_level}, ))
+    self.hwc_process = Process(target=pluto_esm_hw_command_processor_thread_func, args=({"pluto_uri"      : pluto_uri,
+                                                                                         "local_ip"       : local_ip,
+                                                                                         "request_queue"  : self.request_queue,
+                                                                                         "result_queue"   : self.result_queue,
+                                                                                         "log_dir"        : logger.path,
+                                                                                         "log_level"      : logger.min_level}, ))
     self.hwc_process.start()
 
   def _update_receive_queue(self):
@@ -217,6 +222,18 @@ class pluto_esm_hw_command_processor:
     self.unique_key += 1
     return k
 
+  def _update_remote_mac(self):
+    if self.remote_mac_set:
+      return
+
+    if self.hwdr.remote_mac is None:
+      return
+
+    self.logger.log(self.logger.LL_INFO, "[hwcp] _update_remote_mac: {}".format(self.hwdr.remote_mac))
+
+    self.remote_mac_set = True
+    self.send_command(hw_command.gen_set_remote_mac(self.hwdr.remote_mac), False)
+
   def update(self):
     self._update_receive_queue()
 
@@ -249,6 +266,7 @@ class pluto_esm_hw_config:
     self.logger.log(self.logger.LL_DEBUG, "[hw_cfg] send_reset")
     packed_data = PACKED_ESM_CONFIG_CONTROL.pack(ESM_CONTROL_MAGIC_NUM,
                                               self.seq_num,
+                                              0,
                                               ESM_MODULE_ID_CONTROL, ESM_CONTROL_MESSAGE_TYPE_ENABLE,
                                               0, 0, 0, 1)
     self.seq_num += 1
@@ -258,14 +276,15 @@ class pluto_esm_hw_config:
     self.logger.log(self.logger.LL_DEBUG, "[hw_cfg] send_enables: {} {} {}".format(chan_enable, pdw_enable, status_enable))
     packed_data = PACKED_ESM_CONFIG_CONTROL.pack(ESM_CONTROL_MAGIC_NUM,
                                               self.seq_num,
+                                              0,
                                               ESM_MODULE_ID_CONTROL, ESM_CONTROL_MESSAGE_TYPE_ENABLE,
                                               status_enable, pdw_enable, chan_enable, 0)
     self.seq_num += 1
     return self._send_data(packed_data, False)
 
-  def send_module_data(self, mod_id, msg_type, data, expect_ack):
+  def send_module_data(self, mod_id, msg_type, addr, data, expect_ack):
     self.logger.log(self.logger.LL_DEBUG, "[hw_cfg] send_module_data: mod_id={} msg_type={} len(data)={}".format(mod_id, msg_type, len(data)))
-    packed_header = PACKED_ESM_CONFIG_HEADER.pack(ESM_CONTROL_MAGIC_NUM, self.seq_num, msg_type, mod_id)
+    packed_header = PACKED_ESM_CONFIG_HEADER.pack(ESM_CONTROL_MAGIC_NUM, self.seq_num, addr, msg_type, mod_id)
     self.seq_num += 1
     combined_data = packed_header + data
     return self._send_data(combined_data, expect_ack)
@@ -279,10 +298,10 @@ class pluto_esm_hw_config:
 
 
 class pluto_esm_hw_interface:
-  def __init__(self, logger, pluto_uri, local_ip, pluto_dma_reader_path, pluto_credentials, sim_enabled):
+  def __init__(self, logger, pluto_uri, local_ip, pluto_credentials, sim_enabled):
     self.logger           = logger
-    self.hwcp             = pluto_esm_hw_command_processor(self.logger, pluto_uri)
-    self.hwdr             = pluto_esm_hw_dma_reader.pluto_esm_hw_dma_reader(self.logger, pluto_uri, local_ip, pluto_dma_reader_path, pluto_credentials)
+    self.hwdr             = pluto_esm_hw_dma_reader.pluto_esm_hw_dma_reader(self.logger, pluto_uri, local_ip, pluto_credentials)
+    self.hwcp             = pluto_esm_hw_command_processor(self.logger, self.hwdr,  pluto_uri, local_ip)
     self.hw_cfg           = pluto_esm_hw_config(self.logger, self.hwcp)
     self.status_reporter  = pluto_esm_status_reporter.pluto_esm_status_reporter(self.logger, self.hwdr.output_data_status)
     self.sim_enabled      = sim_enabled
@@ -315,7 +334,7 @@ class pluto_esm_hw_interface:
     attributes_dev_dbg  = [("adi,rx-fastlock-pincontrol-enable", "1")]
 
     for entry in attributes_phy:
-      cmd = hw_command.gen_write_attr_phy(self.hwcp.get_next_unique_key(), entry[0], entry[1])
+      cmd = hw_command.gen_write_attr_rx_phy(self.hwcp.get_next_unique_key(), entry[0], entry[1])
       self.hwcp.send_command(cmd, False)
 
     for entry in attributes_dev_dbg:
