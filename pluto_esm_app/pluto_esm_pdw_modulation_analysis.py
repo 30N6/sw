@@ -21,7 +21,7 @@ class pluto_esm_pdw_modulation_analysis:
     phase_unwrapped = np.unwrap(phase_wrapped)
 
     y_freq = (1/(2*np.pi)) * np.diff(phase_unwrapped) / self.dt
-    x_freq = np.arange(0, y_freq.size * self.dt, self.dt)
+    x_freq = np.linspace(0, (y_freq.size-1) * self.dt, y_freq.size)
 
     [p_freq, p_info] = np.polynomial.polynomial.Polynomial.fit(x_freq, y_freq, deg=1, full=True)
 
