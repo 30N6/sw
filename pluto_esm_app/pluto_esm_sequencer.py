@@ -10,7 +10,8 @@ import pluto_esm_hw_pkg
 import pluto_esm_hw_stats
 
 class dwell_data:
-  def __init__(self, frequency, dwell_time):
+  def __init__(self, entry_index, frequency, dwell_time):
+    self.entry_index                = entry_index
     self.frequency                  = frequency
     self.dwell_time                 = dwell_time
     self.fast_lock_profile_valid    = False
@@ -19,26 +20,26 @@ class dwell_data:
     self.fast_lock_profile_time     = 0
 
     self.hw_dwell_valid             = False
-    self.hw_dwell_entry             = pluto_esm_hw_dwell.esm_message_dwell_entry.default_dwell()
+    self.hw_dwell_entry             = pluto_esm_hw_dwell.esm_dwell_entry.default_dwell()
 
     self.first_dwell                = False
     self.last_dwell                 = False
 
   @staticmethod
   def from_dict(d):
-    r = dwell_data(d["frequency"], d["dwell_time"])
+    r = dwell_data(d["entry_index"], d["frequency"], d["dwell_time"])
     r.fast_lock_profile_valid    = d["fast_lock_profile_valid"]
     r.fast_lock_profile_updated  = d["fast_lock_profile_updated"]
     r.fast_lock_profile_data     = d["fast_lock_profile_data"]
     r.fast_lock_profile_time     = d["fast_lock_profile_time"]
     r.hw_dwell_valid             = d["hw_dwell_valid"]
-    r.hw_dwell_entry             = pluto_esm_hw_dwell.esm_message_dwell_entry.from_dict(d["hw_dwell_entry"])
+    r.hw_dwell_entry             = pluto_esm_hw_dwell.esm_dwell_entry.from_dict(d["hw_dwell_entry"])
     r.first_dwell                = d["first_dwell"]
     r.last_dwell                 = d["last_dwell"]
     return r
 
   def __str__(self):
-    return "dwell_data: {} {} {} {}".format(self.frequency, self.dwell_time, self.fast_lock_profile_valid, self.fast_lock_profile_data)
+    return "dwell_data: {} {} {} {} {}".format(self.entry_index, self.frequency, self.dwell_time, self.fast_lock_profile_valid, self.fast_lock_profile_data)
   def __repr__(self):
     return self.__str__()
 
@@ -91,9 +92,11 @@ class pluto_esm_sequencer:
 
     self.scan_dwells = {}
     self.scan_total_time = 0
+    dwell_index = 0
     for freq in sw_config.scan_dwells:
-      self.scan_dwells[freq] = dwell_data(freq, sw_config.scan_dwells[freq])
+      self.scan_dwells[freq] = dwell_data(dwell_index, freq, sw_config.scan_dwells[freq])
       self.scan_total_time += self.scan_dwells[freq].dwell_time
+      dwell_index += 1
 
     for freq in self.scan_dwells:
       self.logger.log(self.logger.LL_DEBUG, "[sequencer] scan_dwells[{}]=[{}]".format(freq, self.scan_dwells[freq]))
@@ -128,6 +131,8 @@ class pluto_esm_sequencer:
 
         if (r["frequency"] != int(round(expected_dwell_data.frequency))):
           self.logger.log(self.logger.LL_WARN, "[sequencer] _process_dwell_reports_from_hw: dwell frequency mismatch: received={} expected={}".format(r["frequency"], int(round(expected_dwell_data.frequency))))
+          self.logger.log(self.logger.LL_WARN, "[sequencer] _process_dwell_reports_from_hw: dwell frequency mismatch: r={}".format(r))
+          self.logger.log(self.logger.LL_WARN, "[sequencer] _process_dwell_reports_from_hw: dwell frequency mismatch: e={}".format(expected_dwell_entry))
         assert (r["frequency"] == int(round(expected_dwell_data.frequency)))
 
         self.logger.log(self.logger.LL_INFO, "[sequencer] _process_dwell_reports_from_hw: combined report received for frequency={} dwell_seq={}".format(expected_dwell_data.frequency, r["dwell_seq_num"]))
@@ -265,14 +270,14 @@ class pluto_esm_sequencer:
       dwell = self.scan_dwells[freq]
       fast_lock_profile = i % self.MAX_ACTIVE_SCAN_DWELLS
 
-      dwell.hw_dwell_entry = pluto_esm_hw_dwell.populate_dwell_entry(self.sw_config.config, i, freq, dwell.dwell_time, fast_lock_profile)
+      dwell.hw_dwell_entry = pluto_esm_hw_dwell.populate_dwell_entry(self.sw_config.config, dwell.entry_index, freq, dwell.dwell_time, fast_lock_profile)
       dwell.hw_entry_valid = True
 
-      dwell_key = self.dwell_ctrl_interface.send_dwell_entry(dwell.hw_dwell_entry)
+      dwell_key = self.dwell_ctrl_interface.send_dwell_entry(dwell.entry_index, dwell.hw_dwell_entry)
       self.hw_dwell_entry_pending.append(dwell_key)
 
-      self.logger.log(self.logger.LL_INFO, "[sequencer] sending initial hw scan dwell for freq={}: dwell_time={} fast_lock_profile={} -- uk={} -- hw_entry={}".format(
-        freq, dwell.dwell_time, fast_lock_profile, dwell_key, dwell.hw_dwell_entry))
+      self.logger.log(self.logger.LL_INFO, "[sequencer] sending initial hw scan dwell for freq={}: dwell_index={} dwell_time={} fast_lock_profile={} -- uk={} -- hw_entry={}".format(
+        freq, dwell.entry_index, dwell.dwell_time, fast_lock_profile, dwell_key, dwell.hw_dwell_entry))
 
   def _send_hw_dwell_program(self, dwell_program):
     key = self.dwell_ctrl_interface.send_dwell_program(dwell_program)
@@ -352,11 +357,11 @@ class pluto_esm_sequencer:
     for entry in self.dwell_active:
       dwell = entry["dwell"]
       next_instruction_index += 1
-      dwell_instructions.append(pluto_esm_hw_dwell.esm_dwell_instruction(1, 0, 0, 0, 0, 1, 0, dwell.hw_dwell_entry.entry_index, next_instruction_index))
+      dwell_instructions.append(pluto_esm_hw_dwell.esm_dwell_instruction(1, 0, 0, 0, 0, 1, 0, dwell.entry_index, next_instruction_index))
     for _ in range(pluto_esm_hw_pkg.ESM_NUM_DWELL_INSTRUCTIONS - len(dwell_instructions)):
       dwell_instructions.append(pluto_esm_hw_dwell.esm_dwell_instruction(0, 0, 0, 0, 0, 0, 0, 0, 0))
 
-    return pluto_esm_hw_dwell.esm_message_dwell_program(1, 0, 0, 0, dwell_instructions)
+    return pluto_esm_hw_dwell.esm_dwell_program(1, 0, 0, 0, dwell_instructions)
 
   def _activate_next_dwells(self):
     assert (len(self.dwell_active) == 0)
@@ -418,6 +423,7 @@ class pluto_esm_sequencer:
       if len(self.fast_lock_load_pending) == 0:
         self.dwell_state = "SEND_PROGRAM"
         dwell_program = self._compute_next_dwell_program()
+        #self.logger.log(self.logger.LL_INFO, "[sequencer] _update_scan_dwells [LOAD_PROFILES]: dwell_program={}".format(dwell_program))
         self._send_hw_dwell_program(dwell_program)
         self.logger.log(self.logger.LL_INFO, "[sequencer] _update_scan_dwells [LOAD_PROFILES]: profiles loaded, sending dwell program")
 

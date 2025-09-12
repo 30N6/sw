@@ -1,0 +1,47 @@
+{
+    "sim_mode": {"enable": 0, "filename": "", "speed": 1.0},
+    "enable_recording": 0,
+    "analysis_config": {
+      "enable_pdw_recording": 1,
+      "cw_emitter_config": {
+        "max_dwell_age"               : 300,
+        "max_signal_age"              : 30,
+        "auto_threshold_factor_dB"    : 6,
+        "auto_threshold_min_dB"       : 0,
+        "num_dwells_required"         : 5
+      },
+      "pulsed_emitter_config": {
+        "expected_pulse_count_factor" : 0.1,
+        "min_matched_pulses"          : 40,
+        "max_dwell_age"               : 60,
+        "max_emitter_age"             : 30,
+        "max_pdw_age_to_confirm"      : 20,
+        "emitter_update_interval"     : 0.5,
+        "PW_range_scaling"            : [0.25, 1.25],
+        "PRI_range_scaling"           : [0.75, 1.25],
+        "modulation_threshold"        : 0.25,
+        "histogram_max_pri"           : 65536,
+        "histogram_max_pd"            : 1024
+      },
+      "modulation_analysis": {"FM_threshold_residual": 0.05, "FM_threshold_r_squared": 0.5, "FM_threshold_slope": 1000, "FM_min_samples": 8}
+    },
+    "fast_lock_config": {"recalibration_interval": 600.0, "recalibration_pause": 2.0},
+    "dwell_config": {"freq_start": 96.0, "freq_step": 48.0, "channel_step": 0.96},
+    "scan_config": {
+      "randomize_scan_order": 0,
+      "include_freqs": [
+          {"freq_range": [4200, 4400], "dwell_time": 0.31415926, "comment": "rad_alt"}
+      ],
+      "exclude_freqs": []
+    },
+    "emitter_config": {
+        "pulsed_emitters": [
+            {"name": "rad_alt",  "freq_range": [4200, 4400], "PW_range": [25, 1000], "PRI_range": [25, 14000], "priority": 2, "threshold_dB": 6}
+        ],
+        "cw_emitters": []
+    },
+    "pluto_dma_reader_path": "../pluto_dma_reader/pluto_dma_reader",
+    "pluto_credentials": {"username": "root", "password": "analog"},
+    "graphics": {"fullscreen": 0, "noframe": 0},
+    "debug_log": 0
+}

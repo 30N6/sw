@@ -48,13 +48,12 @@ ETH_MAC_HEADER_LENGTH                   = 14
 ETH_IPV4_HEADER_LENGTH                  = 20
 ETH_UDP_HEADER_LENGTH                   = 8
 
-PACKED_ESM_REPORT_COMMON_HEADER   = struct.Struct("<" + PACKED_UINT32 + PACKED_UINT32 + "xx" + PACKED_UINT8 + PACKED_UINT8)
+PACKED_ESM_REPORT_COMMON_HEADER   = struct.Struct("<" + PACKED_UINT32 + PACKED_UINT32 + "xx"          + PACKED_UINT8 + PACKED_UINT8)
 PACKED_ESM_CONFIG_HEADER          = struct.Struct("<" + PACKED_UINT32 + PACKED_UINT32 + PACKED_UINT16 + PACKED_UINT8 + PACKED_UINT8 + "xxxx")
 PACKED_ESM_CONFIG_CONTROL         = struct.Struct("<" + PACKED_UINT32 + PACKED_UINT32 + PACKED_UINT16 + PACKED_UINT8 + PACKED_UINT8 + "xxxx" +
                                                         PACKED_UINT8 + PACKED_UINT8 + PACKED_UINT8 + PACKED_UINT8 + "xxxx")
 
-PACKED_ESM_MESSAGE_DWELL_ENTRY    = struct.Struct("<" + PACKED_UINT8 + "xxx" + "xxxx" +
-                                                        PACKED_UINT16 + PACKED_UINT16 +
+PACKED_ESM_DWELL_ENTRY            = struct.Struct("<" + PACKED_UINT16 + PACKED_UINT16 +
                                                         PACKED_UINT32 +
                                                         PACKED_UINT8 + PACKED_UINT8 + "xx" +
                                                         PACKED_UINT8 + PACKED_UINT8 + "xx" +
