@@ -10,9 +10,10 @@ import copy
 
 class pluto_esm_analysis_processor:
   def __init__(self, logger, log_dir, config):
-    self.logger   = logger
-    self.recorder = pluto_esm_data_recorder.pluto_esm_data_recorder(log_dir, "analysis", config["analysis_config"]["enable_pdw_recording"])
-    self.config   = config
+    self.logger           = logger
+    self.recorder_narrow  = pluto_esm_data_recorder.pluto_esm_data_recorder(log_dir, "analysis-narrow", config["analysis_config"]["enable_pdw_recording"])
+    self.recorder_full    = pluto_esm_data_recorder.pluto_esm_data_recorder(log_dir, "analysis-full",   config["analysis_config"]["enable_pdw_recording"])
+    self.config           = config
 
     self.pdw_processor        = pluto_esm_pdw_processor.pluto_esm_pdw_processor(logger, config)
     self.dwell_processor      = pluto_esm_dwell_processor.pluto_esm_dwell_processor(logger, config)
@@ -22,10 +23,15 @@ class pluto_esm_analysis_processor:
     self.confirmed_pulsed_signals_to_render     = []
     self.confirmed_cw_primary_signals_to_render = []
 
-    self.pending_dwell_reports        = []
-    self.pending_pdw_summary_reports  = []
-    self.pending_pdw_pulse_reports    = []
-    self.pending_combined_data        = []
+    self.pending_dwell_reports_narrow           = []
+    self.pending_pdw_summary_reports_narrow     = []
+    self.pending_pdw_pulse_reports_narrow       = []
+    self.pending_combined_data                  = []
+
+    self.pending_pdw_pulse_reports_full         = []
+    self.pending_pdw_summary_reports_full       = []
+
+    self.dwell_frequency_by_seq_num             = {}
 
     self.center_channel_index = (ESM_NUM_CHANNELS_NARROW // 2)
     self.channel_spacing      = (ADC_CLOCK_FREQUENCY / ESM_NUM_CHANNELS_NARROW) / 1e6
@@ -49,9 +55,9 @@ class pluto_esm_analysis_processor:
         mod_data = None
       pdw["modulation_data"] = mod_data
 
-      self.recorder.log(pdw)
+      self.recorder_narrow.log(pdw)
 
-    self.recorder.flush()
+    self.recorder_narrow.flush()
 
   def _populate_dwell_channels(self, combined_data):
     dwell_freq          = combined_data["dwell_report"]["dwell_data"].frequency
@@ -93,31 +99,31 @@ class pluto_esm_analysis_processor:
       self.dwell_processor.submit_dwell_data(combined_data)
 
   def _match_dwell_reports(self):
-    if (len(self.pending_dwell_reports) == 0) or (len(self.pending_pdw_summary_reports) == 0):
+    if (len(self.pending_dwell_reports_narrow) == 0) or (len(self.pending_pdw_summary_reports_narrow) == 0):
       return
 
-    pdw_seq_num   = self.pending_pdw_summary_reports[0]["pdw_summary_report"]["dwell_seq_num"]
-    dwell_seq_num = self.pending_dwell_reports[0]["dwell_report"]["dwell_seq_num"]
+    pdw_seq_num   = self.pending_pdw_summary_reports_narrow[0]["pdw_summary_report"]["dwell_seq_num"]
+    dwell_seq_num = self.pending_dwell_reports_narrow[0]["dwell_report"]["dwell_seq_num"]
 
     if pdw_seq_num != dwell_seq_num:
       assert (pdw_seq_num > dwell_seq_num)
       self.logger.log(self.logger.LL_WARN, "[analysis_processor] _match_dwell_reports: missed PDW dwell detected! dwell_seq_num={} pdw_seq_num={}".format(dwell_seq_num, pdw_seq_num))
-      self.pending_dwell_reports.pop(0)
+      self.pending_dwell_reports_narrow.pop(0)
       return
 
     matched_pulse_reports = []
-    while len(self.pending_pdw_pulse_reports) > 0:
-      pdw_dwell_seq_num = self.pending_pdw_pulse_reports[0]["pdw_pulse_report"]["dwell_seq_num"]
+    while len(self.pending_pdw_pulse_reports_narrow) > 0:
+      pdw_dwell_seq_num = self.pending_pdw_pulse_reports_narrow[0]["pdw_pulse_report"]["dwell_seq_num"]
       if pdw_dwell_seq_num == dwell_seq_num:
-        matched_pulse_reports.append(self.pending_pdw_pulse_reports.pop(0)["pdw_pulse_report"])
+        matched_pulse_reports.append(self.pending_pdw_pulse_reports_narrow.pop(0)["pdw_pulse_report"])
       else:
         if (pdw_dwell_seq_num <= dwell_seq_num):
           print("_match_dwell_reports: out of order seq num: pdw={} dwell={}".format(pdw_dwell_seq_num, dwell_seq_num))
         assert(pdw_dwell_seq_num > dwell_seq_num)
         break
 
-    self.pending_combined_data.append({"dwell_report": self.pending_dwell_reports.pop(0),
-                                       "pdw_summary_report": self.pending_pdw_summary_reports.pop(0)["pdw_summary_report"],
+    self.pending_combined_data.append({"dwell_report": self.pending_dwell_reports_narrow.pop(0),
+                                       "pdw_summary_report": self.pending_pdw_summary_reports_narrow.pop(0)["pdw_summary_report"],
                                        "pdw_pulse_reports": matched_pulse_reports})
 
   def _update_tracked_emitters(self):
@@ -130,23 +136,67 @@ class pluto_esm_analysis_processor:
     self.confirmed_cw_primary_signals_to_render   = copy.deepcopy(self.dwell_processor.combined_data_primary)
     self.confirmed_cw_secondary_signals_to_render = copy.deepcopy(self.dwell_processor.combined_data_secondary)
 
+  def _process_full_path_reports(self):
+    if len(self.pending_pdw_summary_reports_full) == 0:
+      return
+
+    dwell_seq_num = self.pending_pdw_summary_reports_full[0]["pdw_summary_report"]["dwell_seq_num"]
+
+    if dwell_seq_num not in self.dwell_frequency_by_seq_num:
+      return
+
+    dwell_freq = self.dwell_frequency_by_seq_num[dwell_seq_num]
+
+    while len(self.pending_pdw_pulse_reports_full) > 0:
+      report = self.pending_pdw_pulse_reports_full[0]
+      report_seq_num = report["pdw_pulse_report"]["dwell_seq_num"]
+      assert (report_seq_num >= dwell_seq_num)
+
+      if report_seq_num == dwell_seq_num:
+        report["pdw_pulse_report"]["dwell_frequency"] = dwell_freq
+        self.recorder_full.log(report)
+        self.pending_pdw_pulse_reports_full.pop(0)
+      elif report_seq_num > dwell_seq_num:
+        break
+
+    dwell_report = self.pending_pdw_summary_reports_full.pop(0)
+    dwell_report["pdw_summary_report"]["dwell_frequency"] = dwell_freq
+    self.recorder_full.log(dwell_report)
+
+    self.dwell_frequency_by_seq_num.pop(dwell_seq_num)
+
   def submit_report(self, report):
     if "pdw_pulse_report" in report:
-      self.pending_pdw_pulse_reports.append(report)
+      if report["pdw_pulse_report"]["mod_id"] == ESM_MODULE_ID_PDW_NARROW:
+        self.pending_pdw_pulse_reports_narrow.append(report)
+      else:
+        self.pending_pdw_pulse_reports_full.append(report)
+
     elif "pdw_summary_report" in report:
-      self.pending_pdw_summary_reports.append(report)
+      if report["pdw_summary_report"]["mod_id"] == ESM_MODULE_ID_PDW_NARROW:
+        self.pending_pdw_summary_reports_narrow.append(report)
+      else:
+        self.pending_pdw_summary_reports_full.append(report)
+
     elif "dwell_report" in report:
-      self.pending_dwell_reports.append(report)
+      self.pending_dwell_reports_narrow.append(report)
+      self.dwell_frequency_by_seq_num[report["dwell_report"]["dwell_seq_num"]] = report["dwell_data"].frequency
     else:
       raise RuntimeError("invalid report")
 
   def update(self):
+    self.recorder_full.flush()
+
     self.dwell_processor.update()
     self.pdw_processor.update()
     self.pulsed_tracker.update()
+
     self._match_dwell_reports()
     self._process_matched_reports()
     self._update_tracked_emitters()
 
+    self._process_full_path_reports()
+
   def shutdown(self, reason):
-    self.recorder.shutdown(reason)
+    self.recorder_narrow.shutdown(reason)
+    self.recorder_full.shutdown(reason)

@@ -34,7 +34,7 @@ def populate_dwell_entry(config, entry_index, center_freq, dwell_time, fast_lock
   duration_in_cycles = int(dwell_time / FAST_CLOCK_PERIOD)
   min_pd = int((0.5 * PW_range[0]) // channel_sampling_time_us)
 
-  return esm_dwell_entry(entry_index, center_freq, duration_in_cycles, 0, fast_lock_profile, threshold_shift, 31, channel_mask_final, 0xFF, min_pd)
+  return esm_dwell_entry(entry_index, center_freq, duration_in_cycles, 0, fast_lock_profile, threshold_shift, threshold_shift, channel_mask_final, 0xFF, min_pd)
 
 class esm_dwell_entry:
   def __init__(self, tag, freq, duration, gain, fast_lock_profile, thresh_shift_n, thresh_shift_w, chan_mask_n, chan_mask_w, min_pd):

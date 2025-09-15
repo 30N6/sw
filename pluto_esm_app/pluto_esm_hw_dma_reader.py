@@ -10,14 +10,7 @@ import subprocess
 import multiprocessing
 from multiprocessing import Process, Queue, Manager
 
-
-UDP_PAYLOAD_SIZE  = DMA_TRANSFER_SIZE + 4 #includes seq num
-
 class pluto_esm_hw_dma_reader_thread:
-  WORD_SIZE = 4
-  TRANSFERS_PER_BUFFER = 1 #8 #optimal size unclear -- doesn't matter now with UDP
-  BUFFER_SIZE = TRANSFERS_PER_BUFFER*DMA_TRANSFER_SIZE // WORD_SIZE
-
   def __init__(self, arg):
     self.logger         = pluto_esm_logger.pluto_esm_logger(arg["log_dir"], "pluto_esm_hw_dma_reader_thread", arg["log_level"])
     self.request_queue  = arg["request_queue"]
@@ -46,7 +39,7 @@ class pluto_esm_hw_dma_reader_thread:
     try:
       data, addr = self.sock.recvfrom(8192)
       #self.logger.log(self.logger.LL_INFO, "_read: data received: addr={} len={}".format(addr, len(data)))
-      assert (len(data) == UDP_PAYLOAD_SIZE)
+      assert (len(data) > self.PACKED_UDP_HEADER.size)
       unpacked_header = self.PACKED_UDP_HEADER.unpack(data[:self.PACKED_UDP_HEADER.size])
       udp_seq_num = unpacked_header[0]
       if udp_seq_num != self.next_udp_seq_num:
@@ -59,6 +52,8 @@ class pluto_esm_hw_dma_reader_thread:
 
     except Exception as e:
       self.logger.log(self.logger.LL_WARN, "Exception: {}".format(e))
+      traceback.print_exc()
+      raise RuntimeError("read failed")
 
     return udp_seq_num, data
 
@@ -158,12 +153,10 @@ class pluto_esm_hw_dma_reader:
       udp_seq_num = full_data["udp_seq_num"]
       data = full_data["data"]
 
-      assert ((len(data) % DMA_TRANSFER_SIZE) == 0)
-      num_transfers = len(data) // DMA_TRANSFER_SIZE
-      for i_xfer in range(num_transfers):
-        xfer_data = data[i_xfer*DMA_TRANSFER_SIZE : (i_xfer+1)*DMA_TRANSFER_SIZE]
-        unpacked_header = PACKED_ESM_REPORT_COMMON_HEADER.unpack(xfer_data[:PACKED_ESM_REPORT_COMMON_HEADER.size])
-        self._process_message(unpacked_header, xfer_data, udp_seq_num)
+      assert (len(data) >= PACKED_ESM_REPORT_COMMON_HEADER.size)
+      unpacked_header = PACKED_ESM_REPORT_COMMON_HEADER.unpack(data[:PACKED_ESM_REPORT_COMMON_HEADER.size])
+
+      self._process_message(unpacked_header, data, udp_seq_num)
 
   def _process_message(self, header, full_data, udp_seq_num):
     magic_num = header[0]
@@ -180,12 +173,19 @@ class pluto_esm_hw_dma_reader:
     if msg_type == ESM_REPORT_MESSAGE_TYPE_STATUS:
       self.num_status_reports += 1
       self.logger.log(self.logger.LL_DEBUG, "[hwdr] _process_message: saving status message: hw_seq_num={} udp_seq_num={}".format(seq_num, udp_seq_num))
+      assert (len(full_data) == ESM_REPORT_LENGTH_STATUS)
       self.output_data_status.append(full_data)
-    elif msg_type in (ESM_REPORT_MESSAGE_TYPE_PDW_PULSE, ESM_REPORT_MESSAGE_TYPE_PDW_SUMMARY):
-      self.logger.log(self.logger.LL_DEBUG, "[hwdr] _process_message: saving PDW message: hw_seq_num={} udp_seq_num={}".format(seq_num, udp_seq_num))
+    elif msg_type == ESM_REPORT_MESSAGE_TYPE_PDW_SUMMARY:
+      self.logger.log(self.logger.LL_DEBUG, "[hwdr] _process_message: saving PDW summary message: hw_seq_num={} udp_seq_num={}".format(seq_num, udp_seq_num))
+      assert (len(full_data) == ESM_REPORT_LENGTH_PDW_SUMMARY)
+      self.output_data_pdw.append(full_data)
+    elif msg_type == ESM_REPORT_MESSAGE_TYPE_PDW_PULSE:
+      self.logger.log(self.logger.LL_DEBUG, "[hwdr] _process_message: saving PDW pulse message: hw_seq_num={} udp_seq_num={} len={}".format(seq_num, udp_seq_num, len(full_data)))
+      assert (len(full_data) >= ESM_REPORT_LENGTH_PDW_PULSE_EMPTY)
       self.output_data_pdw.append(full_data)
     elif msg_type == ESM_REPORT_MESSAGE_TYPE_DWELL_STATS:
       self.logger.log(self.logger.LL_DEBUG, "[hwdr] _process_message: saving dwell message: hw_seq_num={} udp_seq_num={}".format(seq_num, udp_seq_num))
+      assert (len(full_data) == ESM_REPORT_LENGTH_DWELL_STATS)
       self.output_data_dwell.append(full_data)
     else:
       raise RuntimeError("unknown message type: {}".format(msg_type))

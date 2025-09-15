@@ -299,13 +299,14 @@ class pluto_esm_hw_config:
 
 
 class pluto_esm_hw_interface:
-  def __init__(self, logger, pluto_uri, local_ip, pluto_credentials, sim_enabled):
-    self.logger           = logger
-    self.hwdr             = pluto_esm_hw_dma_reader.pluto_esm_hw_dma_reader(self.logger, pluto_uri, local_ip, pluto_credentials)
-    self.hwcp             = pluto_esm_hw_command_processor(self.logger, self.hwdr,  pluto_uri, local_ip)
-    self.hw_cfg           = pluto_esm_hw_config(self.logger, self.hwcp)
-    self.status_reporter  = pluto_esm_status_reporter.pluto_esm_status_reporter(self.logger, self.hwdr.output_data_status)
-    self.sim_enabled      = sim_enabled
+  def __init__(self, logger, pluto_uri, local_ip, sw_config):
+    self.logger             = logger
+    self.hwdr               = pluto_esm_hw_dma_reader.pluto_esm_hw_dma_reader(self.logger, pluto_uri, local_ip, sw_config.pluto_credentials)
+    self.hwcp               = pluto_esm_hw_command_processor(self.logger, self.hwdr,  pluto_uri, local_ip)
+    self.hw_cfg             = pluto_esm_hw_config(self.logger, self.hwcp)
+    self.status_reporter    = pluto_esm_status_reporter.pluto_esm_status_reporter(self.logger, self.hwdr.output_data_status)
+    self.sim_enabled        = sw_config.sim_enabled
+    self.full_path_enabled  = sw_config.config["path_config"]["enable_full"]
 
     self.logger.log(self.logger.LL_INFO, "[hwi] init done, hwcp={} hwdr={}".format(self.hwcp, self.hwdr))
 
@@ -384,7 +385,8 @@ class pluto_esm_hw_interface:
         self.logger.log(self.logger.LL_INFO, "[hwi] temp_fpga={:.2f}".format(self.temp_fpga))
 
   def enable_hw(self):
-    self.hw_cfg.send_enables(3, 3, 1)
+    enable_flag = 7 if self.full_path_enabled else 3
+    self.hw_cfg.send_enables(enable_flag, enable_flag, 1)
 
   #TODO: move this to the sequencer? at least move the cal pending stuff
   def send_fast_lock_cal_cmd(self, frequency):

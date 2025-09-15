@@ -4,8 +4,6 @@ import socket
 import struct
 from getmac import get_mac_address
 
-UDP_PAYLOAD_SIZE = DMA_TRANSFER_SIZE + 4 #includes seq num
-
 class pluto_esm_hw_dma_writer_udp:
   def __init__(self, logger, pluto_uri, local_ip):
     self.logger = logger

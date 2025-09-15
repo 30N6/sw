@@ -8,7 +8,7 @@ class pluto_esm_hw_pdw_reporter:
     self.logger.log(self.logger.LL_INFO, "[pluto_esm_hw_pdw_reporter] init")
 
   def _process_common_header(self, data):
-    assert (len(data) == DMA_TRANSFER_SIZE)
+    assert (len(data) > PACKED_ESM_REPORT_COMMON_HEADER.size)
     unpacked_header = PACKED_ESM_REPORT_COMMON_HEADER.unpack(data[:PACKED_ESM_REPORT_COMMON_HEADER.size])
 
     magic_num   = unpacked_header[0]
@@ -18,7 +18,7 @@ class pluto_esm_hw_pdw_reporter:
 
     assert (magic_num == ESM_REPORT_MAGIC_NUM)
     assert (msg_type in (ESM_REPORT_MESSAGE_TYPE_PDW_PULSE, ESM_REPORT_MESSAGE_TYPE_PDW_SUMMARY))
-    assert (mod_id in (ESM_MODULE_ID_PDW_NARROW, ESM_MODULE_ID_PDW_WIDE))
+    assert (mod_id in (ESM_MODULE_ID_PDW_NARROW, ESM_MODULE_ID_PDW_WIDE, ESM_MODULE_ID_PDW_FULL))
 
     if msg_seq_num != self.next_msg_seq_num:
       self.logger.log(self.logger.LL_WARN, "PDW seq num gap: expected {}, received {}".format(self.next_msg_seq_num, msg_seq_num))
@@ -27,11 +27,13 @@ class pluto_esm_hw_pdw_reporter:
     return msg_type
 
   def _process_pdw_summary_message(self, data):
+    assert (len(data) == ESM_REPORT_LENGTH_PDW_SUMMARY)
     unpacked_header = PACKED_PDW_SUMMARY_REPORT_HEADER.unpack(data[:PACKED_PDW_SUMMARY_REPORT_HEADER.size])
 
     report = {}
     report["msg_seq_num"]                 = unpacked_header[1]
     report["msg_type"]                    = unpacked_header[2]
+    report["mod_id"]                      = unpacked_header[3]
     report["dwell_seq_num"]               = unpacked_header[4]
     report["dwell_start_time"]            = (unpacked_header[5] << 32) | unpacked_header[6]
     report["dwell_duration"]              = unpacked_header[7]
@@ -43,11 +45,13 @@ class pluto_esm_hw_pdw_reporter:
     return report
 
   def _process_pdw_pulse_message(self, data):
+    assert (len(data) >= PACKED_PDW_PULSE_REPORT_HEADER.size)
     unpacked_header = PACKED_PDW_PULSE_REPORT_HEADER.unpack(data[:PACKED_PDW_PULSE_REPORT_HEADER.size])
 
     report = {}
     report["msg_seq_num"]             = unpacked_header[1]
     report["msg_type"]                = unpacked_header[2]
+    report["mod_id"]                  = unpacked_header[3]
     report["dwell_seq_num"]           = unpacked_header[4]
     report["pulse_seq_num"]           = unpacked_header[5]
     report["pulse_channel"]           = unpacked_header[6]
@@ -60,9 +64,11 @@ class pluto_esm_hw_pdw_reporter:
     report["buffered_frame_valid"]    = unpacked_header[15]
 
     if report["buffered_frame_valid"]:
-      pulse_iq_data = [[0, 0] for i in range(NUM_PDW_PULSE_TRAILER_WORDS)]
+      trailer_words = (len(data) - PACKED_PDW_PULSE_REPORT_HEADER.size) // PACKED_PDW_PULSE_IQ_WORD.size
 
-      for i in range(NUM_PDW_PULSE_TRAILER_WORDS):
+      pulse_iq_data = [[0, 0] for i in range(trailer_words)]
+
+      for i in range(trailer_words):
         unpacked_word = PACKED_PDW_PULSE_IQ_WORD.unpack(data[(PACKED_PDW_PULSE_REPORT_HEADER.size + PACKED_PDW_PULSE_IQ_WORD.size * i) :
                                                              (PACKED_PDW_PULSE_REPORT_HEADER.size + PACKED_PDW_PULSE_IQ_WORD.size * (i + 1))])
 
