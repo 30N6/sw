@@ -42,6 +42,7 @@
         "cw_emitters": [
         ]
     },
+    "path_config": {"enable_full": 1},
     "pluto_dma_reader_path": "../pluto_dma_reader/pluto_dma_reader",
     "pluto_credentials": {"username": "root", "password": "analog"},
     "graphics": {"fullscreen": 0, "noframe": 0},

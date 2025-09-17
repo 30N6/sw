@@ -12,7 +12,8 @@ def populate_dwell_entry(config, entry_index, center_freq, dwell_time, fast_lock
   channel_mask_initial = 0x0FFFFFFFFFFFFFF0
   channel_mask_final = 0
   PW_range = [10000, 0]
-  min_threshold_dB = 50
+  min_threshold_n_dB = 50
+  min_threshold_f_dB = 50
 
   for i in range(ESM_NUM_CHANNELS_NARROW):
     if (channel_mask_initial & (1 << i)) == 0:
@@ -21,20 +22,27 @@ def populate_dwell_entry(config, entry_index, center_freq, dwell_time, fast_lock
     for emitter in config["emitter_config"]["pulsed_emitters"]:
       if (channel_freq >= emitter["freq_range"][0]) and (channel_freq <= emitter["freq_range"][1]):
         channel_mask_final  = channel_mask_final | (1 << i)
-        min_threshold_dB    = min(min_threshold_dB, emitter["threshold_dB"])
+        min_threshold_n_dB  = min(min_threshold_n_dB, emitter["threshold_n_dB"])
+        min_threshold_f_dB  = min(min_threshold_n_dB, emitter["threshold_f_dB"])
         PW_range[0]         = min(PW_range[0], emitter["PW_range"][0])
         PW_range[1]         = max(PW_range[1], emitter["PW_range"][1])
 
-  min_threshold_linear = 10 ** (min_threshold_dB / 10)
-  threshold_shift = 0
-  while ((1 << threshold_shift) < min_threshold_linear):
-    threshold_shift += 1
-  assert (threshold_shift < 31)
+  min_threshold_n_linear = 10 ** (min_threshold_n_dB / 10)
+  threshold_n_shift = 0
+  while ((1 << threshold_n_shift) < min_threshold_n_linear):
+    threshold_n_shift += 1
+  assert (threshold_n_shift < 31)
+
+  min_threshold_f_linear = 10 ** (min_threshold_f_dB / 10)
+  threshold_f_shift = 0
+  while ((1 << threshold_f_shift) < min_threshold_f_linear):
+    threshold_f_shift += 1
+  assert (threshold_f_shift < 31)
 
   duration_in_cycles = int(dwell_time / FAST_CLOCK_PERIOD)
   min_pd = int((0.5 * PW_range[0]) // channel_sampling_time_us)
 
-  return esm_dwell_entry(entry_index, center_freq, duration_in_cycles, 0, fast_lock_profile, threshold_shift, threshold_shift, channel_mask_final, 0xFF, min_pd)
+  return esm_dwell_entry(entry_index, center_freq, duration_in_cycles, 0, fast_lock_profile, threshold_n_shift, threshold_f_shift, channel_mask_final, 0xFF, min_pd)
 
 class esm_dwell_entry:
   def __init__(self, tag, freq, duration, gain, fast_lock_profile, thresh_shift_n, thresh_shift_w, chan_mask_n, chan_mask_w, min_pd):
@@ -61,7 +69,7 @@ class esm_dwell_entry:
     self.min_pulse_duration     = min_pd
 
   def __str__(self):
-    return "dwell_entry: tag={} freq={} len={} flp={} thresh={} mask={:016X}, mpd={}".format(self.tag, self.frequency, self.duration, self.fast_lock_profile, self.threshold_shift_narrow, self.channel_mask_narrow, self.min_pulse_duration)
+    return "dwell_entry: tag={} freq={} len={} flp={} thresh={}/{} mask={:016X}, mpd={}".format(self.tag, self.frequency, self.duration, self.fast_lock_profile, self.threshold_shift_narrow, self.threshold_shift_wide, self.channel_mask_narrow, self.min_pulse_duration)
   def __repr__(self):
     return self.__str__()
 

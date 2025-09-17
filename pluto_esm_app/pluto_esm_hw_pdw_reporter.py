@@ -3,7 +3,7 @@ from pluto_esm_hw_pkg import *
 class pluto_esm_hw_pdw_reporter:
   def __init__(self, logger):
     self.logger = logger
-    self.next_msg_seq_num = 0
+    self.next_msg_seq_num = {ESM_MODULE_ID_PDW_NARROW: 0, ESM_MODULE_ID_PDW_WIDE: 0, ESM_MODULE_ID_PDW_FULL:0}
 
     self.logger.log(self.logger.LL_INFO, "[pluto_esm_hw_pdw_reporter] init")
 
@@ -20,9 +20,9 @@ class pluto_esm_hw_pdw_reporter:
     assert (msg_type in (ESM_REPORT_MESSAGE_TYPE_PDW_PULSE, ESM_REPORT_MESSAGE_TYPE_PDW_SUMMARY))
     assert (mod_id in (ESM_MODULE_ID_PDW_NARROW, ESM_MODULE_ID_PDW_WIDE, ESM_MODULE_ID_PDW_FULL))
 
-    if msg_seq_num != self.next_msg_seq_num:
-      self.logger.log(self.logger.LL_WARN, "PDW seq num gap: expected {}, received {}".format(self.next_msg_seq_num, msg_seq_num))
-    self.next_msg_seq_num = (msg_seq_num + 1) & 0xFFFFFFFF
+    if msg_seq_num != self.next_msg_seq_num[mod_id]:
+      self.logger.log(self.logger.LL_WARN, "PDW seq num gap: expected {}, received {}".format(self.next_msg_seq_num[mod_id], msg_seq_num))
+    self.next_msg_seq_num[mod_id] = (msg_seq_num + 1) & 0xFFFFFFFF
 
     return msg_type
 
