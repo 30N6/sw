@@ -2,6 +2,7 @@ import pluto_esm_logger
 from pluto_esm_hw_pkg import *
 import socket
 import struct
+import psutil
 from getmac import get_mac_address
 
 class pluto_esm_hw_dma_writer_udp:
@@ -26,8 +27,17 @@ class pluto_esm_hw_dma_writer_udp:
     #TODO: remove data from log line
     self.logger.log(self.logger.LL_DEBUG, "[hw_dma_writer_udp] wrote {} to buffer = {} bytes".format(data, bytes_written))
 
+  def _get_local_interface(self):
+    interfaces = psutil.net_if_addrs()
+    for interface_name, addresses in interfaces.items():
+      for addr in addresses:
+        if addr.address == self.local_ip:
+          return interface_name
+    return None
+
   def initialize_hardware_tx(self, remote_mac):
-    local_mac = get_mac_address(ip=self.local_ip)
+    #local_mac = get_mac_address(ip=self.local_ip) #Windows only?
+    local_mac = get_mac_address(interface=self._get_local_interface())
 
     assert (len(remote_mac) > 0) and (":" in remote_mac) and (len(remote_mac.split(":")) == 6)
     assert (len(local_mac) > 0) and (":" in local_mac) and (len(local_mac.split(":")) == 6)
