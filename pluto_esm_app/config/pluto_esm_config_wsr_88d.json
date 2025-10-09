@@ -1,5 +1,5 @@
 {
-    "sim_mode": {"enable": 0, "filename": "./log/recorded_data-20241125-174304.log", "speed": 1.0},
+    "sim_mode": {"enable": 0, "filename": "", "speed": 1.0},
     "enable_recording": 0,
     "analysis_config": {
       "enable_pdw_recording": 1,
@@ -25,7 +25,7 @@
       },
       "modulation_analysis": {"FM_threshold_residual": 0.05, "FM_threshold_r_squared": 0.5, "FM_threshold_slope": 1000, "FM_min_samples": 8}
     },
-    "fast_lock_config": {"recalibration_interval": 60.0, "recalibration_pause": 2.0},
+    "fast_lock_config": {"recalibration_interval": 600.0, "recalibration_pause": 2.0},
     "dwell_config": {"freq_start": 96.0, "freq_step": 48.0, "channel_step": 0.96},
     "scan_config": {
       "randomize_scan_order": 0,
@@ -37,7 +37,7 @@
     },
     "emitter_config": {
         "pulsed_emitters": [
-            {"name": "WSR-88D", "freq_range": [2700, 3000], "PW_range": [1.57, 4.57], "PRI_range": [760, 3150],   "priority": 2, "threshold_dB": 9}
+            {"name": "WSR-88D", "freq_range": [2700, 3000], "PW_range": [1.57, 4.57], "PRI_range": [760, 3150],   "priority": 2, "threshold_n_dB": 9, "threshold_f_dB": 6}
         ],
         "cw_emitters": [
         ]
