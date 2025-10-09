@@ -30,18 +30,16 @@
     "scan_config": {
       "randomize_scan_order": 0,
       "include_freqs": [
-          {"freq_range": [1250, 1255], "dwell_time": 0.31415926, "comment": "ARSR-4"},
-          {"freq_range": [1334, 1338], "dwell_time": 0.31415926, "comment": "ARSR-4"}
+          {"freq_range": [4200, 4400], "dwell_time": 0.31415926, "comment": "rad_alt"}
       ],
       "exclude_freqs": []
     },
     "emitter_config": {
         "pulsed_emitters": [
-            {"name": "ARSR-4",  "freq_range": [1200, 1400], "PW_range": [60, 90],     "PRI_range": [1500, 14000], "priority": 2, "threshold_n_dB": 9, "threshold_f_dB": 6}
+            {"name": "rad_alt",  "freq_range": [4200, 4400], "PW_range": [25, 1000], "PRI_range": [25, 14000], "priority": 2, "threshold_dB": 6}
         ],
         "cw_emitters": []
     },
-    "path_config": {"enable_full": 1},
     "pluto_dma_reader_path": "../pluto_dma_reader/pluto_dma_reader",
     "pluto_credentials": {"username": "root", "password": "analog"},
     "graphics": {"fullscreen": 0, "noframe": 0},

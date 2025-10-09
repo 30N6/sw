@@ -99,10 +99,14 @@ class pluto_esm_hw_stats:
         self.logger.log(self.logger.LL_INFO, "[hw_stats] stats={}".format(self.stats))
 
   def submit_report(self, report):
+    #TODO: process full path
+
     if "pdw_summary_report" in report:
-      self._process_pdw_summary_report(report)
+      if report["pdw_summary_report"]["mod_id"] == ESM_MODULE_ID_PDW_NARROW:
+        self._process_pdw_summary_report(report)
     elif "pdw_pulse_report" in report:
-      self._process_pdw_pulse_report(report)
+      if report["pdw_pulse_report"]["mod_id"] == ESM_MODULE_ID_PDW_NARROW:
+        self._process_pdw_pulse_report(report)
     elif "dwell_report" in report:
       self._process_dwell_report(report)
 

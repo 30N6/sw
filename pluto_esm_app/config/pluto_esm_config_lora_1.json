@@ -37,7 +37,7 @@
     },
     "emitter_config": {
         "pulsed_emitters": [
-            {"name": "Lora-915",  "freq_range": [902, 926],   "PW_range": [100, 400000], "PRI_range": [1000, 500000], "priority": 2, "threshold_dB": 9}
+            {"name": "Lora-915",  "freq_range": [902, 926],   "PW_range": [100, 400000], "PRI_range": [1000, 500000], "priority": 2, "threshold_n_dB": 9, "threshold_f_dB": 6}
         ],
         "cw_emitters": [
             {"name": "FM-radio",  "freq_range": [88.00,   108.00],    "priority": 0 },
@@ -76,6 +76,7 @@
             {"name": "GPS-L2",    "freq_range": [1226.60, 1228.60],   "priority": 2, "manual_threshold_mean_dB": 10.0, "comment": "GPS L2C"             }
         ]
     },
+    "path_config": {"enable_full": 1},
     "pluto_dma_reader_path": "../pluto_dma_reader/pluto_dma_reader",
     "pluto_credentials": {"username": "root", "password": "analog"},
     "graphics": {"fullscreen": 0, "noframe": 0},

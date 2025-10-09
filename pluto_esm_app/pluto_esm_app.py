@@ -3,20 +3,16 @@ import pluto_esm_main_thread
 import multiprocessing
 import traceback
 
-main_thread = []
-
-def main():
-  global main_thread
-
-  main_thread = pluto_esm_main_thread.pluto_esm_main_thread()
-  main_thread.run()
-
 if __name__ == "__main__":
+  main_thread = pluto_esm_main_thread.pluto_esm_main_thread()
+
   try:
-    main()
+    main_thread.run()
+
   except KeyboardInterrupt:
-    main_thread.shutdown()
+    main_thread.shutdown(True)
   except Exception as e:
+    main_thread.shutdown(True)
     print("Exception: {}".format(e))
     print(traceback.format_exc())
 
