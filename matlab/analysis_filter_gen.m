@@ -1,6 +1,6 @@
-L = 16; % subbands
+L = 128; % subbands
 
-output_width = 12 + log2(L);
+output_width = 18; %12 + log2(L);
 
 M = 12;         % taps per subband
 N = M*L;        % total taps
@@ -58,7 +58,14 @@ H_f(H_f > (2^(output_width - 1) - 1)) = 2^(output_width - 1) - 1;
 %plot(H - H_f / (2^(output_width - 1)));
 s = "";
 for ii = 1:length(H_f)
-    s = s + sprintf('%3d => \"%s\", ', ii - 1, dec2bin(H_f(ii), output_width));
+    bin_data = dec2bin(H_f(ii), output_width);
+    if length(bin_data) > output_width
+        leading_bits = length(bin_data) - output_width;
+        assert(all(bin_data(1:leading_bits) == '1'));
+        assert(bin_data(leading_bits + 1) == '1');
+        bin_data = bin_data((leading_bits + 1):end);
+    end
+    s = s + sprintf('%3d => \"%s\", ', ii - 1, bin_data);
     if mod(ii-1, 8) == 7
         s = s + "\n";
     end
