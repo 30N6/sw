@@ -43,6 +43,13 @@ class intercept_channel_control_entry:
     self.fields["coast_cycles"]       = coast_cycles
     self.fields["integration_cycles"] = integration_cycles
 
+  def update_thresholds(self, threshold_start, threshold_continue):
+    assert (threshold_start     <= 0xFFFFFFFF)
+    assert (threshold_continue  <= 0xFFFFFFFF)
+
+    self.fields["threshold_start"]    = int(threshold_start)
+    self.fields["threshold_continue"] = int(threshold_continue)
+
   def pack(self):
     packed_data = PACKED_INTERCEPT_CONFIG_CHANNEL_CONTROL.pack( self.fields["enable"],
                                                                 self.fields["force_trigger"], self.fields["force_stream"],
@@ -66,8 +73,8 @@ class intercept_stream_control_entry:
     self.fields["stream_encoder_tag"] = tag
 
   def pack(self):
-    packed_data = PACKED_INTERCEPT_CONFIG_CHANNEL_CONTROL.pack( self.fields["enable"],
-                                                                self.fields["stream_encoder_tag"])
+    packed_data = PACKED_INTERCEPT_CONFIG_STREAM_CONTROL.pack( self.fields["enable"],
+                                                               self.fields["stream_encoder_tag"])
     return packed_data
 
   def __str__(self):
@@ -85,7 +92,8 @@ class intercept_hardware_control:
 
   def send_dwell_entry(self, dwell_entry):
     self.current_dwell_entry = dwell_entry
-    return self.config_writer.send_module_data(INTERCEPT_MODULE_ID_DWELL_CONTROLLER, INTERCEPT_CONTROL_MESSAGE_TYPE_DWELL_CONTROLLER_CONFIG, dwell_entry.pack(), True)
+    print("dwell_entry = {}".format(len(dwell_entry.pack())))
+    return self.config_writer.send_module_data(INTERCEPT_MODULE_ID_DWELL_CONTROLLER, INTERCEPT_CONTROL_MESSAGE_TYPE_DWELL_CONTROLLER_CONFIG, 0, dwell_entry.pack(), True)
 
   def send_channel_entry(self, channel_index, channel_entry):
     self.channel_entries_by_index[channel_index] = channel_entry
@@ -93,4 +101,4 @@ class intercept_hardware_control:
 
   def send_stream_entry(self, stream_index, stream_entry):
     self.stream_entries_by_index[stream_index] = stream_entry
-    return self.config_writer.send_module_data(INTERCEPT_MODULE_ID_STREAM_ENCODER, INTERCEPT_CONTROL_MESSAGE_TYPE_CHANNEL_CONFIG, stream_index, stream_entry.pack(), True)
+    return self.config_writer.send_module_data(INTERCEPT_MODULE_ID_STREAM_ENCODER, INTERCEPT_CONTROL_MESSAGE_TYPE_STREAM_CONFIG, stream_index, stream_entry.pack(), True)

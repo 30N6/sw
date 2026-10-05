@@ -19,6 +19,8 @@ class pluto_intercept_hw_dma_reader_thread:
     self.PACKED_UDP_HEADER = struct.Struct(">" + PACKED_UINT32)
 
     self.next_udp_seq_num = 0
+    self.num_udp_gaps = 0
+
     assert ("ip:" in arg["pluto_uri"])
     self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     self.sock.bind((arg["local_ip"], UDP_FILTER_PORT))
@@ -44,6 +46,7 @@ class pluto_intercept_hw_dma_reader_thread:
       udp_seq_num = unpacked_header[0]
       if udp_seq_num != self.next_udp_seq_num:
         self.logger.log(self.logger.LL_WARN, "UDP seq num gap: expected {}, received {}".format(self.next_udp_seq_num, udp_seq_num))
+        self.num_udp_gaps += 1
       self.next_udp_seq_num = (udp_seq_num + 1) & 0xFFFFFFFF
       data = data[4:]
 
@@ -64,7 +67,7 @@ class pluto_intercept_hw_dma_reader_thread:
     while running:
       seq_num, data = self._read()
       if len(data) > 0:
-        self.result_queue.put({"unique_key": unique_key, "data": data, "udp_seq_num": seq_num}, block=False)
+        self.result_queue.put({"unique_key": unique_key, "data": data, "udp_seq_num": seq_num, "udp_gaps": self.num_udp_gaps}, block=False)
         self.logger.log(self.logger.LL_DEBUG, "seq={} - read {} bytes from buffer - uk={}".format(seq_num, len(data), unique_key))
         unique_key += 1
 
@@ -102,6 +105,7 @@ class pluto_intercept_hw_dma_reader:
     self.running = True
     self.num_dma_reads = 0
     self.num_status_reports = 0
+    self.num_udp_gaps = 0
 
     self.output_data_dwell  = []
     self.output_data_stream = []
@@ -144,6 +148,7 @@ class pluto_intercept_hw_dma_reader:
     while not self.hwdr_result_queue.empty():
       data = self.hwdr_result_queue.get(block=False)
       self.num_dma_reads += 1
+      self.num_udp_gaps = data["udp_gaps"]
       self.received_data.append(data)
       self.logger.log(self.logger.LL_DEBUG, "[hwdr] _update_receive_queue: received data: len={} uk={} udp_seq_num={}".format(len(data), data["unique_key"], data["udp_seq_num"]))
 

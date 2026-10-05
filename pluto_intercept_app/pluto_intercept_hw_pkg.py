@@ -43,12 +43,15 @@ ADC_CLOCK_PERIOD                                        = 1/61.44e6
 FAST_CLOCK_PERIOD                                       = 1/(4*61.44e6)
 CHANNELIZER_OVERSAMPLING                                = 2.0
 
+CHANNELIZER_DATA_WIDTH                                  = 25
+CHANNELIZER_SCALE_FACTOR                                = 1 / (2**(CHANNELIZER_DATA_WIDTH - 1))
+
 ETH_MAC_HEADER_LENGTH                                   = 14
 ETH_IPV4_HEADER_LENGTH                                  = 20
 ETH_UDP_HEADER_LENGTH                                   = 8
 
-PACKED_INTERCEPT_REPORT_COMMON_HEADER   = struct.Struct("<" + PACKED_UINT32 + PACKED_UINT32 + "xx"          + PACKED_UINT8 + PACKED_UINT8 + "xxxx")
-PACKED_INTERCEPT_CONFIG_HEADER          = struct.Struct("<" + PACKED_UINT32 + PACKED_UINT32 + PACKED_UINT16 + PACKED_UINT8 + PACKED_UINT8 + "xxxx")
+PACKED_INTERCEPT_REPORT_COMMON_HEADER   = struct.Struct("<" + PACKED_UINT32 + PACKED_UINT32 + "xx"          + PACKED_UINT8 + PACKED_UINT8 + "xxxx")     #magic number, msg seq num, module id, message type
+PACKED_INTERCEPT_CONFIG_HEADER          = struct.Struct("<" + PACKED_UINT32 + PACKED_UINT32 + PACKED_UINT16 + PACKED_UINT8 + PACKED_UINT8 + "xxxx")     #magic number, msg seq num, address, module id, message type
 PACKED_INTERCEPT_CONFIG_CONTROL         = struct.Struct("<" + PACKED_UINT32 + PACKED_UINT32 + PACKED_UINT16 + PACKED_UINT8 + PACKED_UINT8 + "xxxx" +    # common header
                                                               PACKED_UINT8 + PACKED_UINT8 + PACKED_UINT8 + PACKED_UINT8 + "xxxx")                       # reset, enables x 3
 
@@ -56,7 +59,8 @@ PACKED_INTERCEPT_CONFIG_DWELL_CONTROL   = struct.Struct("<" + PACKED_UINT8 +    
                                                               "x" +
                                                               PACKED_UINT16 +                                                                           # tag
                                                               PACKED_UINT32 +                                                                           # frequency
-                                                              PACKED_UINT32)                                                                            # window duration
+                                                              PACKED_UINT32 +                                                                           # window duration
+                                                              "xxxx")
 
 PACKED_INTERCEPT_CONFIG_CHANNEL_CONTROL = struct.Struct("<" + PACKED_UINT8 +                                                                            # enable
                                                               PACKED_UINT8 +                                                                            # force trigger
@@ -82,7 +86,7 @@ PACKED_DWELL_STATS_HEADER               = struct.Struct("<" + PACKED_UINT32 + PA
                                                               PACKED_UINT32 +                                                                           # window seq num
                                                               PACKED_UINT32 + PACKED_UINT32)                                                            # window timestamp
 
-PACKED_DWELL_STATS_CHANNEL_ENTRY        = struct.Struct("<" + PACKED_UINT32 + PACKED_UINT32 + PACKED_UINT32 + PACKED_UINT32)                            # index, accum0, accum1, max
+PACKED_DWELL_STATS_CHANNEL_ENTRY        = struct.Struct("<" + PACKED_UINT8 + "x" + PACKED_UINT16 + PACKED_UINT32 + PACKED_UINT32 + PACKED_UINT32)       # valid, index, accum0, accum1, max
 
 PACKED_STREAM_HEADER                    = struct.Struct("<" + PACKED_UINT32 + PACKED_UINT32 + "xx"          + PACKED_UINT8 + PACKED_UINT8 + "xxxx" +    # common report header
                                                               PACKED_UINT32 + PACKED_UINT32 + PACKED_UINT16 + PACKED_UINT16 +                           # dwell data: seq num, frequency, tag, window duration

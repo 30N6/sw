@@ -9,7 +9,7 @@ import pluto_intercept_data_recorder
 import pluto_intercept_data_loader
 import render_status
 import render_spectrum
-import render_signals
+import render_streams
 
 import cProfile, pstats, io
 from pstats import SortKey
@@ -64,15 +64,15 @@ class pluto_intercept_main_thread:
     self.sequencer        = pluto_intercept_sequencer.pluto_intercept_sequencer(self.logger, self.recorder, self.sw_config, self.hw_interface, self.analysis_thread, self.sim_loader)
     self.render_status    = render_status.render_status(self.surface, self.sw_config, self.hw_interface, self.sequencer, self.analysis_thread, self.VERSION)
     self.render_spectrum  = render_spectrum.render_spectrum(self.surface, self.sw_config, self.sequencer)
-    self.render_signals   = render_signals.render_signals(self.surface, self.sw_config, self.analysis_thread, self.sequencer)
+    self.render_streams   = render_streams.render_streams(self.surface, self.sw_config, self.analysis_thread, self.sequencer)
 
     self.pr = cProfile.Profile()
 
   def run(self):
-    keydown_handlers  = [self.render_spectrum, self.render_signals]
+    keydown_handlers  = [self.render_spectrum, self.render_streams]
     keystate_handlers = [self.sequencer]
-    update_calls      = [self.hw_interface, self.analysis_thread, self.sequencer, self.render_status, self.render_spectrum, self.render_signals]
-    render_calls      = [self.render_status, self.render_spectrum, self.render_signals]
+    update_calls      = [self.hw_interface, self.analysis_thread, self.sequencer, self.render_status, self.render_spectrum, self.render_streams]
+    render_calls      = [self.render_status, self.render_spectrum,  self.render_streams]
 
     running = True
     while (running):

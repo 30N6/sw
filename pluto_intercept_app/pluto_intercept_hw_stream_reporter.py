@@ -50,7 +50,7 @@ class pluto_intercept_hw_stream_reporter:
     #iq_data = iq_data.reshape((report["slice_length"], 2))
     #iq_data = iq_data[:, -1::-1]
 
-    trailer_bytes = PACKED_STREAM_HEADER.size - data.size
+    trailer_bytes = len(data) - PACKED_STREAM_HEADER.size
     num_reported_samples = trailer_bytes // PACKED_STREAM_SAMPLE.size
 
     samples = []

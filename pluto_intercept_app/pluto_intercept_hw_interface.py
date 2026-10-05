@@ -467,6 +467,11 @@ class pluto_intercept_hw_interface:
   def enable_hw(self):
     self.hw_cfg.send_enables(255, 255, 255)
 
+  def set_rx_frequency(self, freq):
+    cmd = hw_command.gen_write_attr_rx_lo(self.hwcp.get_next_unique_key(), "frequency", str(int(freq * 1e6)))
+    self.hwcp.send_command(cmd, True)
+    self.logger.log(self.logger.LL_INFO, "[hwi] set_rx_frequency={}".format(freq))
+
   def update(self):
     #start = time.time()
     #self.pr.enable()

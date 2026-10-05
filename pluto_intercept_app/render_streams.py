@@ -4,17 +4,49 @@ import numpy as np
 from pluto_intercept_hw_pkg import *
 import turbo_colormap
 
-class render_signals:
+class render_streams:
 
   def __init__(self, surface, sw_config, analysis_thread, sequencer):
     self.surface          = surface
     self.sw_config        = sw_config
     self.analysis_thread  = analysis_thread
+    self.sequencer        = sequencer
     #self.ecm_controller   = sequencer.ecm_controller
+
+    self.graphics_left                    = 64
+    self.graphics_width                   = 512
+
+    self.rect_stream                      = [self.graphics_left, 536,   self.graphics_width, 272]
+    self.stream_rows                      = 2
+    self.stream_cols                      = INTERCEPT_NUM_STREAMS // self.stream_rows
+    self.stream_box_height                = 96
+    self.stream_box_width                 = self.graphics_width // self.stream_cols
+
+    self.stream_buffer_depth              = 64
+    self.stream_buffer_data               = np.zeros((INTERCEPT_NUM_STREAMS, self.stream_buffer_depth), dtype=np.complex64)
+    self.stream_buffer_index              = np.zeros(INTERCEPT_NUM_STREAMS, dtype=np.uint32)
+    self.stream_last_trigger_type         = np.ones(INTERCEPT_NUM_STREAMS, dtype=np.uint32) * 3
+    self.stream_last_channel_index        = np.zeros(INTERCEPT_NUM_STREAMS, dtype=np.uint32)
+    self.stream_last_channel_frequency    = np.zeros(INTERCEPT_NUM_STREAMS)
+
+    self.stream_trace_max_dB              = 30
+    self.stream_trace_min_dB              = -60
+
+    self.stream_box_data = []
+    for i in range(INTERCEPT_NUM_STREAMS):
+      self.stream_box_data.append(np.zeros((self.stream_box_width, self.stream_box_height, 3)))
+
+    assert (self.stream_rows * self.stream_cols == INTERCEPT_NUM_STREAMS)
+
+    self.trigger_type_map = {0 : "N", 1 : "C", 2 : "F", 3 : " "}
+
+    self.dwell_frequency                  = 0
+    self.channel_frequency                = []
+    self.channel_frequency_str            = []
 
     self.colors = {}
     self.colors["border"]               = (0, 0, 255)
-    self.colors["frame_elements"]       = (0, 128, 128)
+    self.colors["frame_elements"]       = (0, 255, 192)
     self.colors["grid_lines"]           = (0, 128, 128)
     self.colors["emitter_marker"]       = (0, 192, 0)
     self.colors["signal_entry_active"]  = (0, 255, 0)
@@ -23,7 +55,9 @@ class render_signals:
     self.colors["signal_entry_tx"]      = (255, 64, 64)
     self.colors["emitter_histogram"]    = (192, 255, 0)
 
-    self.font_main                      = pygame.font.SysFont('Consolas', 14)
+    self.colors["trace_peak"]           = np.asarray([32, 255, 32])
+
+    self.font_main                      = pygame.font.SysFont('Consolas', 16)
     self.font_detail                    = pygame.font.SysFont('Consolas', 12)
 
     self.rect_frame_signals_primary               = [640, 0,   384, 384]
@@ -46,6 +80,14 @@ class render_signals:
     self.selected_signal                = 0
 
     self.update_timeout_confirmed       = 1.0
+
+    self._update_frequency()
+
+  def _update_frequency(self):
+    if self.sequencer.dwell_data["frequency"] != self.dwell_frequency:
+      self.dwell_frequency = self.sequencer.dwell_data["frequency"]
+      self.channel_frequency = self.dwell_frequency + (np.arange(INTERCEPT_NUM_CHANNELS) - (INTERCEPT_NUM_CHANNELS / 2)) * (ADC_CLOCK_FREQUENCY * 1e-6 / INTERCEPT_NUM_CHANNELS)
+      self.channel_frequency_str = ["{:.1f}".format(self.channel_frequency[i]) for i in range(INTERCEPT_NUM_CHANNELS)]
 
   def _render_confirmed_signal_list(self):
     emitter_entries = []
@@ -218,10 +260,68 @@ class render_signals:
     if self.selected_signal < 0:
       self.selected_signal = 0
 
+  def _render_stream_display(self):
+    for i_row in range(self.stream_rows):
+      for i_col in range(self.stream_cols):
+        stream_index = i_row * self.stream_cols + i_col
+
+        rect_x = i_col * (self.graphics_width // self.stream_cols) + self.graphics_left
+        rect_y = i_row * (self.rect_stream[3] // self.stream_rows) + self.rect_stream[1]
+        rect = [rect_x, rect_y, self.stream_box_width, self.stream_box_height]
+
+        trigger_type = self.stream_last_trigger_type[stream_index]
+        channel_index = self.stream_last_channel_index[stream_index]
+
+        if trigger_type > 2:
+          pygame.draw.line(self.surface, self.colors["frame_elements"], [rect_x, rect_y], [rect_x + self.stream_box_width, rect_y + self.stream_box_height], 1)
+          pygame.draw.line(self.surface, self.colors["frame_elements"], [rect_x + self.stream_box_width, rect_y], [rect_x, rect_y + self.stream_box_height], 1)
+        else:
+          trigger_str = self.trigger_type_map[trigger_type]
+          text_data = self.font_main.render(trigger_str, True, self.colors["frame_elements"])
+          text_rect = text_data.get_rect()
+          text_rect.centerx = rect_x + self.stream_box_width / 2
+          text_rect.centery = rect_y + self.stream_box_height + 12
+          self.surface.blit(text_data, text_rect)
+
+          text_data = self.font_main.render(self.channel_frequency_str[channel_index], True, self.colors["frame_elements"])
+          text_rect = text_data.get_rect()
+          text_rect.centerx = rect_x + self.stream_box_width / 2
+          text_rect.centery = rect_y - 12
+          self.surface.blit(text_data, text_rect)
+
+          data_s = self.stream_box_data[stream_index]
+          data_max = np.max(data_s)
+          if data_max > 0:
+            data_s_normalized = data_s * (255.0 / data_max)
+          else:
+            data_s_normalized = data_s
+          surf_s = pygame.surfarray.make_surface(data_s_normalized)
+          self.surface.blit(surf_s, rect)
+          #self._update_stream_box(stream_index)
+
+        pygame.draw.rect(self.surface, self.colors["frame_elements"], rect, 1)
+
+  def _process_stream_buffer(self, stream_index):
+    stream_power = np.abs(np.fft.fft(self.stream_buffer_data[stream_index]))
+    stream_power[stream_power < 1e-9] = 1e-9
+
+    stream_power_dB = 10*np.log10(stream_power)
+
+    stream_power_dB[stream_power_dB < self.stream_trace_min_dB] = self.stream_trace_min_dB
+    stream_power_dB[stream_power_dB > self.stream_trace_max_dB] = self.stream_trace_max_dB
+
+    vertical_px_per_dB = (self.stream_box_height - 4) / (self.stream_trace_max_dB - self.stream_trace_min_dB)
+
+    trace_data  = np.zeros((self.stream_box_width, self.stream_box_height, 3))
+    trace_x     = np.arange(self.stream_box_width)
+    trace_y     = self.stream_box_height - (np.round((stream_power_dB - self.stream_trace_min_dB) * vertical_px_per_dB).astype(np.uint32) + 2)
+
+    trace_data[trace_x, trace_y] = self.colors["trace_peak"]
+
+    self.stream_box_data[stream_index] = 0.9 * self.stream_box_data[stream_index]  + 0.1 * trace_data
+
   def render(self):
-    pygame.draw.rect(self.surface, self.colors["border"], self.rect_frame_signals_primary, 1)
-    pygame.draw.rect(self.surface, self.colors["border"], self.rect_frame_signals_secondary, 1)
-    pygame.draw.rect(self.surface, self.colors["border"], self.rect_frame_signals_tx, 1)
+    self._render_stream_display()
 
     #self._render_confirmed_signal_list()
     #self._render_confirmed_details()
@@ -231,45 +331,19 @@ class render_signals:
   def update(self):
     now = time.time()
 
-    for entry in self.analysis_thread.data_to_render:
-      if "confirmed_signals" in entry:
-        self.last_update_time_confirmed = now
-        self.signals_confirmed = []
+    while (len(self.sequencer.streams_to_render)) > 0:
+      report = self.sequencer.streams_to_render.pop(0)
 
-        for signal_data in entry["confirmed_signals"]:
-          signal = {}
-          signal["signal_data"]  = signal_data
-          signal["signal_age"]   = now - signal_data["timestamp_initial"]
-          signal["update_age"]   = now - signal_data["timestamp_final"]
-          self.signals_confirmed.append(signal)
+      for sample in report["stream_samples"]:
+        stream_index = sample["stream_index"]
+        self.stream_last_trigger_type[stream_index] = sample["trigger_type"]
+        self.stream_last_channel_index[stream_index] = sample["channel_index"]
 
-      elif "scan_signals" in entry:
-        self.signals_scan = []
-        for signal_data in entry["scan_signals"]:
-          signal = {}
-          signal["signal_data"]  = signal_data
-          signal["signal_age"]   = now - signal_data["timestamp_initial"]
-          signal["update_age"]   = now - signal_data["timestamp_final"]
-          self.signals_scan.append(signal)
+        self.stream_buffer_data[stream_index, self.stream_buffer_index[stream_index]] = (sample["iq"][0] + 1j * sample["iq"][1]) * CHANNELIZER_SCALE_FACTOR
 
-      else:
-        raise RuntimeError("unexpected data")
-
-    self.signals_tx = []
-    #for signal_data in self.ecm_controller.signals_for_tx:
-    #  signal = {}
-    #  signal["signal_data"] = signal_data
-    #  signal["signal_age"] = now - signal_data["timestamp"]
-    #  self.signals_tx.append(signal)
-
-    if (now - self.last_update_time_confirmed) > self.update_timeout_confirmed:
-      self.signals_confirmed = []
-
-    self.analysis_thread.data_to_render = []
-    self.signals_confirmed.sort(key=lambda entry: entry["signal_data"]["stats"]["power_mean"], reverse=True)
-    self.signals_tx.sort(key=lambda entry: entry["signal_data"]["freq"], reverse=False)
-
-    self._clamp_selected_emitters()
+        if (self.stream_buffer_index[stream_index] == (self.stream_buffer_depth - 1)):
+          self._process_stream_buffer(stream_index)
+        self.stream_buffer_index[stream_index] = (self.stream_buffer_index[stream_index] + 1) % self.stream_buffer_depth
 
   def process_keydown(self, key):
     if key not in (pygame.K_PAGEUP, pygame.K_PAGEDOWN):
