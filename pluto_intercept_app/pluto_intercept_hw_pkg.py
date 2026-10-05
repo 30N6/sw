@@ -78,8 +78,8 @@ PACKED_INTERCEPT_CONFIG_STREAM_CONTROL  = struct.Struct("<" + PACKED_UINT8 +    
                                                               PACKED_UINT16 +                                                                           # tag
                                                               "xxxx")
 
-PACKED_STATUS_REPORT                    = struct.Struct("<" + PACKED_UINT32 + PACKED_UINT32 + "xx"          + PACKED_UINT8 + PACKED_UINT8 + "xxxx" +
-                                                              PACKED_UINT32 + PACKED_UINT32 + PACKED_UINT32 + PACKED_UINT32 + PACKED_UINT32)
+PACKED_STATUS_REPORT                    = struct.Struct("<" + PACKED_UINT32 + PACKED_UINT32 + "xx"          + PACKED_UINT8 + PACKED_UINT8 + "xxxx" +    # common report header
+                                                              PACKED_UINT32 + PACKED_UINT32 + PACKED_UINT32 + PACKED_UINT32 + PACKED_UINT32)            # enables, status flags, reporter flags, timestamp upper word, timestamp lower word
 
 PACKED_DWELL_STATS_HEADER               = struct.Struct("<" + PACKED_UINT32 + PACKED_UINT32 + "xx"          + PACKED_UINT8 + PACKED_UINT8 + "xxxx" +    # common report header
                                                               PACKED_UINT32 + PACKED_UINT32 + PACKED_UINT16 + PACKED_UINT16 +                           # dwell data: seq num, frequency, tag, window duration
