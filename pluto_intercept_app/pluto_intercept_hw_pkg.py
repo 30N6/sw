@@ -1,4 +1,5 @@
 import struct
+import numpy as np
 
 PACKED_UINT8  = "B"
 PACKED_UINT16 = "H"
@@ -28,7 +29,7 @@ INTERCEPT_REPORT_MESSAGE_TYPE_STREAM                    = 0x20
 INTERCEPT_REPORT_MESSAGE_TYPE_STATUS                    = 0x30
 
 INTERCEPT_NUM_CHANNELS                                  = 512
-INTERCEPT_NUM_STREAMS                                   = 16
+INTERCEPT_NUM_STREAMS                                   = 8     # 16 in hardware
 
 INTERCEPT_DWELL_DURATION_MAX_FRAMES                     = 65535
 INTERCEPT_DWELL_DURATION_MIN_FRAMES                     = 16
@@ -99,3 +100,11 @@ PACKED_STREAM_SAMPLE                    = struct.Struct("<" + PACKED_UINT8 +    
                                                               PACKED_UINT32 +                                                                           # sample index
                                                               PACKED_INT32 +                                                                            # I
                                                               PACKED_INT32)                                                                             # Q
+PACKED_STREAM_SAMPLE_DTYPE              = np.dtype([
+                                                    ("trigger_type",  "<u1"),
+                                                    ("stream_index",  "<u1"),
+                                                    ("channel_index", "<u2"),
+                                                    ("sample_index",  "<u4"),
+                                                    ("I",             "<i4"),
+                                                    ("Q",             "<i4"),
+                                                  ])

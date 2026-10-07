@@ -43,32 +43,14 @@ class pluto_intercept_hw_stream_reporter:
     report["dwell_window_duration"] = unpacked_header[7]
     report["timestamp"]             = (unpacked_header[8] << 32) | unpacked_header[9]
 
-    #TODO: use fast method for decoding entries? not clear if beneficial for this use case
-    ## fast method
-    #report_data = np.frombuffer(data, dtype=np.int16)
-    #iq_data = report_data[(PACKED_DRFM_CHANNEL_REPORT_HEADER.size//2) : (PACKED_DRFM_CHANNEL_REPORT_HEADER.size//2 + 2 * report["slice_length"])]
-    #iq_data = iq_data.reshape((report["slice_length"], 2))
-    #iq_data = iq_data[:, -1::-1]
-
     trailer_bytes = len(data) - PACKED_STREAM_HEADER.size
     num_reported_samples = trailer_bytes // PACKED_STREAM_SAMPLE.size
 
-    samples = []
+    offset = PACKED_STREAM_HEADER.size
+    nbytes = num_reported_samples * PACKED_STREAM_SAMPLE_DTYPE.itemsize
+    raw = data[offset:offset + nbytes]
 
-    #slow method - TODO: remove
-    for i in range(num_reported_samples):
-      unpacked_sample = PACKED_STREAM_SAMPLE.unpack(data[(PACKED_STREAM_HEADER.size + PACKED_STREAM_SAMPLE.size * i) :
-                                                         (PACKED_STREAM_HEADER.size + PACKED_STREAM_SAMPLE.size * (i + 1))])
-      sample = {}
-      sample["trigger_type"]  = unpacked_sample[0]
-      sample["stream_index"]  = unpacked_sample[1]
-      sample["channel_index"] = unpacked_sample[2]
-      sample["sample_index"]  = unpacked_sample[3]
-      sample["iq"]            = [unpacked_sample[4], unpacked_sample[5]]
-
-      samples.append(sample)
-
-    report["stream_samples"] = samples
+    report["stream_samples"] = np.frombuffer(raw, dtype=PACKED_STREAM_SAMPLE_DTYPE, count=num_reported_samples)
 
     return report
 

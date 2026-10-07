@@ -37,7 +37,7 @@ class pluto_intercept_sequencer:
     self.hw_stream_entry_pending        = []
 
     self.dwells_to_render               = []
-    self.streams_to_render              = []
+    #self.streams_to_render              = [] #todo
 
     self.channel_entry_write_queue      = []
     self.stream_entry_write_queue       = []
@@ -49,6 +49,16 @@ class pluto_intercept_sequencer:
     self.dwell_entry                    = None
     self.channel_entries                = {}
     self.stream_entries                 = {}
+
+    self.channel_frequency              = [self.dwell_data["frequency"] + (i - (INTERCEPT_NUM_CHANNELS / 2)) * (ADC_CLOCK_FREQUENCY * 1e-6 / INTERCEPT_NUM_CHANNELS) for i in range(INTERCEPT_NUM_CHANNELS)]
+    self.channel_frequency_str          = ["{:.3f}".format(self.channel_frequency[i]) for i in range(INTERCEPT_NUM_CHANNELS)]
+
+    self.stream_last_trigger_type       = np.ones(INTERCEPT_NUM_STREAMS, dtype=np.uint32) * 3
+    self.stream_last_channel_index      = np.zeros(INTERCEPT_NUM_STREAMS, dtype=np.uint32)
+    self.stream_last_sample_index       = np.zeros(INTERCEPT_NUM_STREAMS, dtype=np.uint32)
+    self.stream_last_frequency          = np.zeros(INTERCEPT_NUM_STREAMS)
+    self.stream_last_frequency_str      = ["" for i in range(INTERCEPT_NUM_STREAMS)]
+
 
     self.logger.log(self.logger.LL_INFO, "[sequencer] init done; sim_enabled={} frequency={} window_duration={}".format(self.sim_enabled, self.dwell_data["frequency"], self.dwell_data["window_duration"]))
 
@@ -68,25 +78,25 @@ class pluto_intercept_sequencer:
     if len(self.dwell_entry_write_queue) > 0:
       self.logger.log(self.logger.LL_DEBUG, "[sequencer] _flush_channel_entry_queue: num_entries={}".format(len(self.dwell_entry_write_queue)))
 
-    while len(self.dwell_entry_write_queue) > 0:
-      entry = self.dwell_entry_write_queue.pop(0)
+    for entry in self.dwell_entry_write_queue:
       self._send_hw_dwell_entry(entry)
+    self.dwell_entry_write_queue.clear()
 
   def _flush_channel_entry_queue(self):
     if len(self.channel_entry_write_queue) > 0:
       self.logger.log(self.logger.LL_DEBUG, "[sequencer] _flush_channel_entry_queue: num_entries={}".format(len(self.channel_entry_write_queue)))
 
-    while len(self.channel_entry_write_queue) > 0:
-      entry = self.channel_entry_write_queue.pop(0)
+    for entry in self.channel_entry_write_queue:
       self._send_hw_channel_entry(entry["index"], entry["entry"])
+    self.channel_entry_write_queue.clear()
 
   def _flush_stream_entry_queue(self):
     if len(self.stream_entry_write_queue) > 0:
       self.logger.log(self.logger.LL_DEBUG, "[sequencer] _flush_stream_entry_queue: num_entries={}".format(len(self.stream_entry_write_queue)))
 
-    while len(self.stream_entry_write_queue) > 0:
-      entry = self.stream_entry_write_queue.pop(0)
+    for entry in self.stream_entry_write_queue:
       self._send_hw_stream_entry(entry["index"], entry["entry"])
+    self.stream_entry_write_queue.clear()
 
   def _send_hw_dwell_entry(self, data):
     self.dwell_entry = data
@@ -137,8 +147,7 @@ class pluto_intercept_sequencer:
     return len(keys_found)
 
   def _process_dwell_reports_from_hw(self):
-    while len(self.hw_interface.hwdr.output_data_dwell) > 0:
-      packed_report = self.hw_interface.hwdr.output_data_dwell.pop(0)
+    for packed_report in self.hw_interface.hwdr.output_data_dwell:
       r = self.dwell_reporter.process_message(packed_report)
 
       if r is None:
@@ -151,21 +160,58 @@ class pluto_intercept_sequencer:
       self.dwells_to_render.append(r)
       self.threshold_control.process_dwell(r)
 
+    self.hw_interface.hwdr.output_data_dwell.clear()
+
   def _process_stream_reports_from_hw(self):
-    while len(self.hw_interface.hwdr.output_data_stream) > 0:
-      packed_report = self.hw_interface.hwdr.output_data_stream.pop(0)
+    results = []
+    for packed_report in self.hw_interface.hwdr.output_data_stream:
       r = self.stream_reporter.process_message(packed_report)
 
       self.logger.log(self.logger.LL_DEBUG, "[sequencer] _process_stream_reports_from_hw: report received msg_seq_num={} num_samples={}".format(r["msg_seq_num"], len(r["stream_samples"]))) #TODO: reduce logging
       self.recorder.log({"stream_report": r})
 
+      self._track_stream_state(r)
       self.hw_stats.submit_report(r)
-      self.streams_to_render.append(r)
+      results.append(r)
+      #self.analysis_thread.submit_data(r)
+      #self.streams_to_render.append(r)
+    self.hw_interface.hwdr.output_data_stream.clear()
+
+    #TODO: wait until N items ready (or time elapsed)
+    if len(results) > 0:
+      self.analysis_thread.submit_data(results)
+
+  def _track_stream_state(self, stream_report):
+    #self.pr.enable()
+
+    samples = stream_report["stream_samples"]
+
+    trigger_type  = samples["trigger_type"]
+    stream_index  = samples["stream_index"]
+    channel_index = samples["channel_index"]
+    sample_index  = samples["sample_index"]
+
+    # last occurrence of each stream index
+    _, first = np.unique(stream_index[::-1], return_index=True)
+    last = stream_index.size - 1 - first
+
+    s = stream_index[last]
+    self.stream_last_trigger_type[s]  = trigger_type[last]
+    self.stream_last_channel_index[s] = channel_index[last]
+    self.stream_last_sample_index[s]  = sample_index[last]
+
+  def get_stream_state(self, stream_index):
+    return self.stream_last_trigger_type[stream_index], \
+           self.stream_last_channel_index[stream_index], \
+           self.stream_last_sample_index[stream_index]
+
+  def get_channel_frequency_str(self, channel_index):
+    return self.channel_frequency_str[channel_index]
 
   def _send_initial_hw_control(self):
     self.submit_dwell_entry(pluto_intercept_hw_control.intercept_dwell_control_entry(1, 12345, int(self.dwell_data["frequency"] * 1e3), self.dwell_data["window_duration"]))
     for i in range(INTERCEPT_NUM_CHANNELS):
-      self.submit_channel_entry(i, pluto_intercept_hw_control.intercept_channel_control_entry(1, (i == 300), 15, 0, 0xFFFFFFFF, 0xFFFFFFFF, 60000, 0))
+      self.submit_channel_entry(i, pluto_intercept_hw_control.intercept_channel_control_entry(1, (i == 256), 7, 0, 0xFFFFFFFF, 0xFFFFFFFF, 60000, 0))
     for i in range(INTERCEPT_NUM_STREAMS):
       self.submit_stream_entry(i, pluto_intercept_hw_control.intercept_stream_control_entry(i < (INTERCEPT_NUM_STREAMS - 1), 0xFFFF))
 

@@ -76,6 +76,8 @@ class pluto_intercept_main_thread:
 
     running = True
     while (running):
+      self.pr.enable()
+
       for i in pygame.event.get():
         if i.type == pygame.QUIT:
           running = False
@@ -93,21 +95,21 @@ class pluto_intercept_main_thread:
       self.logger.flush()
       self.recorder.flush()
 
-      #self.pr.enable()
-
       for mod in update_calls:
         mod.update()
 
-      #self.pr.disable()
-      #s = io.StringIO()
-      #sortby = SortKey.CUMULATIVE
-      #ps = pstats.Stats(self.pr, stream=s).sort_stats(sortby)
-      #ps.print_stats()
-      #print(s.getvalue())
+      #self.pr.enable()
 
       self.surface.fill((0,0,0))
       for mod in render_calls:
         mod.render()
+
+      self.pr.disable()
+      s = io.StringIO()
+      sortby = SortKey.CUMULATIVE
+      ps = pstats.Stats(self.pr, stream=s).sort_stats(sortby)
+      ps.print_stats()
+      print(s.getvalue())
 
       pygame.display.flip()
       self.clock.tick(self.FPS)

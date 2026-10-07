@@ -4,6 +4,9 @@ import numpy as np
 from pluto_intercept_hw_pkg import *
 import turbo_colormap
 
+import cProfile, pstats, io
+from pstats import SortKey
+
 class render_streams:
 
   def __init__(self, surface, sw_config, analysis_thread, sequencer):
@@ -22,19 +25,10 @@ class render_streams:
     self.stream_box_height                = 96
     self.stream_box_width                 = self.graphics_width // self.stream_cols
 
-    self.stream_buffer_depth              = 64
-    self.stream_buffer_data               = np.zeros((INTERCEPT_NUM_STREAMS, self.stream_buffer_depth), dtype=np.complex64)
-    self.stream_buffer_index              = np.zeros(INTERCEPT_NUM_STREAMS, dtype=np.uint32)
-    self.stream_last_trigger_type         = np.ones(INTERCEPT_NUM_STREAMS, dtype=np.uint32) * 3
-    self.stream_last_channel_index        = np.zeros(INTERCEPT_NUM_STREAMS, dtype=np.uint32)
-    self.stream_last_channel_frequency    = np.zeros(INTERCEPT_NUM_STREAMS)
-
     self.stream_trace_max_dB              = 30
     self.stream_trace_min_dB              = -60
 
-    self.stream_box_data = []
-    for i in range(INTERCEPT_NUM_STREAMS):
-      self.stream_box_data.append(np.zeros((self.stream_box_width, self.stream_box_height, 3)))
+    self.stream_box_data                  = [None for i in range(INTERCEPT_NUM_STREAMS)]
 
     assert (self.stream_rows * self.stream_cols == INTERCEPT_NUM_STREAMS)
 
@@ -82,6 +76,8 @@ class render_streams:
     self.update_timeout_confirmed       = 1.0
 
     self._update_frequency()
+
+    self.pr = cProfile.Profile()
 
   def _update_frequency(self):
     if self.sequencer.dwell_data["frequency"] != self.dwell_frequency:
@@ -269,8 +265,8 @@ class render_streams:
         rect_y = i_row * (self.rect_stream[3] // self.stream_rows) + self.rect_stream[1]
         rect = [rect_x, rect_y, self.stream_box_width, self.stream_box_height]
 
-        trigger_type = self.stream_last_trigger_type[stream_index]
-        channel_index = self.stream_last_channel_index[stream_index]
+        trigger_type, channel_index, sample_index = self.sequencer.get_stream_state(stream_index)
+        frequency_str = self.sequencer.get_channel_frequency_str(channel_index)
 
         if trigger_type > 2:
           pygame.draw.line(self.surface, self.colors["frame_elements"], [rect_x, rect_y], [rect_x + self.stream_box_width, rect_y + self.stream_box_height], 1)
@@ -279,46 +275,33 @@ class render_streams:
           trigger_str = self.trigger_type_map[trigger_type]
           text_data = self.font_main.render(trigger_str, True, self.colors["frame_elements"])
           text_rect = text_data.get_rect()
-          text_rect.centerx = rect_x + self.stream_box_width / 2
-          text_rect.centery = rect_y + self.stream_box_height + 12
+          text_rect.left = rect_x + 4 #+ self.stream_box_width / 2
+          text_rect.centery = rect_y - 8 #+ self.stream_box_height + 12
           self.surface.blit(text_data, text_rect)
 
-          text_data = self.font_main.render(self.channel_frequency_str[channel_index], True, self.colors["frame_elements"])
+          text_data = self.font_main.render(frequency_str, True, self.colors["frame_elements"])
           text_rect = text_data.get_rect()
           text_rect.centerx = rect_x + self.stream_box_width / 2
-          text_rect.centery = rect_y - 12
+          text_rect.centery = rect_y - 8
+          self.surface.blit(text_data, text_rect)
+
+          text_data = self.font_main.render("{}".format(sample_index), True, self.colors["frame_elements"])
+          text_rect = text_data.get_rect()
+          text_rect.right = rect_x + self.stream_box_width
+          text_rect.centery = rect_y + self.stream_box_height + 8
           self.surface.blit(text_data, text_rect)
 
           data_s = self.stream_box_data[stream_index]
-          data_max = np.max(data_s)
-          if data_max > 0:
-            data_s_normalized = data_s * (255.0 / data_max)
-          else:
-            data_s_normalized = data_s
-          surf_s = pygame.surfarray.make_surface(data_s_normalized)
-          self.surface.blit(surf_s, rect)
-          #self._update_stream_box(stream_index)
+          if data_s is not None:
+            data_max = np.max(data_s)
+            if data_max > 0:
+              data_s_normalized = data_s * (255.0 / data_max)
+            else:
+              data_s_normalized = data_s
+            surf_s = pygame.surfarray.make_surface(data_s_normalized)
+            self.surface.blit(surf_s, rect)
 
         pygame.draw.rect(self.surface, self.colors["frame_elements"], rect, 1)
-
-  def _process_stream_buffer(self, stream_index):
-    stream_power = np.abs(np.fft.fft(self.stream_buffer_data[stream_index]))
-    stream_power[stream_power < 1e-9] = 1e-9
-
-    stream_power_dB = 10*np.log10(stream_power)
-
-    stream_power_dB[stream_power_dB < self.stream_trace_min_dB] = self.stream_trace_min_dB
-    stream_power_dB[stream_power_dB > self.stream_trace_max_dB] = self.stream_trace_max_dB
-
-    vertical_px_per_dB = (self.stream_box_height - 4) / (self.stream_trace_max_dB - self.stream_trace_min_dB)
-
-    trace_data  = np.zeros((self.stream_box_width, self.stream_box_height, 3))
-    trace_x     = np.arange(self.stream_box_width)
-    trace_y     = self.stream_box_height - (np.round((stream_power_dB - self.stream_trace_min_dB) * vertical_px_per_dB).astype(np.uint32) + 2)
-
-    trace_data[trace_x, trace_y] = self.colors["trace_peak"]
-
-    self.stream_box_data[stream_index] = 0.9 * self.stream_box_data[stream_index]  + 0.1 * trace_data
 
   def render(self):
     self._render_stream_display()
@@ -331,19 +314,16 @@ class render_streams:
   def update(self):
     now = time.time()
 
-    while (len(self.sequencer.streams_to_render)) > 0:
-      report = self.sequencer.streams_to_render.pop(0)
+    #self.pr.enable()
 
-      for sample in report["stream_samples"]:
-        stream_index = sample["stream_index"]
-        self.stream_last_trigger_type[stream_index] = sample["trigger_type"]
-        self.stream_last_channel_index[stream_index] = sample["channel_index"]
+    self.stream_box_data = self.analysis_thread.get_stream_fft_box_data()
 
-        self.stream_buffer_data[stream_index, self.stream_buffer_index[stream_index]] = (sample["iq"][0] + 1j * sample["iq"][1]) * CHANNELIZER_SCALE_FACTOR
-
-        if (self.stream_buffer_index[stream_index] == (self.stream_buffer_depth - 1)):
-          self._process_stream_buffer(stream_index)
-        self.stream_buffer_index[stream_index] = (self.stream_buffer_index[stream_index] + 1) % self.stream_buffer_depth
+    #self.pr.disable()
+    #s = io.StringIO()
+    #sortby = SortKey.CUMULATIVE
+    #ps = pstats.Stats(self.pr, stream=s).sort_stats(sortby)
+    #ps.print_stats()
+    #print(s.getvalue())
 
   def process_keydown(self, key):
     if key not in (pygame.K_PAGEUP, pygame.K_PAGEDOWN):

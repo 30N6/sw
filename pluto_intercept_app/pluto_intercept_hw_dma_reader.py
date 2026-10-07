@@ -27,7 +27,7 @@ class pluto_intercept_hw_dma_reader_thread:
     self.sock.settimeout(0.1)
 
     recv_buffer_size = self.sock.getsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF)
-    self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 1048576)
+    self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 1048576 * 16)
     recv_buffer_size_m = self.sock.getsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF)
 
     self.logger.log(self.logger.LL_INFO, "init: [UDP mode] queues={}/{} sock={}, current_process={} buf_size={}->{}".format(self.request_queue, self.result_queue, self.sock, multiprocessing.current_process(), recv_buffer_size, recv_buffer_size_m))
@@ -46,6 +46,7 @@ class pluto_intercept_hw_dma_reader_thread:
       udp_seq_num = unpacked_header[0]
       if udp_seq_num != self.next_udp_seq_num:
         self.logger.log(self.logger.LL_WARN, "UDP seq num gap: expected {}, received {}".format(self.next_udp_seq_num, udp_seq_num))
+        self.logger.flush()
         self.num_udp_gaps += 1
       self.next_udp_seq_num = (udp_seq_num + 1) & 0xFFFFFFFF
       data = data[4:]
@@ -68,7 +69,7 @@ class pluto_intercept_hw_dma_reader_thread:
       seq_num, data = self._read()
       if len(data) > 0:
         self.result_queue.put({"unique_key": unique_key, "data": data, "udp_seq_num": seq_num, "udp_gaps": self.num_udp_gaps}, block=False)
-        self.logger.log(self.logger.LL_DEBUG, "seq={} - read {} bytes from buffer - uk={}".format(seq_num, len(data), unique_key))
+        #self.logger.log(self.logger.LL_DEBUG, "seq={} - read {} bytes from buffer - uk={}".format(seq_num, len(data), unique_key))
         unique_key += 1
 
       if not self.request_queue.empty():
@@ -153,8 +154,7 @@ class pluto_intercept_hw_dma_reader:
       self.logger.log(self.logger.LL_DEBUG, "[hwdr] _update_receive_queue: received data: len={} uk={} udp_seq_num={}".format(len(data), data["unique_key"], data["udp_seq_num"]))
 
   def _update_output_queues(self):
-    while len(self.received_data) > 0:
-      full_data = self.received_data.pop(0)
+    for full_data in self.received_data:
       udp_seq_num = full_data["udp_seq_num"]
       data = full_data["data"]
 
@@ -162,6 +162,8 @@ class pluto_intercept_hw_dma_reader:
       unpacked_header = PACKED_INTERCEPT_REPORT_COMMON_HEADER.unpack(data[:PACKED_INTERCEPT_REPORT_COMMON_HEADER.size])
 
       self._process_message(unpacked_header, data, udp_seq_num)
+
+    self.received_data.clear()
 
   def _process_message(self, header, full_data, udp_seq_num):
     magic_num = header[0]
@@ -180,8 +182,9 @@ class pluto_intercept_hw_dma_reader:
       #assert (len(full_data) == INTERCEPT_REPORT_LENGTH_STATUS)   #TODO check sizes
       self.output_data_status.append(full_data)
     elif msg_type == INTERCEPT_REPORT_MESSAGE_TYPE_STREAM:
-      self.logger.log(self.logger.LL_DEBUG, "[hwdr] _process_message: saving stream message: hw_seq_num={} udp_seq_num={}".format(seq_num, udp_seq_num))
+      #self.logger.log(self.logger.LL_DEBUG, "[hwdr] _process_message: saving stream message: hw_seq_num={} udp_seq_num={}".format(seq_num, udp_seq_num))
       self.output_data_stream.append(full_data)
+      pass
     elif msg_type == INTERCEPT_REPORT_MESSAGE_TYPE_DWELL_STATS:
       self.logger.log(self.logger.LL_DEBUG, "[hwdr] _process_message: saving stats message: hw_seq_num={} udp_seq_num={}".format(seq_num, udp_seq_num))
       self.output_data_dwell.append(full_data)

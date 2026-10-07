@@ -2,14 +2,16 @@ import time
 from pluto_intercept_hw_pkg import *
 import numpy as np
 import time
+from collections import deque
 
 class pluto_intercept_hw_stats:
 
   def __init__(self, logger):
     self.logger = logger
 
-    self.dwell_reports_1sec   = []
-    self.stream_reports_1sec  = []
+    self.dwell_reports_1sec   = deque()
+    self.stream_reports_1sec  = deque()
+    self.stream_samples_1sec  = 0
     self.last_log_time        = 0
 
     self.stats = {}
@@ -26,18 +28,16 @@ class pluto_intercept_hw_stats:
 
   def update(self):
     now = time.time()
+    cutoff = now - 1.0
 
-    while (len(self.dwell_reports_1sec) > 0) and ((now - self.dwell_reports_1sec[0]["timestamp"]) > 1.0):
-      self.dwell_reports_1sec.pop(0)
+    while self.dwell_reports_1sec and (self.dwell_reports_1sec[0] < cutoff):
+      self.dwell_reports_1sec.popleft()
     self.stats["dwell_reports_per_sec"] = len(self.dwell_reports_1sec)
 
-    while (len(self.stream_reports_1sec) > 0) and ((now - self.stream_reports_1sec[0]["timestamp"]) > 1.0):
-      self.stream_reports_1sec.pop(0)
+    while self.stream_reports_1sec and (self.stream_reports_1sec[0][0] < cutoff):
+      self.stream_samples_1sec -= self.stream_reports_1sec.popleft()[1]
     self.stats["stream_reports_per_sec"] = len(self.stream_reports_1sec)
-
-    self.stats["stream_samples_per_sec"] = 0
-    for entry in self.stream_reports_1sec:
-      self.stats["stream_samples_per_sec"] += len(entry["report"]["stream_samples"])
+    self.stats["stream_samples_per_sec"] = self.stream_samples_1sec
 
     if (now - self.last_log_time) >= 10.0:
       self.last_log_time = now
@@ -50,17 +50,16 @@ class pluto_intercept_hw_stats:
       self._process_dwell_report(report)
 
   def _process_dwell_report(self, report):
-    now = time.time()
-
     self.stats["dwell_report_total"]  += 1
     self.stats["dwell_windows_total"] = report["window_seq_num"]
 
-    self.dwell_reports_1sec.append({"timestamp": now, "report": report})
+    self.dwell_reports_1sec.append(time.time())
 
   def _process_stream_report(self, report):
-    now = time.time()
+    num_samples = report["stream_samples"].size
 
     self.stats["stream_report_total"] += 1
-    self.stats["stream_samples_total"] += len(report["stream_samples"])
+    self.stats["stream_samples_total"] += num_samples
 
-    self.stream_reports_1sec.append({"timestamp": now, "report": report})
+    self.stream_reports_1sec.append((time.time(), num_samples))
+    self.stream_samples_1sec += num_samples

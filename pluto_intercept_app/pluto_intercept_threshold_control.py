@@ -22,13 +22,13 @@ class pluto_intercept_threshold_control:
     self.threshold_valid        = False
 
     #self.dwell_window_duration  = 0
-    self.channel_data_buffer            = np.empty([INTERCEPT_NUM_CHANNELS, self.threshold_history_len])
+    self.channel_data_buffer            = np.zeros([INTERCEPT_NUM_CHANNELS, self.threshold_history_len])
     self.channel_data_index             = 0
-    self.channel_data_mean              = np.empty(INTERCEPT_NUM_CHANNELS)
-    self.channel_threshold_raw          = np.empty(INTERCEPT_NUM_CHANNELS)
-    self.channel_threshold_hw_start     = np.empty(INTERCEPT_NUM_CHANNELS, dtype=np.uint32)
-    self.channel_threshold_hw_continue  = np.empty(INTERCEPT_NUM_CHANNELS, dtype=np.uint32)
-    self.channel_threshold_render       = np.empty(INTERCEPT_NUM_CHANNELS)
+    self.channel_data_mean              = np.zeros(INTERCEPT_NUM_CHANNELS)
+    self.channel_threshold_raw          = np.zeros(INTERCEPT_NUM_CHANNELS)
+    self.channel_threshold_hw_start     = np.zeros(INTERCEPT_NUM_CHANNELS, dtype=np.uint32)
+    self.channel_threshold_hw_continue  = np.zeros(INTERCEPT_NUM_CHANNELS, dtype=np.uint32)
+    self.channel_threshold_render       = np.zeros(INTERCEPT_NUM_CHANNELS)
 
     self.threshold_update_interval  = 0.125 #TODO: config
     self.threshold_update_count     = 32  #TODO: config
@@ -58,24 +58,38 @@ class pluto_intercept_threshold_control:
 
     self.channel_data_index = (self.channel_data_index + 1) % self.threshold_history_len
 
+    self.channel_data_mean = np.sum(self.channel_data_buffer, 1) * self.threshold_scale_full
+    self.channel_threshold_raw = self._median_filter(self.channel_data_mean, self.threshold_window_len)
+
+    ##print(dwell_report["channel_max"])
+    ##print(dwell_report["channel_accum"])
+    #for i in range(len(self.channel_threshold_raw)):
+    #  print(i)
+    #  print(self.channel_threshold_raw[i])
+    #  print(self.channel_threshold_raw[i].astype(np.uint32))
+    #
+    self.channel_threshold_hw_start = self.channel_threshold_raw.astype(np.uint32)
+    self.channel_threshold_hw_continue = (self.channel_threshold_raw * self.threshold_continue_fac).astype(np.uint32)
+
     if not self.threshold_valid:
       self.dwells_received += 1
       if self.dwells_received == self.threshold_history_len:
         self.threshold_valid = True
-        self.logger.log(self.logger.LL_INFO, "[pluto_intercept_threshold_control] threshold_valid = True")
-      return
-
-    self.channel_data_mean = np.sum(self.channel_data_buffer, 1) * self.threshold_scale_full
-    self.channel_threshold_raw = self._median_filter(self.channel_data_mean, self.threshold_window_len)
-    self.channel_threshold_hw_start = self.channel_threshold_raw.astype(np.uint32)
-    self.channel_threshold_hw_continue = (self.channel_threshold_raw * self.threshold_continue_fac).astype(np.uint32)
+        self.logger.log(self.logger.LL_INFO, "[pluto_intercept_threshold_control] threshold_valid=True")
 
   def get_thresholds_for_render(self):
-      #return self.channel_accum_mean
+    #return self.channel_accum_mean
+    if self.threshold_valid:
       return self.channel_threshold_render
+    else:
+      return None
 
   def update(self):
     now = time.time()
+
+    if not self.threshold_valid:
+      return
+
     if (now - self.last_threshold_update_time) > self.threshold_update_interval:
       self.last_threshold_update_time = now
 

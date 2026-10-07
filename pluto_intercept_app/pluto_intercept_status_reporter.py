@@ -21,6 +21,7 @@ class pluto_intercept_status_reporter:
 
   def _decode_main_status(self, data):
     status_bits = (
+      "error_watchdog_timeout",
       "warning_demux_gap",
       "error_chan_demux_overflow",
       "error_chan_filter_overflow",
@@ -68,5 +69,6 @@ class pluto_intercept_status_reporter:
     self.last_sw_timestamp = time.time()
 
   def update(self):
-    while len(self.status_queue) > 0:
-      self._process_message(self.status_queue.pop(0))
+    for entry in self.status_queue:
+      self._process_message(entry)
+    self.status_queue.clear()
