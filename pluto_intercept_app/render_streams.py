@@ -32,11 +32,7 @@ class render_streams:
 
     assert (self.stream_rows * self.stream_cols == INTERCEPT_NUM_STREAMS)
 
-    self.trigger_type_map = {0 : "N", 1 : "C", 2 : "F", 3 : " "}
-
-    self.dwell_frequency                  = 0
-    self.channel_frequency                = []
-    self.channel_frequency_str            = []
+    self.trigger_type_map = ("N", "C", "F", " ")
 
     self.colors = {}
     self.colors["border"]               = (0, 0, 255)
@@ -75,15 +71,19 @@ class render_streams:
 
     self.update_timeout_confirmed       = 1.0
 
-    self._update_frequency()
+    self._update_labels()
 
     self.pr = cProfile.Profile()
 
-  def _update_frequency(self):
-    if self.sequencer.dwell_data["frequency"] != self.dwell_frequency:
-      self.dwell_frequency = self.sequencer.dwell_data["frequency"]
-      self.channel_frequency = self.dwell_frequency + (np.arange(INTERCEPT_NUM_CHANNELS) - (INTERCEPT_NUM_CHANNELS / 2)) * (ADC_CLOCK_FREQUENCY * 1e-6 / INTERCEPT_NUM_CHANNELS)
-      self.channel_frequency_str = ["{:.1f}".format(self.channel_frequency[i]) for i in range(INTERCEPT_NUM_CHANNELS)]
+  def _update_labels(self):
+    self.channel_frequency_label = []
+    for i in range(INTERCEPT_NUM_CHANNELS):
+      frequency_str = self.sequencer.get_channel_frequency_str(i)
+      self.channel_frequency_label.append(self.font_main.render(frequency_str, True, self.colors["frame_elements"]))
+
+    self.trigger_type_label = []
+    for i in range(len(self.trigger_type_map)):
+      self.trigger_type_label.append(self.font_main.render(self.trigger_type_map[i], True, self.colors["frame_elements"]))
 
   def _render_confirmed_signal_list(self):
     emitter_entries = []
@@ -272,14 +272,13 @@ class render_streams:
           pygame.draw.line(self.surface, self.colors["frame_elements"], [rect_x, rect_y], [rect_x + self.stream_box_width, rect_y + self.stream_box_height], 1)
           pygame.draw.line(self.surface, self.colors["frame_elements"], [rect_x + self.stream_box_width, rect_y], [rect_x, rect_y + self.stream_box_height], 1)
         else:
-          trigger_str = self.trigger_type_map[trigger_type]
-          text_data = self.font_main.render(trigger_str, True, self.colors["frame_elements"])
+          text_data = self.trigger_type_label[trigger_type]
           text_rect = text_data.get_rect()
           text_rect.left = rect_x + 4 #+ self.stream_box_width / 2
           text_rect.centery = rect_y - 8 #+ self.stream_box_height + 12
           self.surface.blit(text_data, text_rect)
 
-          text_data = self.font_main.render(frequency_str, True, self.colors["frame_elements"])
+          text_data = self.channel_frequency_label[channel_index]
           text_rect = text_data.get_rect()
           text_rect.centerx = rect_x + self.stream_box_width / 2
           text_rect.centery = rect_y - 8

@@ -28,9 +28,9 @@ class pluto_intercept_spectrogram:
     self.spec_trace_min_dB      = 30
 
     self.colors = {}
-    self.colors["trace_peak"]   = np.asarray([32, 255, 32])
-    self.colors["trace_avg"]    = np.asarray([255, 32, 32])
-    self.colors["trace_thresh"] = np.asarray([0, 128, 255])
+    self.colors["trace_peak"]   = np.asarray([32, 255, 32], dtype=np.uint8)
+    self.colors["trace_avg"]    = np.asarray([255, 32, 32], dtype=np.uint8)
+    self.colors["trace_thresh"] = np.asarray([0, 128, 255], dtype=np.uint8)
 
   def set_thresholds(self, thresholds):
     self.channel_threshold = thresholds

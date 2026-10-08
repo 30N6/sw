@@ -24,7 +24,7 @@ class pluto_intercept_hw_dma_reader_thread:
     assert ("ip:" in arg["pluto_uri"])
     self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     self.sock.bind((arg["local_ip"], UDP_FILTER_PORT))
-    self.sock.settimeout(0.1)
+    self.sock.setblocking(False)
 
     recv_buffer_size = self.sock.getsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF)
     self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 1048576 * 16)
@@ -34,43 +34,40 @@ class pluto_intercept_hw_dma_reader_thread:
 
     self.logger.flush()
 
-  def _read(self):
-    data = []
-    udp_seq_num = -1
+  def _read(self, unique_key):
+    batch = []
 
-    try:
-      data, addr = self.sock.recvfrom(8192)
-      #self.logger.log(self.logger.LL_INFO, "_read: data received: addr={} len={}".format(addr, len(data)))
-      assert (len(data) > self.PACKED_UDP_HEADER.size)
-      unpacked_header = self.PACKED_UDP_HEADER.unpack(data[:self.PACKED_UDP_HEADER.size])
-      udp_seq_num = unpacked_header[0]
-      if udp_seq_num != self.next_udp_seq_num:
-        self.logger.log(self.logger.LL_WARN, "UDP seq num gap: expected {}, received {}".format(self.next_udp_seq_num, udp_seq_num))
-        self.logger.flush()
-        self.num_udp_gaps += 1
-      self.next_udp_seq_num = (udp_seq_num + 1) & 0xFFFFFFFF
-      data = data[4:]
+    while True:
+      try:
+        data, addr = self.sock.recvfrom(8192)
+        assert (len(data) > self.PACKED_UDP_HEADER.size)
+        unpacked_header = self.PACKED_UDP_HEADER.unpack(data[:self.PACKED_UDP_HEADER.size])
+        udp_seq_num = unpacked_header[0]
 
-    except TimeoutError as e:
-      pass
+        if udp_seq_num != self.next_udp_seq_num:
+          self.logger.log(self.logger.LL_WARN, "UDP seq num gap: expected {}, received {}".format(self.next_udp_seq_num, udp_seq_num))
+          self.logger.flush()
+          self.num_udp_gaps += 1
+        self.next_udp_seq_num = (udp_seq_num + 1) & 0xFFFFFFFF
 
-    except Exception as e:
-      self.logger.log(self.logger.LL_WARN, "Exception: {}".format(e))
-      traceback.print_exc()
-      raise RuntimeError("read failed")
+        batch.append((unique_key, udp_seq_num, data[4:]))
+        unique_key += 1
 
-    return udp_seq_num, data
+      except BlockingIOError:
+        break
+
+    return unique_key, batch
 
   def run(self):
     running = True
     unique_key = 0
 
     while running:
-      seq_num, data = self._read()
-      if len(data) > 0:
-        self.result_queue.put({"unique_key": unique_key, "data": data, "udp_seq_num": seq_num, "udp_gaps": self.num_udp_gaps}, block=False)
-        #self.logger.log(self.logger.LL_DEBUG, "seq={} - read {} bytes from buffer - uk={}".format(seq_num, len(data), unique_key))
-        unique_key += 1
+      unique_key, batch = self._read(unique_key)
+
+      if batch:
+        self.result_queue.put((batch, self.num_udp_gaps), block=False)
+        self.logger.log(self.logger.LL_DEBUG, "packets={} last_uk={}".format(len(batch), unique_key))
 
       if not self.request_queue.empty():
         cmd = self.request_queue.get()
@@ -148,15 +145,19 @@ class pluto_intercept_hw_dma_reader:
   def _update_receive_queue(self):
     while not self.hwdr_result_queue.empty():
       data = self.hwdr_result_queue.get(block=False)
-      self.num_dma_reads += 1
-      self.num_udp_gaps = data["udp_gaps"]
-      self.received_data.append(data)
-      self.logger.log(self.logger.LL_DEBUG, "[hwdr] _update_receive_queue: received data: len={} uk={} udp_seq_num={}".format(len(data), data["unique_key"], data["udp_seq_num"]))
+      self.num_udp_gaps = data[1]
+
+      batch = data[0]
+      self.num_dma_reads += len(batch)
+
+      self.received_data.extend(batch)
+
+      self.logger.log(self.logger.LL_DEBUG, "[hwdr] _update_receive_queue: received data: num_packets={}".format(len(batch)))
 
   def _update_output_queues(self):
     for full_data in self.received_data:
-      udp_seq_num = full_data["udp_seq_num"]
-      data = full_data["data"]
+      udp_seq_num = full_data[1]
+      data        = full_data[2]
 
       assert (len(data) >= PACKED_INTERCEPT_REPORT_COMMON_HEADER.size)
       unpacked_header = PACKED_INTERCEPT_REPORT_COMMON_HEADER.unpack(data[:PACKED_INTERCEPT_REPORT_COMMON_HEADER.size])

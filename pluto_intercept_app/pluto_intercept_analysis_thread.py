@@ -126,7 +126,7 @@ class pluto_intercept_analysis_runner:
       else:
         raise RuntimeError("unexpected data in output queue")
 
-      self.logger.log(self.logger.LL_DEBUG, "[analysis] _update_output_queue: received data: len={} data={}".format(len(data), data))
+      #self.logger.log(self.logger.LL_DEBUG, "[analysis] _update_output_queue: received data: len={} keys={}".format(len(data), data.keys()))
 
   def submit_data(self, reports):
     if self.running:
