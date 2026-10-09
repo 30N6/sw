@@ -8,11 +8,11 @@ from pluto_intercept_hw_pkg import *
 import pluto_intercept_data_recorder
 
 class pluto_intercept_analysis_processor:
-  def __init__(self, logger, log_dir, config, output_queue):
+  def __init__(self, logger, log_dir, config):
     self.logger       = logger
     self.recorder     = pluto_intercept_data_recorder.pluto_intercept_data_recorder(log_dir, "analysis", config["analysis_config"]["enable_analysis_recording"])
     self.config       = config
-    self.output_queue = output_queue
+    self.output_queue = []
     self.input_queue  = []
 
     self.stream_render_interval   = 0.25
@@ -24,7 +24,6 @@ class pluto_intercept_analysis_processor:
 
     self.stream_fft_buffer_depth  = 128
     self.stream_fft_buffer_data   = np.zeros((INTERCEPT_NUM_STREAMS, self.stream_fft_buffer_depth), dtype=np.complex64)
-    self.stream_fft_buffer_index  = np.zeros(INTERCEPT_NUM_STREAMS, dtype=np.uint32)
     self.stream_fft_channel_index = np.zeros(INTERCEPT_NUM_STREAMS, dtype=np.uint32)
     self.stream_fft_box_height    = 96
     self.stream_fft_trace_max_dB  = 30
@@ -57,41 +56,68 @@ class pluto_intercept_analysis_processor:
 
 
   def _process_input_queue(self):
+    if len(self.input_queue) == 0:
+      return
+
+    total_samples = 0
+    for entry in self.input_queue:
+      total_samples += entry["stream_samples"].size
+
+    print("{} : _process_input_queue start - len={} total_samples={}".format(time.time(), len(self.input_queue), total_samples))
+
+    total_samples_by_index = np.zeros(INTERCEPT_NUM_STREAMS, dtype=np.uint32)
+    samples_by_index = np.empty((INTERCEPT_NUM_STREAMS, total_samples), dtype=PACKED_STREAM_SAMPLE_DTYPE)
+
     for entry in self.input_queue:
       samples = entry["stream_samples"]
+      stream_index = samples["stream_index"]
 
-      stream_index  = samples["stream_index"]
-      channel_index = samples["channel_index"]
-      iq            = (samples["I"] + 1j * samples["Q"]) * CHANNELIZER_SCALE_FACTOR
-
-      for i in range(stream_index.size):
+      for i in range(samples.size):
         s = stream_index[i]
+        samples_by_index[s, total_samples_by_index[s]] = samples[i]
+        total_samples_by_index[s] += 1
 
-        if self.stream_fft_channel_index[s] != channel_index[i]:
-          self.stream_fft_channel_index[s]  = channel_index[i]
-          self.stream_fft_buffer_index[s]   = 0
-          self.stream_fft_box_data[s]       = np.zeros((self.stream_fft_buffer_depth, self.stream_fft_box_height, 3))
+    channel_index = samples_by_index["channel_index"]
+    iq            = (samples_by_index["I"] + 1j * samples_by_index["Q"]) * CHANNELIZER_SCALE_FACTOR
+    num_frames    = total_samples_by_index // self.stream_fft_buffer_depth
 
-        self.stream_fft_buffer_data[s, self.stream_fft_buffer_index[s]] = iq[i]
+    for s in range(INTERCEPT_NUM_STREAMS):
+      if total_samples_by_index[s] < self.stream_fft_buffer_depth:
+        continue
 
-        if (self.stream_fft_buffer_index[s] == (self.stream_fft_buffer_depth - 1)):
-          self._process_fft_stream_buffer(s)
-        self.stream_fft_buffer_index[s] = (self.stream_fft_buffer_index[s] + 1) % self.stream_fft_buffer_depth
+      #for frame_index in range(num_frames[s]):
+      frame_index = 0
+      frame_start = frame_index * self.stream_fft_buffer_depth
+      frame_end   = frame_start + self.stream_fft_buffer_depth
+
+      if self.stream_fft_channel_index[s] != channel_index[s, frame_start]:
+        self.stream_fft_channel_index[s]  = channel_index[s, frame_start]
+        self.stream_fft_box_data[s]       = np.zeros((self.stream_fft_buffer_depth, self.stream_fft_box_height, 3))
+
+      self.stream_fft_buffer_data[s] = iq[s, frame_start:frame_end]
+      self._process_fft_stream_buffer(s)
 
     self.input_queue.clear()
+
+    print("{} : _process_input_queue done, frames={}".format(time.time(), num_frames))
 
   def _update_output(self):
     now = time.time()
 
     if (now - self.last_stream_render_time) > self.stream_render_interval:
       self.last_stream_render_time = now
+      print("{} : fft_box_data updated".format(now))
 
-      self.output_queue.put({"stream_fft_box_data": self.stream_fft_box_data})
+      self.output_queue.append({"stream_fft_box_data": self.stream_fft_box_data})
+
+  def get_output_data(self):
+    return self.output_queue
 
   def submit_data(self, data):
     if "stream_samples" not in data:
       self.logger.log(self.logger.LL_INFO, "[pluto_intercept_analysis_processor]: error: data={}".format(data))
       self.logger.flush()
+
     assert("stream_samples" in data)
     self.input_queue.append(data)
 

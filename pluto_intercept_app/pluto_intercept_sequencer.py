@@ -179,6 +179,7 @@ class pluto_intercept_sequencer:
 
     #TODO: wait until N items ready (or time elapsed)
     if len(results) > 0:
+      #self.logger.log(self.logger.LL_DEBUG, "[sequencer] _process_stream_reports_from_hw: submitting {} items to analysis thread".format(len(results)))
       self.analysis_thread.submit_data(results)
 
   def _track_stream_state(self, stream_report):

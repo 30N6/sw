@@ -315,6 +315,8 @@ class render_streams:
 
     #self.pr.enable()
 
+    #TODO: verify update frequency
+
     self.stream_box_data = self.analysis_thread.get_stream_fft_box_data()
 
     #self.pr.disable()

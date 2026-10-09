@@ -14,17 +14,21 @@ class pluto_intercept_hw_stats:
     self.stream_samples_1sec  = 0
     self.last_log_time        = 0
 
-    self.stats = {}
+    self.dwell_active           = False
+    self.first_dwell_hw_time    = 0
+    self.first_dwell_sw_time    = 0
+    self.first_dwell_time_diff  = 0
 
-    self.stats["dwell_report_total"]                    = 0
-    self.stats["dwell_reports_per_sec"]                 = 0
-    self.stats["dwell_windows_total"]                   = 0 #TODO
-    self.stats["dwell_windows_per_sec"]                 = 0
-
-    self.stats["stream_report_total"]                   = 0
-    self.stats["stream_reports_per_sec"]                = 0
-    self.stats["stream_samples_total"]                  = 0
-    self.stats["stream_samples_per_sec"]                = 0
+    self.stats                            = {}
+    self.stats["dwell_report_total"]      = 0
+    self.stats["dwell_reports_per_sec"]   = 0
+    self.stats["dwell_windows_total"]     = 0
+    self.stats["dwell_windows_per_sec"]   = 0
+    self.stats["dwell_time_diff_first"]   = 0
+    self.stats["stream_report_total"]     = 0
+    self.stats["stream_reports_per_sec"]  = 0
+    self.stats["stream_samples_total"]    = 0
+    self.stats["stream_samples_per_sec"]  = 0
 
   def update(self):
     now = time.time()
@@ -50,10 +54,22 @@ class pluto_intercept_hw_stats:
       self._process_dwell_report(report)
 
   def _process_dwell_report(self, report):
-    self.stats["dwell_report_total"]  += 1
-    self.stats["dwell_windows_total"] = report["window_seq_num"]
+    now = time.time()
 
-    self.dwell_reports_1sec.append(time.time())
+    if not self.dwell_active:
+      self.dwell_active = True
+      self.first_dwell_hw_time = report["window_timestamp"] * FAST_CLOCK_PERIOD
+      self.first_dwell_sw_time = now
+      self.first_dwell_time_diff = self.first_dwell_sw_time - self.first_dwell_hw_time
+    else:
+      dwell_time_diff = now - report["window_timestamp"] * FAST_CLOCK_PERIOD
+      self.stats["dwell_time_diff_first"] = dwell_time_diff - self.first_dwell_time_diff
+      self.stats["dwell_windows_total"]   = report["window_seq_num"]
+      self.stats["dwell_windows_per_sec"] = report["window_seq_num"] / (now - self.first_dwell_sw_time)
+
+    self.stats["dwell_report_total"] += 1
+
+    self.dwell_reports_1sec.append(now)
 
   def _process_stream_report(self, report):
     num_samples = report["stream_samples"].size

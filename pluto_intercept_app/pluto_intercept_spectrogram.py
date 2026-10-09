@@ -18,8 +18,8 @@ class pluto_intercept_spectrogram:
     self.spec_depth_waterfall   = int((dwell_pane_height_waterfall  // self.output_row_height) * self.output_row_height)
     self.spec_depth_trace       = int((dwell_pane_height_trace      // self.output_row_height) * self.output_row_height)
 
-    self.spec_waterfall_avg     = np.zeros((self.spec_depth_waterfall, self.spec_width, 3))
-    self.spec_waterfall_peak    = np.zeros((self.spec_depth_waterfall, self.spec_width, 3))
+    self.spec_waterfall_avg     = np.zeros((self.spec_depth_waterfall, self.spec_width, 3), np.uint8)
+    self.spec_waterfall_peak    = np.zeros((self.spec_depth_waterfall, self.spec_width, 3), np.uint8)
     self.spec_waterfall_max_dB  = 60
     self.spec_waterfall_min_dB  = -300
 
@@ -64,17 +64,19 @@ class pluto_intercept_spectrogram:
     #return row_scaled
 
   @staticmethod
-  def _shift_and_insert(buf, new_row):
-    return np.vstack((new_row, buf[:-1]))
+  def _shift_and_insert(buf, new_row, n):
+    buf[n:] = buf[:-n]
+    buf[:n] = new_row
 
   def process_new_dwell(self, dwell_data):
     input_row_avg     = np.divide(dwell_data["channel_accum"], dwell_data["dwell_window_duration"])
     input_row_peak    = dwell_data["channel_max"].copy()
     input_row_thresh  = self.channel_threshold
 
-    for i in range(self.output_row_height):
-      self.spec_waterfall_avg   = self._shift_and_insert(self.spec_waterfall_avg,  np.expand_dims(turbo_colormap.interpolate_color(self._normalize_row(input_row_avg)), 0))
-      self.spec_waterfall_peak  = self._shift_and_insert(self.spec_waterfall_peak, np.expand_dims(turbo_colormap.interpolate_color(self._normalize_row(input_row_peak)), 0))
+    row_avg  = turbo_colormap.interpolate_color(self._normalize_row(input_row_avg))
+    row_peak = turbo_colormap.interpolate_color(self._normalize_row(input_row_peak))
+    self._shift_and_insert(self.spec_waterfall_avg, row_avg, self.output_row_height)
+    self._shift_and_insert(self.spec_waterfall_peak, row_peak, self.output_row_height)
 
     power_floor = 10 ** (self.spec_trace_min_dB / 10)
     power_ceil  = 10 ** (self.spec_trace_max_dB / 10)

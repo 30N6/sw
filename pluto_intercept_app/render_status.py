@@ -3,16 +3,17 @@ import time
 import numpy as np
 
 class render_status:
-  def __init__(self, surface, sw_config, hw_interface, sequencer, analysis_thread, version):
+  def __init__(self, surface, sw_config, hw_interface, sequencer, analysis, version):
     self.surface          = surface
     self.hw_interface     = hw_interface
     self.sequencer        = sequencer
-    self.analysis_thread  = analysis_thread
+    self.analysis         = analysis
     self.version          = version
 
     self.colors = {}
     self.colors["border"] = (0, 0, 255)
     self.colors["stats"]  = (0, 192, 192)
+    self.colors["alert"]  = (255, 0, 0)
 
     self.font = pygame.font.SysFont('Consolas', 14)
 
@@ -58,6 +59,15 @@ class render_status:
                   {"format": "Stream samp/sec   : {:.1f}", "value": hw_stats["stream_samples_per_sec"],                   "pos_offset": [8, 112]},
                   {"format": "Stream samp total : {}",     "value": hw_stats["stream_samples_total"],                     "pos_offset": [8, 128]},
 
+
+                  {"format": "Dwell rx time diff: {:.3f}", "value": hw_stats["dwell_time_diff_first"],                    "pos_offset": [8, 144], "alert_threshold": 0.03, "alert_color": self.colors["alert"]},
+                  {"format": "UDP rx queue      : {:.3f}", "value": self.hw_interface.hwdr.time_diff_result,              "pos_offset": [8, 160], "alert_threshold": 0.03, "alert_color": self.colors["alert"]},
+                  {"format": "Analysis rx queue : {:.3f}", "value": self.analysis.time_diff_input,                        "pos_offset": [8, 176], "alert_threshold": 0.03, "alert_color": self.colors["alert"]},
+                  {"format": "Analysis tx queue : {:.3f}", "value": self.analysis.time_diff_output,                       "pos_offset": [8, 192], "alert_threshold": 0.03, "alert_color": self.colors["alert"]},
+
+                  {"format": "Analysis inputs   : {}", "value": self.analysis.items_to_analysis,                          "pos_offset": [8, 208]},
+                  {"format": "Analysis outputs  : {}", "value": self.analysis.items_from_analysis,                        "pos_offset": [8, 224]},
+
                   #{"format": "Dwell cv meas req : {:.3f}", "value": hw_stats["dwell_coverage_meas_req"],                  "pos_offset": [8, 128]},
                   #{"format": "Dwell cv meas act : {:.3f}", "value": hw_stats["dwell_coverage_meas_active"],               "pos_offset": [8, 144]},
                   #{"format": "Dwell cv tot meas : {:.3f}", "value": hw_stats["dwell_coverage_total_meas"],                "pos_offset": [8, 160]},
@@ -84,7 +94,13 @@ class render_status:
 
     for entry in stats_desc:
       stats_str = entry["format"].format(entry["value"])
-      text_data = self.font.render(stats_str, True, self.colors["stats"])
+
+      if ("alert_threshold" in entry) and (entry["value"] > entry["alert_threshold"]):
+        color = entry["alert_color"]
+      else:
+        color = self.colors["stats"]
+
+      text_data = self.font.render(stats_str, True, color)
       text_rect = text_data.get_rect()
       text_rect.left = status_rect[0] + entry["pos_offset"][0]
       text_rect.bottom = status_rect[1] + entry["pos_offset"][1]

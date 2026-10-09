@@ -15,16 +15,25 @@ from pstats import SortKey
 class pluto_intercept_analysis_thread:
 
   def __init__(self, arg):
-    self.input_queue  = arg["input_queue"]
-    self.output_queue = arg["output_queue"]
-    self.logger       = pluto_intercept_logger.pluto_intercept_logger(arg["log_dir"], "pluto_intercept_analysis_thread", arg["log_level"])
-    self.processor    = pluto_intercept_analysis_processor.pluto_intercept_analysis_processor(self.logger, arg["log_dir"], arg["config"], self.output_queue)
+    self.input_queue      = arg["input_queue"]
+    self.output_queue     = arg["output_queue"]
+    self.logger           = pluto_intercept_logger.pluto_intercept_logger(arg["log_dir"], "pluto_intercept_analysis_thread", arg["log_level"])
+    self.processor        = pluto_intercept_analysis_processor.pluto_intercept_analysis_processor(self.logger, arg["log_dir"], arg["config"])
+
+    self.time_diff_input  = 0
 
     self.pr = cProfile.Profile()
 
     self.logger.log(self.logger.LL_INFO, "init: queues={}/{}, current_process={}".format(self.input_queue, self.output_queue, multiprocessing.current_process()))
 
     #tracemalloc.start()
+
+  def _update_output_queue(self):
+    input_data = self.processor.get_output_data()
+    if input_data:
+      output_data = {"timestamp": time.time(), "time_diff_input": self.time_diff_input, "data": input_data}
+      self.output_queue.put(output_data)
+      input_data.clear()
 
   def run(self):
     running = True
@@ -38,8 +47,12 @@ class pluto_intercept_analysis_thread:
         while not self.input_queue.empty():
           #self.logger.log(self.logger.LL_INFO, "input_queue.get()")
           data = self.input_queue.get()
-          if isinstance(data, list):
-            for entry in data:
+
+          if isinstance(data, tuple):
+            #self.logger.log(self.logger.LL_DEBUG, "input_queue: len={}".format(len(data)))
+            self.time_diff_input = time.time() - data[0]
+
+            for entry in data[1]:
               self.processor.submit_data(entry)
           elif isinstance(data, dict):
             #self.logger.log(self.logger.LL_INFO, "input_queue: got dict: time_diff={:.3f}".format(time.time() - data["timestamp"]))
@@ -53,7 +66,10 @@ class pluto_intercept_analysis_thread:
               raise RuntimeError("invalid command")
               running = False
 
+        self.logger.log(self.logger.LL_INFO, "analysis: queue={}".format(len(self.processor.input_queue)))
+
         self.processor.update()
+        self._update_output_queue()
 
         #print("analysis_thread: {:.3f}".format(time.time() - start))
         #self.pr.disable()
@@ -105,8 +121,12 @@ class pluto_intercept_analysis_runner:
     self.output_queue = self.mp_manager.Queue()
     self.running      = True
 
-    self.signal_processing_delay  = 0
-    self.stream_fft_box_data = [None for i in range(INTERCEPT_NUM_STREAMS)]
+    self.time_diff_input      = 0
+    self.time_diff_output     = 0
+    self.items_to_analysis    = 0
+    self.items_from_analysis  = 0
+
+    self.stream_fft_box_data  = [None for i in range(INTERCEPT_NUM_STREAMS)]
 
     self.analysis_process = Process(target=pluto_intercept_analysis_thread_func,
                                args=({"input_queue": self.input_queue, "output_queue": self.output_queue,
@@ -115,25 +135,30 @@ class pluto_intercept_analysis_runner:
 
   def _update_output_queue(self):
     while not self.output_queue.empty():
-      data = self.output_queue.get(block=False)
+      full_data = self.output_queue.get(block=False)
 
-      if "stream_fft_box_data" in data:
-        self.stream_fft_box_data = data["stream_fft_box_data"]
+      data                  = full_data["data"]
+      self.time_diff_input  = full_data["time_diff_input"]
+      self.time_diff_output = time.time() - full_data["timestamp"]
 
-      elif "signal_processing_delay" in data: #TODO
-        self.signal_processing_delay = data["signal_processing_delay"]
+      for entry in data:
+        self.items_from_analysis += 1
+        if "stream_fft_box_data" in entry:
+          self.stream_fft_box_data = entry["stream_fft_box_data"]
 
-      else:
-        raise RuntimeError("unexpected data in output queue")
+        else:
+          raise RuntimeError("unexpected data in output queue")
 
-      #self.logger.log(self.logger.LL_DEBUG, "[analysis] _update_output_queue: received data: len={} keys={}".format(len(data), data.keys()))
+        #self.logger.log(self.logger.LL_DEBUG, "[analysis] _update_output_queue: received data: len={} keys={}".format(len(data), data.keys()))
 
   def submit_data(self, reports):
     if self.running:
-      self.logger.log(self.logger.LL_DEBUG, "[analysis] submit_data - reports")
-      self.input_queue.put(reports, block=False)
+      data = (time.time(), reports)
+      #self.logger.log(self.logger.LL_DEBUG, "[analysis] submit_data - reports count={}".format(len(reports)))
+      self.input_queue.put(data, block=False)
+      self.items_to_analysis += len(reports)
     else:
-      self.logger.log(self.logger.LL_INFO, "[analysis] submit_data: shutting down -- report dropped: {}".format(report))
+      self.logger.log(self.logger.LL_INFO, "[analysis] submit_data: shutting down -- reports dropped: {}".format(reports))
 
   def get_stream_fft_box_data(self):
     return self.stream_fft_box_data

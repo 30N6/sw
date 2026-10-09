@@ -21,6 +21,9 @@ class pluto_intercept_hw_dma_reader_thread:
     self.next_udp_seq_num = 0
     self.num_udp_gaps = 0
 
+    self.batch_trigger_size = 1024
+    self.batch_trigger_time = 0.05
+
     assert ("ip:" in arg["pluto_uri"])
     self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     self.sock.bind((arg["local_ip"], UDP_FILTER_PORT))
@@ -34,9 +37,7 @@ class pluto_intercept_hw_dma_reader_thread:
 
     self.logger.flush()
 
-  def _read(self, unique_key):
-    batch = []
-
+  def _read(self, unique_key, batch):
     while True:
       try:
         data, addr = self.sock.recvfrom(8192)
@@ -56,18 +57,23 @@ class pluto_intercept_hw_dma_reader_thread:
       except BlockingIOError:
         break
 
-    return unique_key, batch
+    return unique_key
 
   def run(self):
     running = True
     unique_key = 0
+    batch = []
+    last_put_time = 0
 
     while running:
-      unique_key, batch = self._read(unique_key)
+      unique_key = self._read(unique_key, batch)
+      now = time.time()
 
-      if batch:
-        self.result_queue.put((batch, self.num_udp_gaps), block=False)
+      if batch and ((len(batch) >= self.batch_trigger_size) or ((now - last_put_time) >= self.batch_trigger_time)):
+        self.result_queue.put((batch, self.num_udp_gaps, now), block=False)
         self.logger.log(self.logger.LL_DEBUG, "packets={} last_uk={}".format(len(batch), unique_key))
+        batch = []
+        last_put_time = now
 
       if not self.request_queue.empty():
         cmd = self.request_queue.get()
@@ -100,10 +106,11 @@ class pluto_intercept_hw_dma_reader:
     self.mp_manager           = Manager()
     self.hwdr_request_queue   = Queue() # faster than self.mp_manager.Queue()
     self.hwdr_result_queue    = Queue() # faster than self.mp_manager.Queue()
-    self.running = True
-    self.num_dma_reads = 0
-    self.num_status_reports = 0
-    self.num_udp_gaps = 0
+    self.running              = True
+    self.num_dma_reads        = 0
+    self.num_status_reports   = 0
+    self.num_udp_gaps         = 0
+    self.time_diff_result     = 0
 
     self.output_data_dwell  = []
     self.output_data_stream = []
@@ -143,19 +150,26 @@ class pluto_intercept_hw_dma_reader:
     return data.split("=")[1]
 
   def _update_receive_queue(self):
+    total_count = 0
+    num_batches = 0
     while not self.hwdr_result_queue.empty():
       data = self.hwdr_result_queue.get(block=False)
-      self.num_udp_gaps = data[1]
+      batch                 = data[0]
+      self.num_udp_gaps     = data[1]
+      self.time_diff_result = time.time() - data[2]
 
-      batch = data[0]
       self.num_dma_reads += len(batch)
+      total_count += len(batch)
+      num_batches += 1
 
       self.received_data.extend(batch)
 
-      self.logger.log(self.logger.LL_DEBUG, "[hwdr] _update_receive_queue: received data: num_packets={}".format(len(batch)))
+    if total_count > 0:
+      self.logger.log(self.logger.LL_DEBUG, "[hwdr] _update_receive_queue: received data: num_batches={} total_count={} last_uk={} --> result_queue={}".format(num_batches, total_count, batch[-1][0], len(self.received_data)))
 
   def _update_output_queues(self):
     for full_data in self.received_data:
+      unique_key  = full_data[0]
       udp_seq_num = full_data[1]
       data        = full_data[2]
 
@@ -163,6 +177,9 @@ class pluto_intercept_hw_dma_reader:
       unpacked_header = PACKED_INTERCEPT_REPORT_COMMON_HEADER.unpack(data[:PACKED_INTERCEPT_REPORT_COMMON_HEADER.size])
 
       self._process_message(unpacked_header, data, udp_seq_num)
+
+    if self.received_data:
+      self.logger.log(self.logger.LL_DEBUG, "[hwdr] _update_output_queues: complete -- last_uk={} last_udp_seq_num={}".format(unique_key, udp_seq_num))
 
     self.received_data.clear()
 
