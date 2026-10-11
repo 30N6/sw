@@ -52,5 +52,10 @@ class pluto_intercept_hw_stream_reporter:
 
     report["stream_samples"] = np.frombuffer(raw, dtype=PACKED_STREAM_SAMPLE_DTYPE, count=num_reported_samples)
 
+    I = report["stream_samples"]["I"].astype(np.float32)
+    Q = report["stream_samples"]["Q"].astype(np.float32)
+    report["stream_IQ"] = ((I + 1j * Q) * np.float32(CHANNELIZER_SCALE_FACTOR)).astype(np.complex64)
+    #report["stream_IQ"] = (report["stream_samples"]["I"] + 1j * report["stream_samples"]["Q"]) * CHANNELIZER_SCALE_FACTOR
+
     return report
 

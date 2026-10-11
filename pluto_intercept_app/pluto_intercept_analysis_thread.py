@@ -66,7 +66,7 @@ class pluto_intercept_analysis_thread:
               raise RuntimeError("invalid command")
               running = False
 
-        self.logger.log(self.logger.LL_INFO, "analysis: queue={}".format(len(self.processor.input_queue)))
+        #self.logger.log(self.logger.LL_INFO, "analysis: queue={}".format(len(self.processor.input_queue)))
 
         self.processor.update()
         self._update_output_queue()
