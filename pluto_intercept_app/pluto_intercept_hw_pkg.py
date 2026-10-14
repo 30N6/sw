@@ -44,6 +44,7 @@ ADC_CLOCK_PERIOD                                        = 1/61.44e6
 FAST_CLOCK_PERIOD                                       = 1/(4*61.44e6)
 CHANNELIZER_OVERSAMPLING                                = 2.0
 CHANNELIZER_OUTPUT_FREQUENCY                            = ADC_CLOCK_FREQUENCY * CHANNELIZER_OVERSAMPLING / INTERCEPT_NUM_CHANNELS
+CHANNELIZER_OUTPUT_PERIOD                               = 1 / CHANNELIZER_OUTPUT_FREQUENCY
 
 CHANNELIZER_DATA_WIDTH                                  = 25
 CHANNELIZER_SCALE_FACTOR                                = 1 / (2**(CHANNELIZER_DATA_WIDTH - 1))

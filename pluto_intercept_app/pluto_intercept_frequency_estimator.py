@@ -9,8 +9,9 @@ import cProfile, pstats, io
 from pstats import SortKey
 
 class pluto_intercept_frequency_estimator:
-  def __init__(self, logger, log_dir, config):
+  def __init__(self, logger, recorder, config):
     self.logger       = logger
+    self.recorder     = recorder
     self.config       = config
 
     self.fft_width              = 512
@@ -57,6 +58,8 @@ class pluto_intercept_frequency_estimator:
         peak_accum_moment_1 = p * power_norm[p]
         peak_accum_moment_2 = p * p * power_norm[p]
 
+        self.logger.log(self.logger.LL_INFO, "_get_accumulated_peaks: stream_index={}: idx={} p={} -> {}".format(stream_index, p, power_norm[p], peak_accum_moment_1 / peak_accum_power))
+
         power_norm[p] = 1.0
         upper_done = False
         lower_done = False
@@ -68,6 +71,7 @@ class pluto_intercept_frequency_estimator:
             peak_accum_power    += power_norm[upper_index]
             peak_accum_moment_1 += upper_index * power_norm[upper_index]
             peak_accum_moment_2 += upper_index * upper_index * power_norm[upper_index]
+            self.logger.log(self.logger.LL_INFO, "_get_accumulated_peaks: stream_index={}: idx={} p={} -> {}".format(stream_index, upper_index, power_norm[upper_index], peak_accum_moment_1 / peak_accum_power))
             power_norm[upper_index] = 1.0
           else:
             upper_done = True
@@ -76,6 +80,7 @@ class pluto_intercept_frequency_estimator:
             peak_accum_power    += power_norm[lower_index]
             peak_accum_moment_1 += lower_index * power_norm[lower_index]
             peak_accum_moment_2 += lower_index * lower_index * power_norm[lower_index]
+            self.logger.log(self.logger.LL_INFO, "_get_accumulated_peaks: stream_index={}: idx={} p={} -> {}".format(stream_index, lower_index, power_norm[lower_index], peak_accum_moment_1 / peak_accum_power))
             power_norm[lower_index] = 1.0
           else:
             lower_done = True
@@ -121,10 +126,12 @@ class pluto_intercept_frequency_estimator:
         self.est_std[stream_index]    = peak_std / self.fft_width
         self.est_accum[stream_index]  = peak_accum
 
+        self.recorder.log({"type": "freq_est", "stream_index": stream_index, "est_valid": self.est_valid[stream_index].tolist(), "est_center": self.est_center[stream_index].tolist(), "fft_accum_power": self.fft_accumulated_power[stream_index].tolist()})
+
         #self.logger.log(self.logger.LL_INFO, "stream_index={}: power={}".format(stream_index, self.fft_accumulated_power[stream_index]))
         log_line = "[freq_est] stream_buffer_process: estimate complete - stream_index={} valid={} center={} accum={} std={}".format(stream_index, peak_valid, self.est_center[stream_index], self.est_std[stream_index], peak_std)
         self.logger.log(self.logger.LL_INFO, log_line)
-        
+
   def stream_buffer_clear(self, stream_index):
     self.fft_accumulated_power[stream_index] = np.zeros(self.fft_width)
     self.fft_accumulated_index[stream_index] = 0
