@@ -38,9 +38,10 @@ class pluto_intercept_hw_stream_reporter:
     report["msg_type"]              = unpacked_header[2]
 
     report["dwell_seq_num"]         = unpacked_header[4]
-    report["dwell_tag"]             = unpacked_header[5]
-    report["dwell_frequency"]       = unpacked_header[6]
+    report["dwell_frequency"]       = unpacked_header[5]
+    report["dwell_tag"]             = unpacked_header[6]
     report["dwell_window_duration"] = unpacked_header[7]
+
     report["timestamp"]             = (unpacked_header[8] << 32) | unpacked_header[9]
 
     trailer_bytes = len(data) - PACKED_STREAM_HEADER.size

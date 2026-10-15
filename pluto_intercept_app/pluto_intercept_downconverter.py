@@ -57,7 +57,7 @@ class pluto_intercept_downconverter:
     self.downconversion_ratio = 6
     self.fs_output            = CHANNELIZER_OUTPUT_FREQUENCY / self.downconversion_ratio
 
-    self.input_buffer_depth   = 3 * 4096
+    self.input_buffer_depth   = 6 * 4096
 
     self.input_buffer         = np.zeros((INTERCEPT_NUM_STREAMS, self.input_buffer_depth), dtype=np.complex64)
     self.input_count          = np.zeros(INTERCEPT_NUM_STREAMS, dtype=np.uint32)
@@ -103,7 +103,7 @@ class pluto_intercept_downconverter:
 
         iq_shifted      = self.input_buffer[stream_index] * lo_data
         iq_downsampled  = self.filters[stream_index][i_lo].process(iq_shifted)
-        results[i_lo]   = (i_lo, self.lo_frequency[stream_index, i_lo], iq_downsampled)
+        results[i_lo]   = {"lo_index": i_lo, "lo_frequency": self.lo_frequency[stream_index, i_lo], "iq_data": iq_downsampled, "fs": self.fs_output}
 
     return results
 

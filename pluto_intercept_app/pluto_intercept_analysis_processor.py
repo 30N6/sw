@@ -6,9 +6,10 @@ import traceback
 
 from pluto_intercept_hw_pkg import *
 import pluto_intercept_data_recorder
+import pluto_intercept_stream_graphics
 import pluto_intercept_frequency_estimator
 import pluto_intercept_downconverter
-import pluto_intercept_stream_graphics
+import pluto_intercept_signal_analysis
 
 import cProfile, pstats, io
 from pstats import SortKey
@@ -33,6 +34,7 @@ class pluto_intercept_analysis_processor:
     self.stream_buffer_data         = np.zeros((INTERCEPT_NUM_STREAMS, self.stream_buffer_depth), dtype=np.complex64)
     self.stream_buffer_index        = np.zeros(INTERCEPT_NUM_STREAMS, dtype=np.uint32)
     self.stream_buffer_channel      = np.zeros(INTERCEPT_NUM_STREAMS, dtype=np.uint32)
+    self.stream_buffer_dwell_freq   = np.zeros(INTERCEPT_NUM_STREAMS, dtype=np.uint32)
 
     self.samples_by_index_depth     = 8388608
     self.trigger_type_by_index      = np.empty((INTERCEPT_NUM_STREAMS, self.samples_by_index_depth), dtype=np.uint8)
@@ -43,6 +45,7 @@ class pluto_intercept_analysis_processor:
     self.stream_graphics            = pluto_intercept_stream_graphics.pluto_intercept_stream_graphics(logger, config)
     self.stream_freq_estimator      = pluto_intercept_frequency_estimator.pluto_intercept_frequency_estimator(logger, self.recorder, config)
     self.stream_downconverter       = pluto_intercept_downconverter.pluto_intercept_downconverter(logger, config)
+    self.signal_analysis            = pluto_intercept_signal_analysis.pluto_intercept_signal_analysis(config)
 
     self.downconverted_output_queue = []
 
@@ -61,7 +64,6 @@ class pluto_intercept_analysis_processor:
     self.stream_downconverter.update_downconverters(stream_index, est_valid, est_center)
     downconverted_data = self.stream_downconverter.stream_buffer_process(stream_index, current_stream_buffer)
 
-
     #self.logger.log(self.logger.LL_INFO, "[processor]: _stream_buffer_process: stream_index={} est_valid={} est_center={}".format(stream_index, est_valid, est_center))
     #self.logger.flush()
 
@@ -79,16 +81,16 @@ class pluto_intercept_analysis_processor:
       ##self.logger.log(self.logger.LL_INFO, "[processor]: _stream_buffer_process: stream_index={} downconverted_data[{}]={}".format(stream_index, i, downconverted_data[i].size))
       #self.recorder.log({"type": "downconversion", "stream_index": stream_index, "channel_index": int(self.stream_buffer_channel[stream_index]), "lo_index": i, "lo_freq": lo_freq, "data_uI": data_uI, "data_uQ": data_uQ, "data_dI": data_dI, "data_dQ": data_dQ})
 
-      output_entry = {"stream_index"  : stream_index,
-                      "channel_index" : self.stream_buffer_channel[stream_index],
-                      "timestamp"     : now,
-                      "lo_index"      : downconverted_data[i][0],
-                      "lo_frequency"  : downconverted_data[i][1],
-                      "iq_data"       : downconverted_data[i][2]}
+      output_entry = {"timestamp_conv_end"  : now,
+                      "stream_index"        : stream_index,
+                      "channel_index"       : self.stream_buffer_channel[stream_index],
+                      "dwell_frequency"     : self.stream_buffer_dwell_freq[stream_index],
+                      "lo_index"            : downconverted_data[i]["lo_index"],
+                      "lo_frequency"        : downconverted_data[i]["lo_frequency"],
+                      "iq_data"             : downconverted_data[i]["iq_data"],
+                      "fs"                  : downconverted_data[i]["fs"]}
 
-      #print(output_entry)
-
-      #self.downconverted_output_queue.push_back(output_entry)
+      self.downconverted_output_queue.append(output_entry)
 
   def _stream_buffer_clear(self, stream_index):
     self.stream_freq_estimator.stream_buffer_clear(stream_index)
@@ -105,11 +107,12 @@ class pluto_intercept_analysis_processor:
 
     print("{} : _process_input_queue start - len={} total_samples={}".format(time.time(), len(self.input_queue), total_samples))
 
-    #samples      = np.concatenate([e["stream_samples"] for e in self.input_queue])
-    channel_index = np.concatenate([e["stream_samples"]["channel_index"] for e in self.input_queue])
-    trigger_type  = np.concatenate([e["stream_samples"]["trigger_type"]  for e in self.input_queue])
-    stream_index  = np.concatenate([e["stream_samples"]["stream_index"]  for e in self.input_queue])
-    iq            = np.concatenate([e["stream_IQ"]                       for e in self.input_queue])
+    #samples        = np.concatenate([e["stream_samples"] for e in self.input_queue])
+    channel_index   = np.concatenate([e["stream_samples"]["channel_index"] for e in self.input_queue])
+    trigger_type    = np.concatenate([e["stream_samples"]["trigger_type"]  for e in self.input_queue])
+    stream_index    = np.concatenate([e["stream_samples"]["stream_index"]  for e in self.input_queue])
+    iq              = np.concatenate([e["stream_IQ"]                       for e in self.input_queue])
+    dwell_frequency = self.input_queue[0]["dwell_frequency"]
 
     total_samples_by_index = np.zeros(INTERCEPT_NUM_STREAMS, dtype=np.uint32)
 
@@ -148,8 +151,9 @@ class pluto_intercept_analysis_processor:
           stream_idx += take
           pos += take
           if stream_idx == stream_depth:
-            self.stream_buffer_index[s] = 0
-            self.stream_buffer_channel[s] = stream_channel[start]
+            self.stream_buffer_index[s]       = 0
+            self.stream_buffer_channel[s]     = stream_channel[start]
+            self.stream_buffer_dwell_freq[s]  = dwell_frequency
             self._stream_buffer_process(s)
             stream_idx = 0
 
@@ -163,6 +167,62 @@ class pluto_intercept_analysis_processor:
 
     now = time.time()
     print("{} : _process_input_queue done, time={}".format(now, now - t_start))
+
+  def _process_downconverted_queue(self):
+    now = time.time()
+
+    for entry in self.downconverted_output_queue:
+      try:
+        result = self.process_pool.apply_async(self.signal_analysis.process_data, (entry,))
+        self.pool_results.append(result)
+        self.pool_timestamp.append(now)
+        print("pool_results.append")
+      except Exception as e:
+        self.logger.log(self.logger.LL_WARN, "_process_downconverted_queue: exception: {}".format(e))
+        self.logger.log(self.logger.LL_WARN, "_process_downconverted_queue: traceback: {}".format(traceback.format_exc()))
+        self.logger.flush()
+
+    self.downconverted_output_queue.clear()
+
+  def _process_pool_results(self):
+    while len(self.pool_results) > 0:
+      if not self.pool_results[0].ready():
+        break
+      result = self.pool_results[0].get()
+
+      #if "sw_timestamp" not in result:
+      #  print("result: {}".format(result))
+
+      now = time.time()
+
+      print("_process_pool_results: {:.6f} {:.6f} c={} features={}".format(now - result["timestamp_conv_end"], result["timestamp_proc_end"] - result["timestamp_proc_start"], result["channel_index"], result["features"]))
+
+      #self.signal_tracker.submit_analysis_report(result)
+      #self.signal_processing_delay = now - result["sw_timestamp"]
+      #
+      #self.logger.log(self.logger.LL_INFO, "_process_pool_results: full processing delay: {:.3f}  from submission delay: {:.3f} processing_time: {:.3f} time_since_read:{:.3f}".format(self.signal_processing_delay, now - self.pool_timestamp[0], result["processing_time"], result["time_since_read"]))
+      #
+      #result_for_logging = result.copy()
+      #result_for_logging["analysis"] = result["analysis"].copy()
+      #result_for_logging["analysis"].pop("iq_stft_abs")
+      #result_for_logging["analysis"].pop("ofdm_data")
+      #self.recorder.log(result_for_logging)
+      self.pool_results.pop(0)
+      self.pool_timestamp.pop(0)
+
+  def _shutdown_pool(self):
+    self.logger.log(self.logger.LL_INFO, "_shutdown_pool: {} items in queue".format(len(self.pool_results)))
+
+    while len(self.pool_results) > 0:
+      if not self.pool_results[0].ready():
+        self.logger.log(self.logger.LL_INFO, "_shutdown_pool: waiting for result...")
+        time.sleep(0.1)
+        continue
+      result = self.pool_results[0].get()
+      self.logger.log(self.logger.LL_INFO, "_shutdown_pool: result done, {} remaining".format(len(self.pool_results) - 1))
+
+      self.pool_results.pop(0)
+      self.pool_timestamp.pop(0)
 
   def _update_output(self):
     now = time.time()
@@ -187,6 +247,8 @@ class pluto_intercept_analysis_processor:
     #self.pr.enable()
 
     self._process_input_queue()
+    self._process_downconverted_queue()
+    self._process_pool_results()
     self._update_output()
 
     #self.pr.disable()
@@ -198,6 +260,9 @@ class pluto_intercept_analysis_processor:
 
   def shutdown(self, reason):
     self.logger.log(self.logger.LL_INFO, "[pluto_intercept_analysis_processor]: shutdown started - reason={}".format(reason))
+    self._shutdown_pool()
+    self.process_pool.terminate()
+    self.process_pool.join()
     self.recorder.shutdown(reason)
     self.logger.log(self.logger.LL_INFO, "[pluto_intercept_analysis_processor]: shutdown complete")
     self.logger.flush()
