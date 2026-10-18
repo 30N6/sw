@@ -41,7 +41,7 @@ class pluto_intercept_hw_dwell_reporter:
     self.logger.log(self.logger.LL_DEBUG, "[hw_dwell_reporter] len={} seq={}".format(len(data), report["msg_seq_num"]))
 
     report["dwell_seq_num"]         = unpacked_header[4]
-    report["dwell_frequency"]       = unpacked_header[5]
+    report["dwell_frequency"]       = unpacked_header[5] * 1e-3
     report["dwell_tag"]             = unpacked_header[7]
     report["dwell_window_duration"] = unpacked_header[6]
 

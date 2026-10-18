@@ -79,7 +79,7 @@ class pluto_intercept_downconverter:
 
       self.lo_active[stream_index, i_lo] = True
       self.lo_frequency[stream_index, i_lo] = (0.5 - est_center[i_lo]) * CHANNELIZER_OUTPUT_FREQUENCY
-      self.logger.log(self.logger.LL_INFO, "[downconv]: update_downconverters: stream_index={} lo_index={} --> freq={:.1f}".format(stream_index, i_lo, self.lo_frequency[stream_index, i_lo] * 1e-3))
+      self.logger.log(self.logger.LL_INFO, "[downconv]: update_downconverters: stream_index={} lo_index={} --> freq={:.1f} kHz".format(stream_index, i_lo, self.lo_frequency[stream_index, i_lo] * 1e-3))
 
   def stream_buffer_process(self, stream_index, stream_buffer):
     assert (self.input_buffer_depth % stream_buffer.size == 0)

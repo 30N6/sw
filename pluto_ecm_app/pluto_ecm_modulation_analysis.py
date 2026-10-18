@@ -41,14 +41,16 @@ class pluto_ecm_modulation_analysis:
       phase_unwrapped   = np.unwrap(phase_wrapped)
       iq_freq           = (1/(2*np.pi)) * np.diff(phase_unwrapped) / self.dt
       iq_freq_mean      = np.mean(iq_freq)
-      iq_padded_fft     = np.abs(np.fft.fftshift(np.fft.fft(iq_data_padded)))
+      iq_padded_fft_u   = np.fft.fft(iq_data_padded)
+      iq_padded_fft     = np.abs(np.fft.fftshift(iq_padded_fft_u))
       iq_padded_fft_abs = np.abs(iq_padded_fft)
       iq_power          = np.square(np.real(iq_data)) + np.square(np.imag(iq_data))
       iq_stft           = self._get_stft(iq_data)
+      iq_acorr_abs        = np.abs(np.fft.ifft(np.square(np.abs(iq_padded_fft_u)))) #TODO: untested
 
-      iq_padded_fft_conj  = np.conjugate(iq_padded_fft)
-      iq_padded_fft_prod  = iq_padded_fft * iq_padded_fft_conj
-      iq_acorr_abs        = np.abs(np.fft.ifft(iq_padded_fft_prod))
+fft = np.fft.fft(iq_data_padded)
+power = np.abs(fft) ** 2
+iq_acorr_abs = np.abs(np.fft.ifft(power))
 
       r = report.copy()
       r.pop("iq_data")
