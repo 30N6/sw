@@ -13,9 +13,11 @@ class pluto_intercept_sw_config:
     self.debug_log    = self.config["debug_log"]
     self.sim_enabled  = self.config["simulation"]["playback_enable"]
     self.dwell_data   = self.config["dwell"]
+    self.trigger_data = self.config["trigger"]
 
     #TODO: thresholds
 
   def _sanity_check(self):
     #TODO: config sanity check
+    #TODO: thresholds_dB values
     pass

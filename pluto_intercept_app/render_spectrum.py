@@ -178,7 +178,7 @@ class render_spectrum:
     #start = time.time()
     #self.pr.enable()
 
-    thresholds = self.sequencer.threshold_control.get_thresholds_for_render()
+    thresholds = self.sequencer.trigger_control.get_thresholds_for_render()
     if thresholds is not None:
       self.spectrogram.set_thresholds(thresholds)
 

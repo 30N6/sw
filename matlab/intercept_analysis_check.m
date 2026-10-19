@@ -1,8 +1,8 @@
 %filename = "analysis-20261015-174144.log";
 %filename = "analysis-20261015-232905.log";
-filename = "analysis-20261018-003655.log";
+filename = "analysis-20261018-234013.log";
 
-reload = 0;
+reload =0 ;
 
 if reload
     lines = readlines(filename);
@@ -59,10 +59,11 @@ end
 %filtered_data = input_data([input_data.frequency] == analysis_frequency);
 
 unique_freqs = sort(unique([input_data.center_frequency]));
+unique_chans = sort(unique([input_data.channel_index]));
 
-filtered_data = input_data([input_data.center_frequency] == unique_freqs(6));
+filtered_data = input_data([input_data.channel_index] == unique_chans(1));
 
-selected_data = filtered_data(2);
+selected_data = filtered_data(6);
 
 t = [0:4095]' * 1/selected_data.fs;
 
@@ -101,14 +102,18 @@ subplot(4,1,4);
 figure(3);
 subplot(4,1,1);
 instfrq = selected_data.fs/(2*pi) * diff(unwrap(angle(selected_data.iq_data)));
-plot(t(1:end-1), instfrq);
+
+t_sel = (t < 80e-3);
+
+%plot(t(1:end-1), instfrq);
+plot(t(t_sel), instfrq(t_sel));
 
 instfrq_m = instfrq - mean(instfrq);
 
 subplot(4,1,2);
-plot(t(1:end-1), instfrq_m.^2);
+plot(t(t_sel), instfrq_m(t_sel).^2);
 
-xc = fftshift(xcorr(instfrq));
+xc = fftshift(xcorr(instfrq(t_sel)));
 subplot(4,1,3);
 plot(abs(xc));
 
@@ -126,6 +131,11 @@ for ii = 1:length(filtered_data)
     combined_iq_I = [combined_iq_I; filtered_data(ii).iq_data_I];
     combined_iq_Q = [combined_iq_Q; filtered_data(ii).iq_data_Q];
 end
+
+% for ii = 1:length(input_data)
+%     combined_iq_I = [combined_iq_I; input_data(ii).iq_data_I];
+%     combined_iq_Q = [combined_iq_Q; input_data(ii).iq_data_Q];
+% end
 
 combined_iq = combined_iq_I + 1j * combined_iq_Q;
 

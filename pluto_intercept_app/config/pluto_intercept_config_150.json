@@ -1,5 +1,21 @@
 {
-  "dwell": {"frequency": 150.000, "window_duration": 6000},
+  "dwell": {
+    "frequency"       : 150.000,
+    "window_duration" : 6000
+  },
+  "trigger":
+  {
+    "coast_duration"                : 60000,
+    "force_duration"                : 73728,
+    "normal_threshold_start_dB"     : 20.0,
+    "normal_threshold_continue_dB"  : 6.0,
+    "forced_threshold_dB"           : 10.0,
+    "forced_window_size"            : 5,
+    "threshold_update_interval"     : 0.125,
+    "threshold_update_count"        : 32,
+    "threshold_use_max_not_mean"    : 1,
+    "threshold_history_length"      : 16
+  },
   "simulation": {"recording_enable": 0, "playback_enable": 0, "playback_filename": "./log/recorded_data-20241125-174304.log", "playback_speed": 1.0},
   "analysis_config": {
     "enable_analysis_recording": 1,

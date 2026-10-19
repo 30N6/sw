@@ -7,7 +7,7 @@ import pluto_intercept_hw_interface
 import pluto_intercept_hw_control
 import pluto_intercept_hw_dwell_reporter
 import pluto_intercept_hw_stream_reporter
-import pluto_intercept_threshold_control
+import pluto_intercept_trigger_control
 
 import cProfile, pstats, io
 from pstats import SortKey
@@ -24,7 +24,7 @@ class pluto_intercept_sequencer:
     self.dwell_reporter                 = pluto_intercept_hw_dwell_reporter.pluto_intercept_hw_dwell_reporter(logger)
     self.stream_reporter                = pluto_intercept_hw_stream_reporter.pluto_intercept_hw_stream_reporter(logger)
     self.hw_stats                       = pluto_intercept_hw_stats.pluto_intercept_hw_stats(logger)
-    self.threshold_control              = pluto_intercept_threshold_control.pluto_intercept_threshold_control(logger, sw_config, self)
+    self.trigger_control                = pluto_intercept_trigger_control.pluto_intercept_trigger_control(logger, sw_config, self)
 
     self.analysis_thread                = analysis_thread
 
@@ -45,6 +45,7 @@ class pluto_intercept_sequencer:
 
     self.pr = cProfile.Profile()
 
+    self.trigger_data                   = sw_config.trigger_data
     self.dwell_data                     = sw_config.dwell_data
     self.dwell_entry                    = None
     self.channel_entries                = {}
@@ -158,7 +159,7 @@ class pluto_intercept_sequencer:
 
       self.hw_stats.submit_report(r)
       self.dwells_to_render.append(r)
-      self.threshold_control.process_dwell(r)
+      self.trigger_control.process_dwell(r)
 
     self.hw_interface.hwdr.output_data_dwell.clear()
 
@@ -212,7 +213,7 @@ class pluto_intercept_sequencer:
   def _send_initial_hw_control(self):
     self.submit_dwell_entry(pluto_intercept_hw_control.intercept_dwell_control_entry(1, 12345, int(self.dwell_data["frequency"] * 1e3), self.dwell_data["window_duration"]))
     for i in range(INTERCEPT_NUM_CHANNELS):
-      self.submit_channel_entry(i, pluto_intercept_hw_control.intercept_channel_control_entry(1, (i == 256), 7, 0, 0xFFFFFFFF, 0xFFFFFFFF, 60000, 0))
+      self.submit_channel_entry(i, pluto_intercept_hw_control.intercept_channel_control_entry(1, 0, 0, 0, 0xFFFFFFFF, 0xFFFFFFFF, self.trigger_data["coast_duration"], 0))
     for i in range(INTERCEPT_NUM_STREAMS):
       self.submit_stream_entry(i, pluto_intercept_hw_control.intercept_stream_control_entry(i < (INTERCEPT_NUM_STREAMS - 1), 0xFFFF))
 
@@ -276,7 +277,7 @@ class pluto_intercept_sequencer:
       self._update_hw_reports()
       self._update_hw_acks()
       self.hw_stats.update()
-      self.threshold_control.update()
+      self.trigger_control.update()
 
     self._update_watchdog()
 
