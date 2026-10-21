@@ -130,7 +130,7 @@ class pluto_intercept_analysis_processor:
     for entry in self.input_queue:
       total_samples += entry["stream_samples"].size
 
-    print("{} : _process_input_queue start - len={} total_samples={}".format(time.time(), len(self.input_queue), total_samples))
+    #print("{} : _process_input_queue start - len={} total_samples={}".format(time.time(), len(self.input_queue), total_samples))
 
     #samples        = np.concatenate([e["stream_samples"] for e in self.input_queue])
     channel_index   = np.concatenate([e["stream_samples"]["channel_index"] for e in self.input_queue])
@@ -191,7 +191,7 @@ class pluto_intercept_analysis_processor:
     self.input_queue.clear()
 
     now = time.time()
-    print("{} : _process_input_queue done, time={}".format(now, now - t_start))
+    #print("{} : _process_input_queue done, time={}".format(now, now - t_start))
 
   def _process_downconverted_queue(self):
     now = time.time()
@@ -201,7 +201,6 @@ class pluto_intercept_analysis_processor:
         result = self.process_pool.apply_async(self.signal_analysis.process_data, (entry,))
         self.pool_results.append(result)
         self.pool_timestamp.append(now)
-        print("pool_results.append")
       except Exception as e:
         self.logger.log(self.logger.LL_WARN, "_process_downconverted_queue: exception: {}".format(e))
         self.logger.log(self.logger.LL_WARN, "_process_downconverted_queue: traceback: {}".format(traceback.format_exc()))
@@ -222,8 +221,7 @@ class pluto_intercept_analysis_processor:
 
       now = time.time()
 
-      #print("_process_pool_results: {:.6f} {:.6f} f={} features={}".format(now - result["timestamp_conv_end"], result["timestamp_proc_end"] - result["timestamp_proc_start"], result["center_frequency"], result["features"]))
-      print("_process_pool_results: {:.6f} {:.6f} {:.6f} f={}".format(now - result["timestamp_conv_end"], now - ts_queue_start, result["timestamp_proc_end"] - result["timestamp_proc_start"], result["center_frequency"]))
+      #print("_process_pool_results: {:.6f} {:.6f} {:.6f} f={}".format(now - result["timestamp_conv_end"], now - ts_queue_start, result["timestamp_proc_end"] - result["timestamp_proc_start"], result["center_frequency"]))
 
       self._log_pool_result(result)
 

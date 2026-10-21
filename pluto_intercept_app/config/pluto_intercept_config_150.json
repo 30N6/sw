@@ -7,14 +7,16 @@
   {
     "coast_duration"                : 60000,
     "force_duration"                : 73728,
-    "normal_threshold_start_dB"     : 20.0,
-    "normal_threshold_continue_dB"  : 6.0,
-    "forced_threshold_dB"           : 10.0,
-    "forced_window_size"            : 5,
+    "normal_threshold_start_dB"     : 6.0,
+    "normal_threshold_continue_dB"  : 3.0,
+    "forced_threshold_dB"           : 6.0,
+    "forced_peak_count"             : 16,
     "threshold_update_interval"     : 0.125,
     "threshold_update_count"        : 32,
     "threshold_use_max_not_mean"    : 1,
-    "threshold_history_length"      : 16
+    "threshold_history_length"      : 16,
+    "threshold_factor_attack"       : 0.005,
+    "threshold_factor_retreat"      : 0.25
   },
   "simulation": {"recording_enable": 0, "playback_enable": 0, "playback_filename": "./log/recorded_data-20241125-174304.log", "playback_speed": 1.0},
   "analysis_config": {

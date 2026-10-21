@@ -182,6 +182,7 @@ class pluto_intercept_sequencer:
     if len(results) > 0:
       #self.logger.log(self.logger.LL_DEBUG, "[sequencer] _process_stream_reports_from_hw: submitting {} items to analysis thread".format(len(results)))
       self.analysis_thread.submit_data(results)
+      self.trigger_control.process_stream(results)
 
   def _track_stream_state(self, stream_report):
     #self.pr.enable()

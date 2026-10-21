@@ -1,8 +1,8 @@
 %filename = "analysis-20261015-174144.log";
 %filename = "analysis-20261015-232905.log";
-filename = "analysis-20261018-234013.log";
+filename = "analysis-20261019-141746.log";
 
-reload =0 ;
+reload = 0;
 
 if reload
     lines = readlines(filename);
@@ -61,9 +61,10 @@ end
 unique_freqs = sort(unique([input_data.center_frequency]));
 unique_chans = sort(unique([input_data.channel_index]));
 
-filtered_data = input_data([input_data.channel_index] == unique_chans(1));
+%filtered_data = input_data([input_data.channel_index] == unique_chans(3));
+filtered_data = input_data([input_data.center_frequency] == unique_freqs(14));
 
-selected_data = filtered_data(6);
+selected_data = filtered_data(1);
 
 t = [0:4095]' * 1/selected_data.fs;
 

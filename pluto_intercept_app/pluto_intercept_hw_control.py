@@ -23,25 +23,25 @@ class intercept_dwell_control_entry:
     return PACKED_INTERCEPT_CONFIG_DWELL_CONTROL.pack(self.fields["enable"], self.fields["dwell_tag"], self.fields["dwell_frequency"], self.fields["window_duration"])
 
 class intercept_channel_control_entry:
-  def __init__(self, enable, force_trigger, force_stream, tag, threshold_start, threshold_continue, coast_cycles, integration_cycles):
-    assert (enable              <= 1)
-    assert (force_trigger       <= 1)
-    assert (force_stream        < INTERCEPT_NUM_STREAMS)
-    assert (tag                 <= 0xFFFF)
-    assert (threshold_start     <= 0xFFFFFFFF)
-    assert (threshold_continue  <= 0xFFFFFFFF)
-    assert (coast_cycles        <= 0x00FFFFFF)
-    assert (integration_cycles  <= 0xFFFF)
+  def __init__(self, enable, force_trigger, force_stream, tag, threshold_start, threshold_continue, coast_or_force_cycles, integration_cycles):
+    assert (enable                <= 1)
+    assert (force_trigger         <= 1)
+    assert (force_stream          < INTERCEPT_NUM_STREAMS)
+    assert (tag                   <= 0xFFFF)
+    assert (threshold_start       <= 0xFFFFFFFF)
+    assert (threshold_continue    <= 0xFFFFFFFF)
+    assert (coast_or_force_cycles <= 0x00FFFFFF)
+    assert (integration_cycles    <= 0xFFFF)
 
-    self.fields                       = {}
-    self.fields["enable"]             = enable
-    self.fields["force_trigger"]      = force_trigger
-    self.fields["force_stream"]       = force_stream
-    self.fields["stream_encoder_tag"] = tag
-    self.fields["threshold_start"]    = threshold_start
-    self.fields["threshold_continue"] = threshold_continue
-    self.fields["coast_cycles"]       = coast_cycles
-    self.fields["integration_cycles"] = integration_cycles
+    self.fields                           = {}
+    self.fields["enable"]                 = enable
+    self.fields["force_trigger"]          = force_trigger
+    self.fields["force_stream"]           = force_stream
+    self.fields["stream_encoder_tag"]     = tag
+    self.fields["threshold_start"]        = threshold_start
+    self.fields["threshold_continue"]     = threshold_continue
+    self.fields["coast_or_force_cycles"]  = coast_or_force_cycles
+    self.fields["integration_cycles"]     = integration_cycles
 
   def update_thresholds(self, threshold_start, threshold_continue):
     assert (threshold_start     <= 0xFFFFFFFF)
@@ -50,12 +50,21 @@ class intercept_channel_control_entry:
     self.fields["threshold_start"]    = int(threshold_start)
     self.fields["threshold_continue"] = int(threshold_continue)
 
+  def update_force(self, force_trigger, force_stream, coast_or_force_cycles):
+    assert (force_trigger         <= 1)
+    assert (force_stream          < INTERCEPT_NUM_STREAMS)
+    assert (coast_or_force_cycles <= 0x00FFFFFF)
+
+    self.fields["force_trigger"]          = force_trigger
+    self.fields["force_stream"]           = force_stream
+    self.fields["coast_or_force_cycles"]  = coast_or_force_cycles
+
   def pack(self):
     packed_data = PACKED_INTERCEPT_CONFIG_CHANNEL_CONTROL.pack( self.fields["enable"],
                                                                 self.fields["force_trigger"], self.fields["force_stream"],
                                                                 self.fields["stream_encoder_tag"],
                                                                 self.fields["threshold_start"], self.fields["threshold_continue"],
-                                                                self.fields["coast_cycles"], self.fields["integration_cycles"])
+                                                                self.fields["coast_or_force_cycles"], self.fields["integration_cycles"])
     return packed_data
 
   def __str__(self):

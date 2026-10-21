@@ -142,6 +142,18 @@ class render_spectrum:
       text_rect.top = line_y[1] + 4
       self.surface.blit(text_data, text_rect)
 
+    peaks = self.sequencer.trigger_control.get_peaks_for_render()
+    if peaks is not None:
+      line_color = self.colors["trigger_forced"]
+      line_y = [self.rect_spectrum[1], self.rect_spectrum[1] + self.rect_spectrum[3] * 0.1]
+
+      for peak_index in range(peaks.size):
+        channel_index = peaks[peak_index]
+        frequency_str = self.sequencer.get_channel_frequency_str(channel_index)
+        line_x = self.rect_spectrum[0] + channel_index
+        pygame.draw.line(self.surface, line_color, [line_x, line_y[0]], [line_x, line_y[1]], 1)
+    #  self.spectrogram.set_peaks(peaks)
+
     pygame.draw.rect(self.surface, self.colors["frame_elements"], self.rect_spectrum, 1)
 
   def _render_cursor(self):

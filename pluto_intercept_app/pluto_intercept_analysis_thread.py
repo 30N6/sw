@@ -127,6 +127,7 @@ class pluto_intercept_analysis_runner:
     self.items_from_analysis  = 0
 
     self.stream_fft_box_data  = [None for i in range(INTERCEPT_NUM_STREAMS)]
+    self.confirmed_signals    = []
 
     self.analysis_process = Process(target=pluto_intercept_analysis_thread_func,
                                args=({"input_queue": self.input_queue, "output_queue": self.output_queue,
@@ -145,7 +146,8 @@ class pluto_intercept_analysis_runner:
         self.items_from_analysis += 1
         if "stream_fft_box_data" in entry:
           self.stream_fft_box_data = entry["stream_fft_box_data"]
-
+        elif "confirmed_signals" in entry:
+          self.confirmed_signals = entry["confirmed_signals"]
         else:
           raise RuntimeError("unexpected data in output queue")
 
