@@ -139,7 +139,10 @@ class render_spectrum:
       text_data = self.channel_frequency_labels[trigger_type][channel_index]
       text_rect = text_data.get_rect()
       text_rect.centerx = line_x
-      text_rect.top = line_y[1] + 4
+      if trigger_type == INTERCEPT_STREAM_TRIGGER_TYPE_FORCED:
+        text_rect.bottom = self.rect_spectrum[1] - 1
+      else:
+        text_rect.top = line_y[1] + 4
       self.surface.blit(text_data, text_rect)
 
     peaks = self.sequencer.trigger_control.get_peaks_for_render()
@@ -149,7 +152,6 @@ class render_spectrum:
 
       for peak_index in range(peaks.size):
         channel_index = peaks[peak_index]
-        frequency_str = self.sequencer.get_channel_frequency_str(channel_index)
         line_x = self.rect_spectrum[0] + channel_index
         pygame.draw.line(self.surface, line_color, [line_x, line_y[0]], [line_x, line_y[1]], 1)
     #  self.spectrogram.set_peaks(peaks)

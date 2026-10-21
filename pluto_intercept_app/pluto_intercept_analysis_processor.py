@@ -198,7 +198,7 @@ class pluto_intercept_analysis_processor:
 
     for entry in self.downconverted_output_queue:
       try:
-        result = self.process_pool.apply_async(self.signal_analysis.process_data, (entry,))
+        result = self.process_pool.apply_async(self.signal_analysis.compute_features, (entry,))
         self.pool_results.append(result)
         self.pool_timestamp.append(now)
       except Exception as e:

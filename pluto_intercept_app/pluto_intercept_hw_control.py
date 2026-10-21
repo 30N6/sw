@@ -59,6 +59,10 @@ class intercept_channel_control_entry:
     self.fields["force_stream"]           = force_stream
     self.fields["coast_or_force_cycles"]  = coast_or_force_cycles
 
+  @staticmethod
+  def disabled_entry():
+    return intercept_channel_control_entry(0, 0, 0, 0, 0, 0, 0, 0)
+
   def pack(self):
     packed_data = PACKED_INTERCEPT_CONFIG_CHANNEL_CONTROL.pack( self.fields["enable"],
                                                                 self.fields["force_trigger"], self.fields["force_stream"],

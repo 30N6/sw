@@ -24,7 +24,7 @@ class pluto_intercept_signal_analysis:
     #  self.cvbs_xcorr_window_inc_by_len[data_len] = [int(self.cvbs_xcorr_window_inc[0] // self.dt), int(self.cvbs_xcorr_window_inc[1] // self.dt)]
     #  self.cvbs_xcorr_window_exc_by_len[data_len] = [int(self.cvbs_xcorr_window_exc[0] // self.dt), int(self.cvbs_xcorr_window_exc[1] // self.dt)]
 
-  def process_data(self, data):
+  def compute_features(self, data):
     t_start = time.time()
 
     try:
