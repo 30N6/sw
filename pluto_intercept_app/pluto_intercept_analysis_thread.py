@@ -18,7 +18,7 @@ class pluto_intercept_analysis_thread:
     self.input_queue      = arg["input_queue"]
     self.output_queue     = arg["output_queue"]
     self.logger           = pluto_intercept_logger.pluto_intercept_logger(arg["log_dir"], "pluto_intercept_analysis_thread", arg["log_level"])
-    self.processor        = pluto_intercept_analysis_processor.pluto_intercept_analysis_processor(self.logger, arg["log_dir"], arg["config"])
+    self.processor        = pluto_intercept_analysis_processor.pluto_intercept_analysis_processor(self.logger, arg["log_dir"], arg["sw_config"])
 
     self.time_diff_input  = 0
 
@@ -127,11 +127,11 @@ class pluto_intercept_analysis_runner:
     self.items_from_analysis  = 0
 
     self.stream_fft_box_data  = [None for i in range(INTERCEPT_NUM_STREAMS)]
-    self.confirmed_signals    = []
+    self.tracked_signals      = []
 
     self.analysis_process = Process(target=pluto_intercept_analysis_thread_func,
                                args=({"input_queue": self.input_queue, "output_queue": self.output_queue,
-                                      "log_dir": logger.path, "log_level": logger.min_level, "config": sw_config.config}, ))
+                                      "log_dir": logger.path, "log_level": logger.min_level, "sw_config": sw_config}, ))
     self.analysis_process.start()
 
   def _update_output_queue(self):
@@ -146,8 +146,8 @@ class pluto_intercept_analysis_runner:
         self.items_from_analysis += 1
         if "stream_fft_box_data" in entry:
           self.stream_fft_box_data = entry["stream_fft_box_data"]
-        elif "confirmed_signals" in entry:
-          self.confirmed_signals = entry["confirmed_signals"]
+        elif "tracked_signals" in entry:
+          self.tracked_signals = entry["tracked_signals"]
         else:
           raise RuntimeError("unexpected data in output queue")
 
@@ -164,6 +164,9 @@ class pluto_intercept_analysis_runner:
 
   def get_stream_fft_box_data(self):
     return self.stream_fft_box_data
+
+  def get_tracked_signals(self):
+    return self.tracked_signals
 
   def update(self):
     #start = time.time()

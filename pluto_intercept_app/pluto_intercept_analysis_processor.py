@@ -10,20 +10,23 @@ import pluto_intercept_stream_graphics
 import pluto_intercept_frequency_estimator
 import pluto_intercept_downconverter
 import pluto_intercept_signal_analysis
+import pluto_intercept_signal_tracker
 
 import cProfile, pstats, io
 from pstats import SortKey
 
 class pluto_intercept_analysis_processor:
-  def __init__(self, logger, log_dir, config):
+  def __init__(self, logger, log_dir, sw_config):
     self.logger       = logger
-    self.recorder     = pluto_intercept_data_recorder.pluto_intercept_data_recorder(log_dir, "analysis", config["analysis_config"]["enable_analysis_recording"])
-    self.config       = config
+    self.recorder     = pluto_intercept_data_recorder.pluto_intercept_data_recorder(log_dir, "analysis", sw_config.config["analysis_config"]["enable_analysis_recording"])
+    self.config       = sw_config
     self.output_queue = []
     self.input_queue  = []
 
     self.stream_render_interval   = 0.25
     self.last_stream_render_time  = 0
+    self.signal_render_interval   = 0.05
+    self.last_signal_render_time  = 0
 
     self.process_pool             = multiprocessing.Pool(4) #TODO: config
     self.pool_results             = []
@@ -42,10 +45,11 @@ class pluto_intercept_analysis_processor:
     self.iq_by_index                = np.empty((INTERCEPT_NUM_STREAMS, self.samples_by_index_depth), dtype=np.complex64)
     #self.samples_by_index           = np.empty((INTERCEPT_NUM_STREAMS, self.samples_by_index_depth), dtype=PACKED_STREAM_SAMPLE_DTYPE)
 
-    self.stream_graphics            = pluto_intercept_stream_graphics.pluto_intercept_stream_graphics(logger, config)
-    self.stream_freq_estimator      = pluto_intercept_frequency_estimator.pluto_intercept_frequency_estimator(logger, self.recorder, config)
-    self.stream_downconverter       = pluto_intercept_downconverter.pluto_intercept_downconverter(logger, config)
-    self.signal_analysis            = pluto_intercept_signal_analysis.pluto_intercept_signal_analysis(config)
+    self.stream_graphics            = pluto_intercept_stream_graphics.pluto_intercept_stream_graphics(logger, sw_config.config)
+    self.stream_freq_estimator      = pluto_intercept_frequency_estimator.pluto_intercept_frequency_estimator(logger, self.recorder, sw_config.config)
+    self.stream_downconverter       = pluto_intercept_downconverter.pluto_intercept_downconverter(logger, sw_config.config)
+    self.signal_analysis            = pluto_intercept_signal_analysis.pluto_intercept_signal_analysis(sw_config.config)
+    self.signal_tracker             = pluto_intercept_signal_tracker.pluto_intercept_signal_tracker(logger, sw_config.config, sw_config.frequency_db)
 
     self.downconverted_output_queue = []
 
@@ -221,9 +225,14 @@ class pluto_intercept_analysis_processor:
 
       now = time.time()
 
-      #print("_process_pool_results: {:.6f} {:.6f} {:.6f} f={}".format(now - result["timestamp_conv_end"], now - ts_queue_start, result["timestamp_proc_end"] - result["timestamp_proc_start"], result["center_frequency"]))
-
       self._log_pool_result(result)
+
+      #print("_process_pool_results: {:.6f} {:.6f} {:.6f} f={}".format(now - result["timestamp_conv_end"], now - ts_queue_start, result["timestamp_proc_end"] - result["timestamp_proc_start"], result["center_frequency"]))
+      result.pop("iq_data_I")
+      result.pop("iq_data_Q")
+
+      self.signal_tracker.submit_analysis_report(result)
+
 
       #self.signal_tracker.submit_analysis_report(result)
       #self.signal_processing_delay = now - result["sw_timestamp"]
@@ -260,8 +269,12 @@ class pluto_intercept_analysis_processor:
 
     if (now - self.last_stream_render_time) > self.stream_render_interval:
       self.last_stream_render_time = now
-      #print("{} : fft_box_data updated".format(now))
       self.output_queue.append({"stream_fft_box_data": self.stream_graphics.get_stream_box_data()})
+
+    if (now - self.last_signal_render_time) > self.signal_render_interval:
+      self.last_signal_render_time = now
+      self.output_queue.append({"tracked_signals": self.signal_tracker.get_tracked_signals()})
+
 
   def get_output_data(self):
     return self.output_queue
@@ -281,6 +294,7 @@ class pluto_intercept_analysis_processor:
     self._process_downconverted_queue()
     self._process_pool_results()
     self._update_output()
+    self.signal_tracker.update()
 
     #self.pr.disable()
     #s = io.StringIO()

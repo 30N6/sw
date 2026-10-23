@@ -15,6 +15,7 @@ class render_spectrum:
     self.graphics_left            = 64
     self.graphics_width           = 512
 
+    self.rect_full                = [0, 0, 640, 800]
     self.rect_waterfall           = [self.graphics_left, 28,    self.graphics_width, 320]
     self.rect_spectrum            = [self.graphics_left, 368,   self.graphics_width, 128]
 
@@ -186,7 +187,7 @@ class render_spectrum:
     self._render_spectrum_display()
     self._render_cursor()
 
-    pygame.draw.rect(self.surface, (0, 0, 255), [0, 0, 640, 800], 1)
+    pygame.draw.rect(self.surface, (0, 0, 255), self.rect_full, 1)
 
   def update(self):
     #start = time.time()

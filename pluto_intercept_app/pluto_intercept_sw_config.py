@@ -15,6 +15,12 @@ class pluto_intercept_sw_config:
     self.dwell_data   = self.config["dwell"]
     self.trigger_data = self.config["trigger"]
 
+    freq_db_filename = self.config["frequency_database_filename"]
+    with open(freq_db_filename, "r") as fd:
+      self.frequency_db = json.load(fd)
+
+
+
     #TODO: thresholds
 
   def _sanity_check(self):
