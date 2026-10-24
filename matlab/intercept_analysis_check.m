@@ -1,6 +1,8 @@
 %filename = "analysis-20261015-174144.log";
 %filename = "analysis-20261015-232905.log";
-filename = "analysis-20261019-141746.log";
+%filename = "analysis-20261019-141746.log";
+%filename = "analysis-20261018-232832-fsk-burst.log";
+filename = "analysis-20261024-160624.log";
 
 reload = 0;
 
@@ -61,8 +63,8 @@ end
 unique_freqs = sort(unique([input_data.center_frequency]));
 unique_chans = sort(unique([input_data.channel_index]));
 
-%filtered_data = input_data([input_data.channel_index] == unique_chans(3));
-filtered_data = input_data([input_data.center_frequency] == unique_freqs(14));
+filtered_data = input_data([input_data.channel_index] == unique_chans(28));
+%filtered_data = input_data([input_data.center_frequency] == unique_freqs(14));
 
 selected_data = filtered_data(1);
 
@@ -157,3 +159,18 @@ plot(abs(xc));
 
 %%
 %marker_t = 0:4096:length(combined_t);
+
+total_power = sum([selected_data.fft_power]);
+power_cs = cumsum([selected_data.fft_power]) / total_power;
+power_ci = find(power_cs >= 0.5, 1);
+
+power_95 = find(power_cs >= 0.95, 1);
+power_05 = find(power_cs < 0.05, 1, "last");
+
+bandwidth = (power_95 - power_05) * (1/length(power_cs)) * 40e3
+
+figure(6);
+subplot(3,1,1);
+plot([selected_data.fft_power]);
+subplot(3,1,2);
+plot([0:length(power_cs)-1], power_cs, [power_ci, power_ci], [0, 1], [power_05, power_05], [0, 1], [power_95, power_95], [0, 1]);

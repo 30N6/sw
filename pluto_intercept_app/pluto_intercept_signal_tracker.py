@@ -114,11 +114,15 @@ class pluto_intercept_signal_tracker:
 
   def _initialize_signal(self, report):
     s = { "center_frequency"    : report["center_frequency"],
+          "channel_index"       : report["channel_index"],
+          "stream_index"        : report["stream_index"],
           "name"                : self._get_signal_name(report["center_frequency"]),
           "modulation"          : report["features"]["modulation"],
           "power_mean"          : report["features"]["power_avg"],
           "power_max"           : report["features"]["power_peak"],
           "amplitude_iqr"       : report["features"]["amplitude_iqr"],
+          "bandwidth"           : report["features"]["bandwidth"],
+          "frequency_offset"    : report["features"]["frequency_offset"],
           "reports"             : [report],
           "timestamp_initial"   : report["timestamp_conv_end"],
           "timestamp_final"     : report["timestamp_conv_end"],
@@ -144,9 +148,13 @@ class pluto_intercept_signal_tracker:
     tracked_signal["power_mean"]        = np.mean(power_mean_data)
     tracked_signal["power_max"]         = np.max(power_max_data)
 
-    tracked_signal["name"]          = self._get_signal_name(tracked_signal["center_frequency"])
-    tracked_signal["modulation"]    = report["features"]["modulation"]
-    tracked_signal["amplitude_iqr"] = report["features"]["amplitude_iqr"]
+    tracked_signal["channel_index"]     = report["channel_index"]
+    tracked_signal["stream_index"]      = report["stream_index"]
+    tracked_signal["name"]              = self._get_signal_name(tracked_signal["center_frequency"])
+    tracked_signal["modulation"]        = report["features"]["modulation"]
+    tracked_signal["amplitude_iqr"]     = report["features"]["amplitude_iqr"]
+    tracked_signal["bandwidth"]         = report["features"]["bandwidth"]
+    tracked_signal["frequency_offset"]  = report["features"]["frequency_offset"]
 
     #TODO: bandwidth
     #TODO: signal type

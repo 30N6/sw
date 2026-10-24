@@ -6,6 +6,8 @@ import traceback
 
 class pluto_intercept_signal_analysis:
   def __init__(self, config):
+    self.max_spur_bandwidth = config["analysis"]["max_spur_bandwidth"]
+
     pass
     #self.stft_length = 16
     #self.lora_num_chunks              = config["analysis_config"]["modulation_analysis"]["elrs-lora"]["parameters"]["lora_num_chunks"]
@@ -60,7 +62,7 @@ class pluto_intercept_signal_analysis:
       iq_data_acorr_abs = np.abs(np.fft.ifft(fft_power))
       iq_freq_acorr_abs = np.abs(np.fft.ifft(np.square(np.abs(iq_freq_fft))))
 
-      bandwidth         = self._get_bandwidth_data(fft_power_shifted, r["fs"])
+      center_offset, bandwidth = self._get_bandwidth_data(fft_power_shifted, r["fs"])
 
       amplitude_hist_count, amplitude_hist_edges = np.histogram(iq_amplitude, 128)
       frequency_hist_count, frequency_hist_edges = np.histogram(iq_freq, 128)
@@ -83,9 +85,8 @@ class pluto_intercept_signal_analysis:
       features["frequency_std"]         = iq_freq_std
       features["frequency_hist_count"]  = frequency_hist_count
       features["frequency_hist_edges"]  = frequency_hist_edges
-      features["bandwidth_3dB"]         = bandwidth[0]
-      features["bandwidth_6dB"]         = bandwidth[1]
-      features["bandwidth_10dB"]        = bandwidth[2]
+      features["frequency_offset"]      = center_offset
+      features["bandwidth"]             = bandwidth
       features["iq_acorr_abs"]          = iq_data_acorr_abs
       features["frequency_acorr_abs"]   = iq_freq_acorr_abs
 
@@ -173,8 +174,12 @@ class pluto_intercept_signal_analysis:
   def _get_modulation(self, features):
     mod_type = "unknown"
 
-    amplitude_iqr = features["amplitude_iqr"]
+    #TODO: better detection
 
+    if features["bandwidth"] < self.max_spur_bandwidth:
+      return "CW?"
+
+    amplitude_iqr = features["amplitude_iqr"]
     if amplitude_iqr > 0.3:
       mod_type = "AM"
     elif amplitude_iqr > 0.15:
@@ -184,39 +189,22 @@ class pluto_intercept_signal_analysis:
 
     return mod_type
 
-
   def _get_bandwidth_data(self, fft_power, fs):
-    p = np.argmax(fft_power)
+    power_cs = np.cumsum(fft_power)
+    freq_scale = fs * (1/power_cs.size)
 
-    bandwidth = [0, 0, 0]
-    threshold = [fft_power[p] * 0.5, fft_power[p] * 0.25, fft_power[p] * 0.01]
-    upper_done = [False, False, False]
-    upper_index = [0, 0, 0]
-    lower_done = [False, False, False]
-    lower_index = [0, 0, 0]
+    threshold_0 = power_cs[-1] * 0.05
+    threshold_1 = power_cs[-1] * 0.50
+    threshold_2 = power_cs[-1] * 0.95
 
-    idx = p
-    while (idx < fft_power.size) and not(all(upper_done)):
-      for j in range(len(threshold)):
-        if (fft_power[idx] < threshold[j]) and not(upper_done[j]):
-          upper_done[j] = True
-          upper_index[j] = idx
-      idx += 1
+    i_0 = np.searchsorted(power_cs, threshold_0)
+    i_1 = np.searchsorted(power_cs, threshold_1)
+    i_2 = np.searchsorted(power_cs, threshold_2)
 
-    idx = p
-    while (idx >= 0) and not(all(lower_done)):
-      for j in range(len(threshold)):
-        if (fft_power[idx] < threshold[j]) and not(lower_done[j]):
-          lower_done[j] = True
-          lower_index[j] = idx
-      idx -= 1
+    center_offset = (i_1 - power_cs.size/2) * freq_scale
+    bandwidth = (i_2 - i_0) * freq_scale
 
-    for i in range(len(threshold)):
-      assert not(upper_done[i] ^ lower_done[i])
-      if upper_done[i] and lower_done[i]:
-        bandwidth[i] = fs * (1/fft_power.size) * (upper_index[i] - lower_index[i] + 1)
-
-    return bandwidth
+    return center_offset, bandwidth
 
   def _get_stft(self, iq_data):
     num_ffts = int(iq_data.size // self.stft_length)

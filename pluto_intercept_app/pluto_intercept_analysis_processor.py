@@ -18,7 +18,7 @@ from pstats import SortKey
 class pluto_intercept_analysis_processor:
   def __init__(self, logger, log_dir, sw_config):
     self.logger       = logger
-    self.recorder     = pluto_intercept_data_recorder.pluto_intercept_data_recorder(log_dir, "analysis", sw_config.config["analysis_config"]["enable_analysis_recording"])
+    self.recorder     = pluto_intercept_data_recorder.pluto_intercept_data_recorder(log_dir, "analysis", sw_config.config["analysis"]["enable_recording"])
     self.config       = sw_config
     self.output_queue = []
     self.input_queue  = []
