@@ -206,8 +206,8 @@ class render_signals:
       report_count      = min(99, len(signal_data["reports"]))
       emitter_color     = self.colors["signal_entry"]
 
-      s = "{:2} {:<12} {:8.3f} {:4.1f} {:4.1f} {:>2.0f} {:>2} {:5.3f}".format(index, signal_data["name"], signal_data["center_frequency"],
-        power_mean_dB, power_max_dB, update_age, report_count, 0.999)
+      s = "{:2} {:8.3f} {:<12} {:4.1f} {:4.1f} {:>2.0f} {:>2} {:4} {:4.2f} {:5.3f}".format(index, signal_data["center_frequency"], signal_data["name"],
+        power_mean_dB, power_max_dB, update_age, report_count, signal_data["modulation"], signal_data["amplitude_iqr"], 0.999)
       pos_offset = [8, 16 + self.emitter_text_height * (index - 1)]
 
       emitter_entries.append({"str": s, "pos_offset": pos_offset, "color": emitter_color})

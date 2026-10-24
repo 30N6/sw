@@ -115,8 +115,10 @@ class pluto_intercept_signal_tracker:
   def _initialize_signal(self, report):
     s = { "center_frequency"    : report["center_frequency"],
           "name"                : self._get_signal_name(report["center_frequency"]),
+          "modulation"          : report["features"]["modulation"],
           "power_mean"          : report["features"]["power_avg"],
           "power_max"           : report["features"]["power_peak"],
+          "amplitude_iqr"       : report["features"]["amplitude_iqr"],
           "reports"             : [report],
           "timestamp_initial"   : report["timestamp_conv_end"],
           "timestamp_final"     : report["timestamp_conv_end"],
@@ -142,7 +144,9 @@ class pluto_intercept_signal_tracker:
     tracked_signal["power_mean"]        = np.mean(power_mean_data)
     tracked_signal["power_max"]         = np.max(power_max_data)
 
-    tracked_signal["name"] = self._get_signal_name(tracked_signal["center_frequency"])
+    tracked_signal["name"]          = self._get_signal_name(tracked_signal["center_frequency"])
+    tracked_signal["modulation"]    = report["features"]["modulation"]
+    tracked_signal["amplitude_iqr"] = report["features"]["amplitude_iqr"]
 
     #TODO: bandwidth
     #TODO: signal type

@@ -78,7 +78,7 @@ class pluto_intercept_signal_analysis:
       features["amplitude_cv"]          = iq_amplitude_std / iq_amplitude_mean
       features["amplitude_hist_count"]  = amplitude_hist_count
       features["amplitude_hist_edges"]  = amplitude_hist_edges
-      features["amplitude_iqr_ratio"]   = (iq_amplitude_qtls[2] - iq_amplitude_qtls[0]) / iq_amplitude_qtls[1]
+      features["amplitude_iqr"]         = (iq_amplitude_qtls[2] - iq_amplitude_qtls[0]) / iq_amplitude_qtls[1]
       features["frequency_mean"]        = iq_freq_mean
       features["frequency_std"]         = iq_freq_std
       features["frequency_hist_count"]  = frequency_hist_count
@@ -88,6 +88,8 @@ class pluto_intercept_signal_analysis:
       features["bandwidth_10dB"]        = bandwidth[2]
       features["iq_acorr_abs"]          = iq_data_acorr_abs
       features["frequency_acorr_abs"]   = iq_freq_acorr_abs
+
+      features["modulation"]            = self._get_modulation(features)
 
       #features["frequency_data"]        = iq_freq #TODO: remove
 
@@ -167,6 +169,21 @@ class pluto_intercept_signal_analysis:
 
     #print("FSK: {:.3f} {:.1f}".format(fsk_r_squared, fsk_freq_spread))
     #print("FSK: {} {}".format(fsk_r_squared, fsk_freq_spread))
+
+  def _get_modulation(self, features):
+    mod_type = "unknown"
+
+    amplitude_iqr = features["amplitude_iqr"]
+
+    if amplitude_iqr > 0.3:
+      mod_type = "AM"
+    elif amplitude_iqr > 0.15:
+      mod_type = "PSK?"
+    else:
+      mod_type = "FSK"
+
+    return mod_type
+
 
   def _get_bandwidth_data(self, fft_power, fs):
     p = np.argmax(fft_power)
