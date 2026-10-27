@@ -71,8 +71,8 @@ class pluto_intercept_main_thread:
     self.pr = cProfile.Profile()
 
   def run(self):
-    keydown_handlers  = [self.render_spectrum, self.render_streams, self.render_signals]
-    keystate_handlers = [self.sequencer]
+    keydown_handlers  = [self.render_spectrum, self.render_streams, self.render_signals, self.sequencer]
+    keystate_handlers = []
     update_calls      = [self.hw_interface, self.analysis_thread, self.sequencer, self.render_status, self.render_spectrum, self.render_streams, self.render_signals]
     render_calls      = [self.render_status, self.render_spectrum,  self.render_streams, self.render_signals]
 

@@ -1,6 +1,7 @@
 import time
 import random
 import json
+import pygame
 from pluto_intercept_hw_pkg import *
 import pluto_intercept_hw_stats
 import pluto_intercept_hw_interface
@@ -51,8 +52,9 @@ class pluto_intercept_sequencer:
     self.channel_entries                = {}
     self.stream_entries                 = {}
 
-    self.channel_frequency              = [self.dwell_data["frequency"] + (i - (INTERCEPT_NUM_CHANNELS / 2)) * (ADC_CLOCK_FREQUENCY * 1e-6 / INTERCEPT_NUM_CHANNELS) for i in range(INTERCEPT_NUM_CHANNELS)]
-    self.channel_frequency_str          = ["{:.3f}".format(self.channel_frequency[i]) for i in range(INTERCEPT_NUM_CHANNELS)]
+    self.channel_frequency              = []
+    self.channel_frequency_str          = []
+    self.channel_enabled                = np.zeros(INTERCEPT_NUM_CHANNELS, dtype=np.bool)
 
     self.stream_last_trigger_type       = np.ones(INTERCEPT_NUM_STREAMS, dtype=np.uint32) * 3
     self.stream_last_channel_index      = np.zeros(INTERCEPT_NUM_STREAMS, dtype=np.uint32)
@@ -60,8 +62,28 @@ class pluto_intercept_sequencer:
     self.stream_last_frequency          = np.zeros(INTERCEPT_NUM_STREAMS)
     self.stream_last_frequency_str      = ["" for i in range(INTERCEPT_NUM_STREAMS)]
 
+    self._update_dwell_frequency(sw_config.dwell_data["frequency"])
 
     self.logger.log(self.logger.LL_INFO, "[sequencer] init done; sim_enabled={} frequency={} window_duration={}".format(self.sim_enabled, self.dwell_data["frequency"], self.dwell_data["window_duration"]))
+
+  def _update_dwell_frequency(self, frequency):
+    self.dwell_data["frequency"]  = frequency
+    self.channel_frequency        = [self.dwell_data["frequency"] + (i - (INTERCEPT_NUM_CHANNELS / 2)) * (ADC_CLOCK_FREQUENCY * 1e-6 / INTERCEPT_NUM_CHANNELS) for i in range(INTERCEPT_NUM_CHANNELS)]
+    self.channel_frequency_str    = ["{:.3f}".format(self.channel_frequency[i]) for i in range(INTERCEPT_NUM_CHANNELS)]
+
+    if len(self.dwell_data["include_freqs"]) > 0:
+      self.channel_enabled = np.zeros(INTERCEPT_NUM_CHANNELS, dtype=np.bool)
+
+      for channel_index in range(INTERCEPT_NUM_CHANNELS):
+        for entry in self.dwell_data["include_freqs"]:
+          if (self.channel_frequency[channel_index] >= entry[0]) and (self.channel_frequency[channel_index] <= entry[1]):
+            self.channel_enabled[channel_index] = True
+    else:
+      self.channel_enabled = np.ones(INTERCEPT_NUM_CHANNELS, dtype=np.bool)
+
+    for entry in self.dwell_data["exclude_freqs"]:
+      if (self.channel_frequency[channel_index] >= entry[0]) and (self.channel_frequency[channel_index] <= entry[1]):
+        self.channel_enabled[channel_index] = False
 
   def submit_dwell_entry(self, entry):
     self.logger.log(self.logger.LL_DEBUG, "[sequencer] submit_dwell_entry: entry={}".format(entry))
@@ -154,6 +176,9 @@ class pluto_intercept_sequencer:
       if r is None:
         continue
 
+      r["channel_accum"] = r["channel_accum"] * self.channel_enabled;
+      r["channel_max"]   = r["channel_max"] * self.channel_enabled;
+
       self.logger.log(self.logger.LL_DEBUG, "[sequencer] _process_dwell_reports_from_hw: full report received, msg_seq_num={} window_seq_num={}".format(r["msg_seq_num"], r["window_seq_num"]))
       self.recorder.log({"dwell_report": r})
 
@@ -214,7 +239,7 @@ class pluto_intercept_sequencer:
   def _send_initial_hw_control(self):
     self.submit_dwell_entry(pluto_intercept_hw_control.intercept_dwell_control_entry(1, 12345, int(self.dwell_data["frequency"] * 1e3), self.dwell_data["window_duration"]))
     for i in range(INTERCEPT_NUM_CHANNELS):
-      self.submit_channel_entry(i, pluto_intercept_hw_control.intercept_channel_control_entry(1, 0, 0, 0, 0xFFFFFFFF, 0xFFFFFFFF, self.trigger_data["coast_duration"], 0))
+      self.submit_channel_entry(i, pluto_intercept_hw_control.intercept_channel_control_entry(self.channel_enabled[i], 0, 0, 0, 0xFFFFFFFF, 0xFFFFFFFF, self.trigger_data["coast_duration"], 0))
     for i in range(INTERCEPT_NUM_STREAMS):
       self.submit_stream_entry(i, pluto_intercept_hw_control.intercept_stream_control_entry(i < (INTERCEPT_NUM_STREAMS - 1), 0xFFFF))
 
@@ -292,6 +317,17 @@ class pluto_intercept_sequencer:
     #ps.print_stats()
     #print(s.getvalue())
 
-  def process_keystate(self, key_state):
-    pass
+  def process_keydown(self, key):
+    dwell_updated = False
+    if key == pygame.K_LEFT:
+      self._update_dwell_frequency(self.dwell_data["frequency"] - 0.5)
+      dwell_updated = True
+    elif key == pygame.K_RIGHT:
+      self._update_dwell_frequency(self.dwell_data["frequency"] + 0.5)
+      dwell_updated = True
+
+    if dwell_updated:
+      self.hw_interface.set_rx_frequency(self.dwell_data["frequency"])
+      self.submit_dwell_entry(pluto_intercept_hw_control.intercept_dwell_control_entry(1, 12345, int(self.dwell_data["frequency"] * 1e3), self.dwell_data["window_duration"]))
+
     #self.ecm_controller.process_keystate(key_state)

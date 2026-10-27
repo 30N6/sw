@@ -205,6 +205,9 @@ class render_spectrum:
         self.spectrogram.process_new_dwell(dwell)
       self.sequencer.dwells_to_render.clear()
 
+    if self.sequencer.dwell_data["frequency"] != self.frequency_range[1]:
+      self._update_frequency_range()
+
     #self.pr.disable()
     #s = io.StringIO()
     #sortby = SortKey.CUMULATIVE

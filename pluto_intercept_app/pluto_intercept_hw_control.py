@@ -34,7 +34,7 @@ class intercept_channel_control_entry:
     assert (integration_cycles    <= 0xFFFF)
 
     self.fields                           = {}
-    self.fields["enable"]                 = enable
+    self.fields["enable"]                 = int(enable)
     self.fields["force_trigger"]          = force_trigger
     self.fields["force_stream"]           = force_stream
     self.fields["stream_encoder_tag"]     = tag
@@ -105,7 +105,6 @@ class intercept_hardware_control:
 
   def send_dwell_entry(self, dwell_entry):
     self.current_dwell_entry = dwell_entry
-    print("dwell_entry = {}".format(len(dwell_entry.pack())))
     return self.config_writer.send_module_data(INTERCEPT_MODULE_ID_DWELL_CONTROLLER, INTERCEPT_CONTROL_MESSAGE_TYPE_DWELL_CONTROLLER_CONFIG, 0, dwell_entry.pack(), True)
 
   def send_channel_entry(self, channel_index, channel_entry):

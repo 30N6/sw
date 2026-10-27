@@ -2,7 +2,7 @@
 %filename = "analysis-20261015-232905.log";
 %filename = "analysis-20261019-141746.log";
 %filename = "analysis-20261018-232832-fsk-burst.log";
-filename = "analysis-20261024-160624.log";
+filename = "analysis-20261024-224447.log";
 
 reload = 0;
 
@@ -63,8 +63,10 @@ end
 unique_freqs = sort(unique([input_data.center_frequency]));
 unique_chans = sort(unique([input_data.channel_index]));
 
-filtered_data = input_data([input_data.channel_index] == unique_chans(28));
+%filtered_data = input_data([input_data.channel_index] == unique_chans(21));
 %filtered_data = input_data([input_data.center_frequency] == unique_freqs(14));
+
+filtered_data = input_data([[input_data.channel_index] == unique_chans(21)] & [[input_data.lo_index] == 0]);
 
 selected_data = filtered_data(1);
 
@@ -101,6 +103,10 @@ plot(selected_data.features.frequency_hist_edges(1:128), selected_data.features.
 
 subplot(4,1,4);
 %plot(selected_data.features.frequency_data);
+g = kaiser(64,5);
+ol = 48;
+nfft = 128;
+spectrogram(selected_data.iq_data,g,ol,nfft,40e3);
 
 figure(3);
 subplot(4,1,1);
@@ -119,6 +125,8 @@ plot(t(t_sel), instfrq_m(t_sel).^2);
 xc = fftshift(xcorr(instfrq(t_sel)));
 subplot(4,1,3);
 plot(abs(xc));
+
+subplot(4,1,4);
 
 
 figure(4);
@@ -146,15 +154,28 @@ combined_t = [0:length(combined_iq_I)-1]' * 1/selected_data.fs;
 combined_instfrq = selected_data.fs/(2*pi) * diff(unwrap(angle(combined_iq)));
 
 figure(5);
-subplot(3,1,1);
+subplot(4,1,1);
 plot(combined_t, combined_iq_I, combined_t, combined_iq_Q);
 
-subplot(3,1,2);
+subplot(4,1,2);
 plot(combined_t(1:end-1), combined_instfrq);
 
-subplot(3,1,3);
+subplot(4,1,3);
 xc = fftshift(xcorr(combined_instfrq));
 plot(abs(xc));
+
+subplot(4,1,4);
+plot([filtered_data.lo_frequency]);
+
+figure(6);
+
+g = kaiser(256,5);
+ol = 220;
+nfft = 512;
+
+spectrogram(combined_iq,g,ol,nfft,40e3);
+
+
 
 
 %%
@@ -169,7 +190,7 @@ power_05 = find(power_cs < 0.05, 1, "last");
 
 bandwidth = (power_95 - power_05) * (1/length(power_cs)) * 40e3
 
-figure(6);
+figure(7);
 subplot(3,1,1);
 plot([selected_data.fft_power]);
 subplot(3,1,2);

@@ -1,7 +1,12 @@
 {
   "dwell": {
     "frequency"       : 150.000,
-    "window_duration" : 6000
+    "window_duration" : 6000,
+    "include_freqs"   : [
+      [108.000, 500.000]
+    ],
+    "exclude_freqs"   : [
+    ]
   },
   "trigger": {
     "coast_duration"                : 60000,

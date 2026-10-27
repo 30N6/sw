@@ -19,7 +19,7 @@ class pluto_intercept_sw_config:
     with open(freq_db_filename, "r") as fd:
       self.frequency_db = json.load(fd)
 
-
+    print(self.dwell_data)
 
     #TODO: thresholds
 
