@@ -94,7 +94,7 @@ class pluto_intercept_frequency_estimator:
 
     return peak_valid, peak_center, peak_std, peak_accum
 
-  def stream_buffer_process(self, stream_index, stream_buffer):
+  def stream_buffer_process(self, stream_index, channel_index, stream_buffer):
     assert (stream_buffer.size % self.fft_width == 0)
     num_ffts_per_buffer = stream_buffer.size // self.fft_width
 
@@ -129,7 +129,7 @@ class pluto_intercept_frequency_estimator:
         self.recorder.log({"type": "freq_est", "stream_index": stream_index, "est_valid": self.est_valid[stream_index].tolist(), "est_center": self.est_center[stream_index].tolist(), "fft_accum_power": self.fft_accumulated_power[stream_index].tolist()})
 
         #self.logger.log(self.logger.LL_INFO, "stream_index={}: power={}".format(stream_index, self.fft_accumulated_power[stream_index]))
-        log_line = "[freq_est] stream_buffer_process: estimate complete - stream_index={} valid={} center={} accum={} std={}".format(stream_index, peak_valid, self.est_center[stream_index], self.est_std[stream_index], peak_std)
+        log_line = "[freq_est] stream_buffer_process: estimate complete - stream_index={} channel_index={} valid={} center={} accum={} std={}".format(stream_index, channel_index, peak_valid, self.est_center[stream_index], self.est_std[stream_index], peak_std)
         self.logger.log(self.logger.LL_INFO, log_line)
 
   def stream_buffer_clear(self, stream_index):

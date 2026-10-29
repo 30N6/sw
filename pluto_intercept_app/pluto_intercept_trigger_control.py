@@ -26,6 +26,7 @@ class pluto_intercept_trigger_control:
 
     self.normal_threshold_start         = 10**(sw_config.trigger_data["normal_threshold_start_dB"] / 10)
     self.normal_threshold_continue      = 10**(sw_config.trigger_data["normal_threshold_continue_dB"] / 10)
+    self.normal_threshold_update_delay  = sw_config.trigger_data["normal_threshold_update_delay"] / CHANNELIZER_OUTPUT_FREQUENCY
 
     self.dwells_received                = 0
     self.channel_data_valid             = False
@@ -36,6 +37,8 @@ class pluto_intercept_trigger_control:
 
     self.channel_threshold_hw_start     = np.zeros(INTERCEPT_NUM_CHANNELS, dtype=np.uint32)
     self.channel_threshold_hw_continue  = np.zeros(INTERCEPT_NUM_CHANNELS, dtype=np.uint32)
+
+    self.channel_threshold_skip         = np.zeros(INTERCEPT_NUM_CHANNELS, dtype=np.bool)
 
     self.peak_max_count                 = sw_config.trigger_data["forced_peak_count"]
     self.peak_threshold                 = 10**(sw_config.trigger_data["forced_threshold_dB"] / 10)
@@ -102,6 +105,9 @@ class pluto_intercept_trigger_control:
       sample_index  = report["stream_samples"]["sample_index"]
 
       for i in range(trigger_type.size):
+        self.channel_threshold_skip[channel_index[i]] = ((trigger_type[i] == INTERCEPT_STREAM_TRIGGER_TYPE_NORMAL) or (trigger_type[i] == INTERCEPT_STREAM_TRIGGER_TYPE_COAST)) and \
+                                                        (sample_index[i] < self.normal_threshold_update_delay)
+
         if (trigger_type[i] == INTERCEPT_STREAM_TRIGGER_TYPE_LAST):
           self.logger.log(self.logger.LL_INFO, "[pluto_intercept_trigger_control] last trigger received: stream={} channel={} sample={}".format(stream_index[i], channel_index[i], sample_index[i]))
 
@@ -148,7 +154,7 @@ class pluto_intercept_trigger_control:
         if self.threshold_update_index not in self.sequencer.channel_entries:
           continue
 
-        if self.threshold_update_index != self.current_peak_channel:  #avoid potentially restarting the forced trigger
+        if (self.threshold_update_index != self.current_peak_channel) and not(self.channel_threshold_skip[self.threshold_update_index]):  #avoid potentially restarting the forced trigger, avoid updating active channels so that transmissions aren't cut off
           channel_enabled = self.sequencer.channel_enabled[self.threshold_update_index]
           channel_entry = pluto_intercept_hw_control.intercept_channel_control_entry(channel_enabled, 0, 0, 0, self.channel_threshold_hw_start[self.threshold_update_index], self.channel_threshold_hw_continue[self.threshold_update_index], self.coast_duration, 0)
           self.sequencer.submit_channel_entry(self.threshold_update_index, channel_entry)
@@ -172,18 +178,21 @@ class pluto_intercept_trigger_control:
       #print(self.render_peaks)
 
     if (not self.current_peak_active) and (len(self.render_peaks) > 0):
-      idx = np.searchsorted(self.render_peaks, self.current_peak_channel)
-      if idx < self.render_peaks.size:
-        self.current_peak_channel = self.render_peaks[idx]
-      else:
-        self.current_peak_channel = self.render_peaks[0]
+      filtered_peaks = self.render_peaks[~self.channel_threshold_skip[self.render_peaks]]
 
-      if self.current_peak_channel in self.sequencer.channel_entries:
-        channel_enabled = self.sequencer.channel_enabled[self.current_peak_channel]
-        channel_entry = pluto_intercept_hw_control.intercept_channel_control_entry(channel_enabled, 1, self.force_trigger_stream_index, 0, 0xFFFFFFFF, 0xFFFFFFFF, self.force_trigger_duration, 0)
+      if filtered_peaks.size > 0:
+        idx = np.searchsorted(filtered_peaks, self.current_peak_channel)
+        if idx < filtered_peaks.size:
+          self.current_peak_channel = filtered_peaks[idx]
+        else:
+          self.current_peak_channel = filtered_peaks[0]
 
-        self.sequencer.submit_channel_entry(self.current_peak_channel, pluto_intercept_hw_control.intercept_channel_control_entry.disabled_entry())
-        self.sequencer.submit_channel_entry(self.current_peak_channel, channel_entry)
-        self.current_peak_active = True
+        if self.current_peak_channel in self.sequencer.channel_entries:
+          channel_enabled = self.sequencer.channel_enabled[self.current_peak_channel]
+          channel_entry = pluto_intercept_hw_control.intercept_channel_control_entry(channel_enabled, 1, self.force_trigger_stream_index, 0, 0xFFFFFFFF, 0xFFFFFFFF, self.force_trigger_duration, 0)
 
-        self.logger.log(self.logger.LL_INFO, "[pluto_intercept_trigger_control] switching forced trigger: channel={}".format(self.current_peak_channel))
+          self.sequencer.submit_channel_entry(self.current_peak_channel, pluto_intercept_hw_control.intercept_channel_control_entry.disabled_entry())
+          self.sequencer.submit_channel_entry(self.current_peak_channel, channel_entry)
+          self.current_peak_active = True
+
+          self.logger.log(self.logger.LL_INFO, "[pluto_intercept_trigger_control] switching forced trigger: channel={}".format(self.current_peak_channel))

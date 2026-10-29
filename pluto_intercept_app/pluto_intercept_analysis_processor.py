@@ -79,12 +79,12 @@ class pluto_intercept_analysis_processor:
     channel_offset = (channel_index - (INTERCEPT_NUM_CHANNELS / 2)) * (ADC_CLOCK_FREQUENCY * 1e-6 / INTERCEPT_NUM_CHANNELS)
     return dwell_frequency + channel_offset + lo_frequency * 1e-6
 
-  def _stream_buffer_process(self, stream_index):
+  def _stream_buffer_process(self, stream_index, channel_index):
     #print("{} : _stream_buffer_process index={}".format(time.time(), stream_index))
     current_stream_buffer = self.stream_buffer_data[stream_index]
 
     #TODO
-    self.stream_freq_estimator.stream_buffer_process(stream_index, current_stream_buffer)
+    self.stream_freq_estimator.stream_buffer_process(stream_index, channel_index, current_stream_buffer)
     est_valid, est_center, est_std, est_accum = self.stream_freq_estimator.get_estimate(stream_index)
 
     self.stream_graphics._stream_buffer_process(stream_index, current_stream_buffer, est_valid, est_center)
@@ -183,7 +183,7 @@ class pluto_intercept_analysis_processor:
             self.stream_buffer_index[s]       = 0
             self.stream_buffer_channel[s]     = stream_channel[start]
             self.stream_buffer_dwell_freq[s]  = dwell_frequency
-            self._stream_buffer_process(s)
+            self._stream_buffer_process(s, stream_channel[start])
             stream_idx = 0
 
         # segment ended on a LAST

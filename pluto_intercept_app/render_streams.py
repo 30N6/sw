@@ -44,9 +44,11 @@ class render_streams:
 
   def _update_labels(self):
     self.channel_frequency_label = []
+    self.channel_label = []
     for i in range(INTERCEPT_NUM_CHANNELS):
       frequency_str = self.sequencer.get_channel_frequency_str(i)
       self.channel_frequency_label.append(self.font_main.render(frequency_str, True, self.colors["frame_elements"]))
+      self.channel_label.append(self.font_main.render("{}".format(i), True, self.colors["frame_elements"]))
 
     self.trigger_type_label = []
     for i in range(len(self.trigger_type_map)):
@@ -68,16 +70,22 @@ class render_streams:
           pygame.draw.line(self.surface, self.colors["frame_elements"], [rect_x, rect_y], [rect_x + self.stream_box_width, rect_y + self.stream_box_height], 1)
           pygame.draw.line(self.surface, self.colors["frame_elements"], [rect_x + self.stream_box_width, rect_y], [rect_x, rect_y + self.stream_box_height], 1)
         else:
-          text_data = self.trigger_type_label[trigger_type]
+          text_data = self.channel_frequency_label[channel_index]
           text_rect = text_data.get_rect()
           text_rect.left = rect_x + 4 #+ self.stream_box_width / 2
           text_rect.centery = rect_y - 8 #+ self.stream_box_height + 12
           self.surface.blit(text_data, text_rect)
 
-          text_data = self.channel_frequency_label[channel_index]
+          text_data = self.channel_label[channel_index]
           text_rect = text_data.get_rect()
-          text_rect.centerx = rect_x + self.stream_box_width / 2
+          text_rect.right = rect_x + self.stream_box_width
           text_rect.centery = rect_y - 8
+          self.surface.blit(text_data, text_rect)
+
+          text_data = self.trigger_type_label[trigger_type]
+          text_rect = text_data.get_rect()
+          text_rect.left = rect_x
+          text_rect.centery = rect_y + self.stream_box_height + 8
           self.surface.blit(text_data, text_rect)
 
           text_data = self.font_main.render("{}".format(sample_index), True, self.colors["frame_elements"])

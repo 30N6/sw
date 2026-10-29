@@ -2,7 +2,7 @@
 %filename = "analysis-20261015-232905.log";
 %filename = "analysis-20261019-141746.log";
 %filename = "analysis-20261018-232832-fsk-burst.log";
-filename = "analysis-20261024-224447.log";
+filename = "analysis-20261029-001145.log";
 
 reload = 0;
 
@@ -66,9 +66,9 @@ unique_chans = sort(unique([input_data.channel_index]));
 %filtered_data = input_data([input_data.channel_index] == unique_chans(21));
 %filtered_data = input_data([input_data.center_frequency] == unique_freqs(14));
 
-filtered_data = input_data([[input_data.channel_index] == unique_chans(21)] & [[input_data.lo_index] == 0]);
-
-selected_data = filtered_data(1);
+filtered_data = input_data([[input_data.channel_index] == unique_chans(5)] & [[input_data.lo_index] == 0]);
+%%
+selected_data = filtered_data(2);
 
 t = [0:4095]' * 1/selected_data.fs;
 
@@ -109,25 +109,30 @@ nfft = 128;
 spectrogram(selected_data.iq_data,g,ol,nfft,40e3);
 
 figure(3);
-subplot(4,1,1);
+subplot(5,1,1);
 instfrq = selected_data.fs/(2*pi) * diff(unwrap(angle(selected_data.iq_data)));
+phase = unwrap(angle(selected_data.iq_data));
 
 t_sel = (t < 80e-3);
 
 %plot(t(1:end-1), instfrq);
-plot(t(t_sel), instfrq(t_sel));
+plot(t(t_sel), instfrq(t_sel), t(t_sel) + 11/40e3, instfrq(t_sel));
+
 
 instfrq_m = instfrq - mean(instfrq);
 
-subplot(4,1,2);
+subplot(5,1,2);
 plot(t(t_sel), instfrq_m(t_sel).^2);
 
 xc = fftshift(xcorr(instfrq(t_sel)));
-subplot(4,1,3);
+subplot(5,1,3);
 plot(abs(xc));
 
-subplot(4,1,4);
+subplot(5,1,4);
+plot(t, phase);
 
+subplot(5,1,5);
+plot(abs(fftshift(fft(instfrq))));
 
 figure(4);
 subplot(4,1,1);
@@ -195,3 +200,13 @@ subplot(3,1,1);
 plot([selected_data.fft_power]);
 subplot(3,1,2);
 plot([0:length(power_cs)-1], power_cs, [power_ci, power_ci], [0, 1], [power_05, power_05], [0, 1], [power_95, power_95], [0, 1]);
+
+%%
+%return;
+
+%%
+lpf_data = lowpass(combined_iq_I, 8e3, 40e3);
+lpf_freq = lowpass(combined_instfrq, 8e3, 40e3);
+
+%soundsc(lpf_data, 40e3);
+    
