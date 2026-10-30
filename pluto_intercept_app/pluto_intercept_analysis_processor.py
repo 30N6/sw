@@ -225,13 +225,18 @@ class pluto_intercept_analysis_processor:
 
       now = time.time()
 
+      self.signal_tracker.submit_analysis_report(result)
+
+      result.pop("details")
+      #result.pop("iq_data_I")
+      #result.pop("iq_data_Q")
       self._log_pool_result(result)
 
       #print("_process_pool_results: {:.6f} {:.6f} {:.6f} f={}".format(now - result["timestamp_conv_end"], now - ts_queue_start, result["timestamp_proc_end"] - result["timestamp_proc_start"], result["center_frequency"]))
-      result.pop("iq_data_I")
-      result.pop("iq_data_Q")
+      #result.pop("iq_data_I")
+      #result.pop("iq_data_Q")
 
-      self.signal_tracker.submit_analysis_report(result)
+
 
 
       #self.signal_tracker.submit_analysis_report(result)

@@ -1,12 +1,15 @@
 from pluto_intercept_hw_pkg import *
+import pluto_intercept_detail_graphics
+
 import numpy as np
-#import scipy as sp
+import scipy as sp
 import time
 import traceback
 
 class pluto_intercept_signal_analysis:
   def __init__(self, config):
     self.max_spur_bandwidth = config["analysis"]["max_spur_bandwidth"]
+    self.detail_graphics = pluto_intercept_detail_graphics.pluto_intercept_detail_graphics(config)
 
     pass
     #self.stft_length = 16
@@ -25,6 +28,13 @@ class pluto_intercept_signal_analysis:
     #  data_len = 2**i
     #  self.cvbs_xcorr_window_inc_by_len[data_len] = [int(self.cvbs_xcorr_window_inc[0] // self.dt), int(self.cvbs_xcorr_window_inc[1] // self.dt)]
     #  self.cvbs_xcorr_window_exc_by_len[data_len] = [int(self.cvbs_xcorr_window_exc[0] // self.dt), int(self.cvbs_xcorr_window_exc[1] // self.dt)]
+
+  def _convert_audio(self, x, peak_scale):
+    m = np.max(np.abs(x))
+    if m > 1e-12:
+        x = x * (peak_scale / m)
+    x = np.clip(x, -1.0, 1.0)
+    return (x * 32767).astype(np.int16)
 
   def compute_features(self, data):
     t_start = time.time()
@@ -67,6 +77,14 @@ class pluto_intercept_signal_analysis:
       amplitude_hist_count, amplitude_hist_edges = np.histogram(iq_amplitude, 128)
       frequency_hist_count, frequency_hist_edges = np.histogram(iq_freq, 128)
 
+      audio_am = sp.signal.resample_poly(iq_amplitude, up=2, down=5)
+      audio_fm = sp.signal.resample_poly(iq_freq, up=2, down=5)
+
+      details = {}
+      details["audio_am"]       = self._convert_audio(audio_am, 0.9)
+      details["audio_fm"]       = self._convert_audio(audio_fm, 0.9)
+      details["spectrum_trace"] = self.detail_graphics.get_spectrum_trace(fft_power_shifted)
+
       r["iq_data_I"] = iq_data.real
       r["iq_data_Q"] = iq_data.imag
 
@@ -97,6 +115,7 @@ class pluto_intercept_signal_analysis:
       r["timestamp_proc_start"] = t_start
       r["timestamp_proc_end"] = time.time()
       r["features"] = features
+      r["details"] = details
 
       return r
 
@@ -206,6 +225,8 @@ class pluto_intercept_signal_analysis:
 
     return center_offset, bandwidth
 
+
+
   def _get_stft(self, iq_data):
     num_ffts = int(iq_data.size // self.stft_length)
 
@@ -225,8 +246,6 @@ class pluto_intercept_signal_analysis:
     fft_var       = np.sum(fft_scaled * np.square(f - fft_mean))
 
     return fft_mean, np.sqrt(fft_var)
-
-
 
   def _get_fsk_fit_metrics(self, iq_freq, M):
     iq_freq_mean = np.mean(iq_freq)
