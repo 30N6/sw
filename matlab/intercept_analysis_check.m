@@ -2,7 +2,7 @@
 %filename = "analysis-20261015-232905.log";
 %filename = "analysis-20261019-141746.log";
 %filename = "analysis-20261018-232832-fsk-burst.log";
-filename = "analysis-20261029-001145.log";
+filename = "analysis-20261030-124053.log";
 
 reload = 0;
 
@@ -66,9 +66,9 @@ unique_chans = sort(unique([input_data.channel_index]));
 %filtered_data = input_data([input_data.channel_index] == unique_chans(21));
 %filtered_data = input_data([input_data.center_frequency] == unique_freqs(14));
 
-filtered_data = input_data([[input_data.channel_index] == unique_chans(5)] & [[input_data.lo_index] == 0]);
+filtered_data = input_data([[input_data.channel_index] == unique_chans(2)] & [[input_data.lo_index] == 0]);
 %%
-selected_data = filtered_data(2);
+selected_data = filtered_data(1);
 
 t = [0:4095]' * 1/selected_data.fs;
 
@@ -206,6 +206,7 @@ plot([0:length(power_cs)-1], power_cs, [power_ci, power_ci], [0, 1], [power_05, 
 
 %%
 lpf_data = lowpass(combined_iq_I, 8e3, 40e3);
+lpf_amp  = lowpass(abs(combined_iq), 8e3, 40e3);
 lpf_freq = lowpass(combined_instfrq, 8e3, 40e3);
 
 %soundsc(lpf_data, 40e3);

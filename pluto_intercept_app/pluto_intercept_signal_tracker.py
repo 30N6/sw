@@ -123,6 +123,7 @@ class pluto_intercept_signal_tracker:
           "amplitude_iqr"       : report["features"]["amplitude_iqr"],
           "bandwidth"           : report["features"]["bandwidth"],
           "frequency_offset"    : report["features"]["frequency_offset"],
+          "details"             : report["details"],
           "reports"             : [report],
           "timestamp_initial"   : report["timestamp_conv_end"],
           "timestamp_final"     : report["timestamp_conv_end"],
@@ -155,6 +156,8 @@ class pluto_intercept_signal_tracker:
     tracked_signal["amplitude_iqr"]     = report["features"]["amplitude_iqr"]
     tracked_signal["bandwidth"]         = report["features"]["bandwidth"]
     tracked_signal["frequency_offset"]  = report["features"]["frequency_offset"]
+    tracked_signal["details"]           = report["details"]
+    
 
     #TODO: bandwidth
     #TODO: signal type

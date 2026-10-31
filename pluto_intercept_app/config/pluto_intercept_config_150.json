@@ -24,7 +24,7 @@
     "threshold_factor_retreat"      : 0.25
   },
   "signal_tracker": {
-    "update_interval" : 0.1,
+    "update_interval" : 0.05,
     "max_report_age"  : 1.0,
     "max_signal_age"  : 30,
     "max_freq_diff"   : 25

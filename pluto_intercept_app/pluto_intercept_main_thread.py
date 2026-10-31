@@ -4,6 +4,7 @@ import pluto_intercept_sw_config
 import pluto_intercept_hw_interface
 import pluto_intercept_sequencer
 import pluto_intercept_analysis_thread
+import pluto_intercept_audio_thread
 import pluto_intercept_logger
 import pluto_intercept_data_recorder
 import pluto_intercept_data_loader
@@ -62,11 +63,12 @@ class pluto_intercept_main_thread:
 
     self.hw_interface     = pluto_intercept_hw_interface.pluto_intercept_hw_interface(self.logger, self.pluto_uri, self.local_ip, self.sw_config.config["pluto_credentials"], self.sw_config.config["simulation"]["playback_enable"])
     self.analysis_thread  = pluto_intercept_analysis_thread.pluto_intercept_analysis_runner(self.logger, self.sw_config)
+    self.audio_thread     = pluto_intercept_audio_thread.pluto_intercept_audio_runner(self.logger, self.sw_config)
     self.sequencer        = pluto_intercept_sequencer.pluto_intercept_sequencer(self.logger, self.recorder, self.sw_config, self.hw_interface, self.analysis_thread, self.sim_loader)
     self.render_status    = render_status.render_status(self.surface, self.sw_config, self.hw_interface, self.sequencer, self.analysis_thread, self.VERSION)
     self.render_spectrum  = render_spectrum.render_spectrum(self.surface, self.sw_config, self.sequencer)
     self.render_streams   = render_streams.render_streams(self.surface, self.sw_config, self.analysis_thread, self.sequencer)
-    self.render_signals   = render_signals.render_signals(self.surface, self.sw_config, self.analysis_thread)
+    self.render_signals   = render_signals.render_signals(self.surface, self.sw_config, self.analysis_thread, self.audio_thread)
 
     self.pr = cProfile.Profile()
 
@@ -122,6 +124,7 @@ class pluto_intercept_main_thread:
     #self.hw_interface.shutdown()
     if not interrupted:
       self.analysis_thread.shutdown()
+      self.audio_thread.shutdown()
 
     self.recorder.shutdown("quit")
     self.logger.log(self.logger.LL_INFO, "[main_thread] shutting down")

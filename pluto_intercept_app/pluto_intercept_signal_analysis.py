@@ -34,7 +34,8 @@ class pluto_intercept_signal_analysis:
     if m > 1e-12:
         x = x * (peak_scale / m)
     x = np.clip(x, -1.0, 1.0)
-    return (x * 32767).astype(np.int16)
+    return x
+    #return (x * 32767).astype(np.int16)
 
   def compute_features(self, data):
     t_start = time.time()
@@ -77,12 +78,9 @@ class pluto_intercept_signal_analysis:
       amplitude_hist_count, amplitude_hist_edges = np.histogram(iq_amplitude, 128)
       frequency_hist_count, frequency_hist_edges = np.histogram(iq_freq, 128)
 
-      audio_am = sp.signal.resample_poly(iq_amplitude, up=2, down=5)
-      audio_fm = sp.signal.resample_poly(iq_freq, up=2, down=5)
-
       details = {}
-      details["audio_am"]       = self._convert_audio(audio_am, 0.9)
-      details["audio_fm"]       = self._convert_audio(audio_fm, 0.9)
+      details["iq_amplitude"]   = self._convert_audio(iq_amplitude, 0.9)
+      details["iq_frequency"]   = self._convert_audio(iq_freq, 0.9)
       details["spectrum_trace"] = self.detail_graphics.get_spectrum_trace(fft_power_shifted)
 
       r["iq_data_I"] = iq_data.real

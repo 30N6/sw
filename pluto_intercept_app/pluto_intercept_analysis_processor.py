@@ -38,6 +38,7 @@ class pluto_intercept_analysis_processor:
     self.stream_buffer_index        = np.zeros(INTERCEPT_NUM_STREAMS, dtype=np.uint32)
     self.stream_buffer_channel      = np.zeros(INTERCEPT_NUM_STREAMS, dtype=np.uint32)
     self.stream_buffer_dwell_freq   = np.zeros(INTERCEPT_NUM_STREAMS, dtype=np.uint32)
+    self.global_seq_num             = 0
 
     self.samples_by_index_depth     = 8388608
     self.trigger_type_by_index      = np.empty((INTERCEPT_NUM_STREAMS, self.samples_by_index_depth), dtype=np.uint8)
@@ -79,9 +80,10 @@ class pluto_intercept_analysis_processor:
     channel_offset = (channel_index - (INTERCEPT_NUM_CHANNELS / 2)) * (ADC_CLOCK_FREQUENCY * 1e-6 / INTERCEPT_NUM_CHANNELS)
     return dwell_frequency + channel_offset + lo_frequency * 1e-6
 
-  def _stream_buffer_process(self, stream_index, channel_index):
+  def _stream_buffer_process(self, stream_index):
     #print("{} : _stream_buffer_process index={}".format(time.time(), stream_index))
     current_stream_buffer = self.stream_buffer_data[stream_index]
+    channel_index = self.stream_buffer_channel[stream_index]
 
     #TODO
     self.stream_freq_estimator.stream_buffer_process(stream_index, channel_index, current_stream_buffer)
@@ -111,7 +113,8 @@ class pluto_intercept_analysis_processor:
 
       output_entry = {"timestamp_conv_end"  : now,
                       "stream_index"        : stream_index,
-                      "channel_index"       : self.stream_buffer_channel[stream_index],
+                      "channel_index"       : channel_index,
+                      "global_seq_num"      : self.global_seq_num,
                       "dwell_frequency"     : self.stream_buffer_dwell_freq[stream_index],
                       "center_frequency"    : self._get_center_frequency(self.stream_buffer_dwell_freq[stream_index], self.stream_buffer_channel[stream_index], downconverted_data[i]["lo_frequency"]),
                       "lo_index"            : downconverted_data[i]["lo_index"],
@@ -183,7 +186,8 @@ class pluto_intercept_analysis_processor:
             self.stream_buffer_index[s]       = 0
             self.stream_buffer_channel[s]     = stream_channel[start]
             self.stream_buffer_dwell_freq[s]  = dwell_frequency
-            self._stream_buffer_process(s, stream_channel[start])
+            self._stream_buffer_process(s)
+            self.global_seq_num += 1
             stream_idx = 0
 
         # segment ended on a LAST
@@ -218,37 +222,24 @@ class pluto_intercept_analysis_processor:
         break
 
       result          = self.pool_results.pop(0).get()
-      ts_queue_start  = self.pool_timestamp.pop(0)
+      ts_queue_start  = self.pool_timestamp.pop(0)    #TODO: use - add to result
 
       #if "sw_timestamp" not in result:
       #  print("result: {}".format(result))
 
       now = time.time()
 
-      self.signal_tracker.submit_analysis_report(result)
+      result_for_logging  = copy.copy(result)
+      result_for_tracking = result
 
-      result.pop("details")
-      #result.pop("iq_data_I")
-      #result.pop("iq_data_Q")
-      self._log_pool_result(result)
+      result_for_logging.pop("details")
+      self._log_pool_result(result_for_logging)
+
+      result_for_tracking.pop("iq_data_I")
+      result_for_tracking.pop("iq_data_Q")
+      self.signal_tracker.submit_analysis_report(result_for_tracking)
 
       #print("_process_pool_results: {:.6f} {:.6f} {:.6f} f={}".format(now - result["timestamp_conv_end"], now - ts_queue_start, result["timestamp_proc_end"] - result["timestamp_proc_start"], result["center_frequency"]))
-      #result.pop("iq_data_I")
-      #result.pop("iq_data_Q")
-
-
-
-
-      #self.signal_tracker.submit_analysis_report(result)
-      #self.signal_processing_delay = now - result["sw_timestamp"]
-      #
-      #self.logger.log(self.logger.LL_INFO, "_process_pool_results: full processing delay: {:.3f}  from submission delay: {:.3f} processing_time: {:.3f} time_since_read:{:.3f}".format(self.signal_processing_delay, now - self.pool_timestamp[0], result["processing_time"], result["time_since_read"]))
-      #
-      #result_for_logging = result.copy()
-      #result_for_logging["analysis"] = result["analysis"].copy()
-      #result_for_logging["analysis"].pop("iq_stft_abs")
-      #result_for_logging["analysis"].pop("ofdm_data")
-      #self.recorder.log(result_for_logging)
 
   def _log_pool_result(self, result):
     converted_result = self._convert_numpy_for_json(result)
