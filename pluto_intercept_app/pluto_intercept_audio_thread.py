@@ -25,13 +25,9 @@ class pluto_intercept_audio_thread:
     self.audio_active           = False
     self.audio_chunks_to_buffer = 4
 
-    self.audio_output_frequency = 16000
-    self.audio_interval_factor  = 0.99 / self.audio_output_frequency
-    self.next_audio_time        = 0
-
     self.pr = cProfile.Profile()
 
-    pygame.mixer.init(frequency=self.audio_output_frequency, size=-16, channels=1, buffer=2048)
+    pygame.mixer.init(frequency=16000, size=-16, channels=1, buffer=2048)
 
     self.logger.log(self.logger.LL_INFO, "init: queue={}, current_process={}".format(self.input_queue, multiprocessing.current_process()))
 
@@ -65,9 +61,6 @@ class pluto_intercept_audio_thread:
 
   def run(self):
     running = True
-
-    #last_time = time.time()
-
     mixer_channel = pygame.mixer.Channel(0)
 
     try:
@@ -92,25 +85,16 @@ class pluto_intercept_audio_thread:
               raise RuntimeError("invalid command")
               running = False
 
-        if self.audio_active and (len(self.audio_chunks) > 0) and (time.time() > self.next_audio_time):
+        if self.audio_active and (len(self.audio_chunks) > 0) and (mixer_channel.get_queue() is None):
           next_chunk = self.audio_chunks.popleft()
-          #self.next_audio_time = time.time() + self.audio_interval_factor * next_chunk.shape[0]
-
           sound = pygame.sndarray.make_sound(next_chunk)
           mixer_channel.queue(sound)
-
-          #now = time.time()
-          #diff = now - last_time
-          #last_time = now
-          #num_samples = diff * 16000
-          #self.logger.log(self.logger.LL_INFO, "play sound: {} -> {}".format(diff, num_samples))
-          #self.logger.flush()
 
           if len(self.audio_chunks) == 0:
             self.audio_active = False
 
         else:
-          time.sleep(0)
+          time.sleep(0.001)
 
         #print("audio_thread: {:.3f}".format(time.time() - start))
         #self.pr.disable()
@@ -128,6 +112,7 @@ class pluto_intercept_audio_thread:
       self.shutdown("exception")
 
   def shutdown(self, reason):
+    pygame.mixer.quit()
     self.logger.shutdown(reason)
 
 audio_thread = 0
