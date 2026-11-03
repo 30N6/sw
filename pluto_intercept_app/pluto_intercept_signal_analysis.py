@@ -37,6 +37,12 @@ class pluto_intercept_signal_analysis:
     return x
     #return (x * 32767).astype(np.int16)
 
+  def _get_top_peaks(data, peak_count):
+    peak_i, properties = sp.signal.find_peaks(signal, height=0)
+    peak_h = properties['peak_heights']
+    top_i = np.argsort(peak_h)[-peak_count:][::-1]
+    return peak_i[top_i], peak_h[top_i]
+
   def compute_features(self, data):
     t_start = time.time()
 
@@ -70,8 +76,10 @@ class pluto_intercept_signal_analysis:
       iq_freq_mean      = np.mean(iq_freq)
       iq_freq_std       = np.std(iq_freq)
 
-      iq_data_acorr_abs = np.abs(np.fft.ifft(fft_power))
+      #iq_data_acorr_abs = np.abs(np.fft.ifft(fft_power))
       iq_freq_acorr_abs = np.abs(np.fft.ifft(np.square(np.abs(iq_freq_fft))))
+      iq_freq_acorr_abs *= 1/iq_freq_acorr_abs[0]
+      iq_freq_acorr_abs = iq_freq_acorr_abs[0:iq_freq_acorr_abs.size//2]
 
       center_offset, bandwidth = self._get_bandwidth_data(fft_power_shifted, r["fs"])
 
@@ -103,7 +111,7 @@ class pluto_intercept_signal_analysis:
       features["frequency_hist_edges"]  = frequency_hist_edges
       features["frequency_offset"]      = center_offset
       features["bandwidth"]             = bandwidth
-      features["iq_acorr_abs"]          = iq_data_acorr_abs
+      #features["iq_acorr_abs"]          = iq_data_acorr_abs
       features["frequency_acorr_abs"]   = iq_freq_acorr_abs
 
       features["modulation"]            = self._get_modulation(features)

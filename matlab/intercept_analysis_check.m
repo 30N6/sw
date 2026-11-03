@@ -2,9 +2,9 @@
 %filename = "analysis-20261015-232905.log";
 %filename = "analysis-20261019-141746.log";
 %filename = "analysis-20261018-232832-fsk-burst.log";
-filename = "analysis-20261030-124053.log";
+filename = "analysis-20261102-223524.log";
 
-reload = 0;
+reload = 1;
 
 if reload
     lines = readlines(filename);
@@ -72,17 +72,46 @@ selected_data = filtered_data(1);
 
 t = [0:4095]' * 1/selected_data.fs;
 
+fft_x = [-2048:2047] * (1/2048) * selected_data.fs * 0.5;
+
+freq_filter_b = ones(4,1) / 4;
+
 figure(1);
 subplot(5, 1, 1);
 plot(t, [selected_data.iq_data_I], t, [selected_data.iq_data_Q]);
 subplot(5, 1, 2);
 plot([selected_data.iq_amplitude]);
 subplot(5, 1, 3);
-plot([selected_data.fft_power_dB]);
+plot(fft_x, [selected_data.fft_power_dB]);
 subplot(5, 1, 4);
-plot([selected_data.features.iq_acorr_abs]);
+%plot([selected_data.features.iq_acorr_abs]);
 subplot(5, 1, 5);
-plot([selected_data.features.frequency_acorr_abs]);
+
+acorr_freq = [selected_data.features.frequency_acorr_abs];
+acorr_freq = acorr_freq / acorr_freq(1);
+%acorr_freq = fftshift(acorr_freq);
+[af_peaks_y, af_peaks_x] = findpeaks(acorr_freq);
+[B,I] = sort(af_peaks_y,'descend');
+af_peaks_x = af_peaks_x(I);
+af_peaks_y = af_peaks_y(I);
+peak_len = min(10, length(af_peaks_x));
+
+plot(t(1:length(acorr_freq)), acorr_freq, t(af_peaks_x(1:peak_len)), af_peaks_y(1:peak_len), 'o');
+
+figure(10);
+subplot(3,1,1);
+
+amp_spectrum = abs(fftshift(fft([selected_data.iq_amplitude])));
+plot(fft_x, 10*log10(amp_spectrum));
+
+subplot(3,1,2);
+
+instfrq = [selected_data.fs/(2*pi) * diff(unwrap(angle(selected_data.iq_data))); 0];
+instfrq_f = filtfilt(freq_filter_b, 1, instfrq);
+
+phase = unwrap(angle(selected_data.iq_data));
+freq_spectrum = abs(fftshift(fft(instfrq)));
+plot(fft_x, 10*log10(freq_spectrum));
 
 amp_s = sort(selected_data.iq_amplitude);
 amp_y = linspace(0, 1, length(amp_s));
@@ -110,8 +139,7 @@ spectrogram(selected_data.iq_data,g,ol,nfft,40e3);
 
 figure(3);
 subplot(5,1,1);
-instfrq = selected_data.fs/(2*pi) * diff(unwrap(angle(selected_data.iq_data)));
-phase = unwrap(angle(selected_data.iq_data));
+
 
 t_sel = (t < 80e-3);
 
@@ -120,6 +148,7 @@ plot(t(t_sel), instfrq(t_sel), t(t_sel) + 11/40e3, instfrq(t_sel));
 
 
 instfrq_m = instfrq - mean(instfrq);
+instfrq_mf = instfrq_f - mean(instfrq_f);
 
 subplot(5,1,2);
 plot(t(t_sel), instfrq_m(t_sel).^2);
@@ -137,6 +166,8 @@ plot(abs(fftshift(fft(instfrq))));
 figure(4);
 subplot(4,1,1);
 histogram(instfrq_m, 1024);
+subplot(4,1,2);
+histogram(instfrq_mf, 1024);
 
 
 %%
@@ -156,20 +187,26 @@ end
 combined_iq = combined_iq_I + 1j * combined_iq_Q;
 
 combined_t = [0:length(combined_iq_I)-1]' * 1/selected_data.fs;
-combined_instfrq = selected_data.fs/(2*pi) * diff(unwrap(angle(combined_iq)));
+
+combined_instfrq = [selected_data.fs/(2*pi) * diff(unwrap(angle(combined_iq))); 0];
+filtered_instfrq = filtfilt(freq_filter_b, 1, combined_instfrq);
+
 
 figure(5);
-subplot(4,1,1);
+subplot(5,1,1);
 plot(combined_t, combined_iq_I, combined_t, combined_iq_Q);
 
-subplot(4,1,2);
-plot(combined_t(1:end-1), combined_instfrq);
+subplot(5,1,2);
+plot(combined_t, combined_instfrq, combined_t, filtered_instfrq);
 
-subplot(4,1,3);
+subplot(5,1,3);
+%plot(combined_t, combined_instfrq, combined_t, filtered_instfrq);
+
+subplot(5,1,4);
 xc = fftshift(xcorr(combined_instfrq));
 plot(abs(xc));
 
-subplot(4,1,4);
+subplot(5,1,5);
 plot([filtered_data.lo_frequency]);
 
 figure(6);

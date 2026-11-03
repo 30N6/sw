@@ -76,14 +76,18 @@ class pluto_intercept_analysis_processor:
     return obj
 
   @staticmethod
+  def _get_channel_frequency(dwell_frequency, channel_index):
+    return dwell_frequency + (channel_index - (INTERCEPT_NUM_CHANNELS / 2 - 1) ) * (ADC_CLOCK_FREQUENCY * 1e-6 / INTERCEPT_NUM_CHANNELS)
+
+  @staticmethod
   def _get_center_frequency(dwell_frequency, channel_index, lo_frequency):
-    channel_offset = (channel_index - (INTERCEPT_NUM_CHANNELS / 2)) * (ADC_CLOCK_FREQUENCY * 1e-6 / INTERCEPT_NUM_CHANNELS)
-    return dwell_frequency + channel_offset + lo_frequency * 1e-6
+    return pluto_intercept_analysis_processor._get_channel_frequency(dwell_frequency, channel_index) - lo_frequency * 1e-6
 
   def _stream_buffer_process(self, stream_index):
     #print("{} : _stream_buffer_process index={}".format(time.time(), stream_index))
     current_stream_buffer = self.stream_buffer_data[stream_index]
     channel_index = self.stream_buffer_channel[stream_index]
+    dwell_frequency = self.stream_buffer_dwell_freq[stream_index]
 
     #TODO
     self.stream_freq_estimator.stream_buffer_process(stream_index, channel_index, current_stream_buffer)
@@ -94,7 +98,9 @@ class pluto_intercept_analysis_processor:
     self.stream_downconverter.update_downconverters(stream_index, est_valid, est_center)
     downconverted_data = self.stream_downconverter.stream_buffer_process(stream_index, current_stream_buffer)
 
-    #self.logger.log(self.logger.LL_INFO, "[processor]: _stream_buffer_process: stream_index={} est_valid={} est_center={}".format(stream_index, est_valid, est_center))
+    self._get_channel_frequency(self.stream_buffer_dwell_freq[stream_index], channel_index)
+
+    #self.logger.log(self.logger.LL_INFO, "[processor]: _stream_buffer_process: stream_index={} channel_index={} channel_frequency={} est_valid={} est_center={}".format(stream_index, channel_index, self._get_channel_frequency(dwell_frequency, channel_index), est_valid, est_center))
     #self.logger.flush()
 
     now = time.time()
@@ -114,9 +120,10 @@ class pluto_intercept_analysis_processor:
       output_entry = {"timestamp_conv_end"  : now,
                       "stream_index"        : stream_index,
                       "channel_index"       : channel_index,
+                      "channel_frequency"   : self._get_channel_frequency(dwell_frequency, channel_index),
                       "global_seq_num"      : self.global_seq_num,
-                      "dwell_frequency"     : self.stream_buffer_dwell_freq[stream_index],
-                      "center_frequency"    : self._get_center_frequency(self.stream_buffer_dwell_freq[stream_index], self.stream_buffer_channel[stream_index], downconverted_data[i]["lo_frequency"]),
+                      "dwell_frequency"     : dwell_frequency,
+                      "center_frequency"    : self._get_center_frequency(dwell_frequency, channel_index, downconverted_data[i]["lo_frequency"]),
                       "lo_index"            : downconverted_data[i]["lo_index"],
                       "lo_frequency"        : downconverted_data[i]["lo_frequency"],
                       "iq_data"             : downconverted_data[i]["iq_data"],

@@ -68,7 +68,7 @@ class pluto_intercept_sequencer:
 
   def _update_dwell_frequency(self, frequency):
     self.dwell_data["frequency"]  = frequency
-    self.channel_frequency        = [self.dwell_data["frequency"] + (i - (INTERCEPT_NUM_CHANNELS / 2)) * (ADC_CLOCK_FREQUENCY * 1e-6 / INTERCEPT_NUM_CHANNELS) for i in range(INTERCEPT_NUM_CHANNELS)]
+    self.channel_frequency        = [self.dwell_data["frequency"] + (i - (INTERCEPT_NUM_CHANNELS / 2 - 1)) * (ADC_CLOCK_FREQUENCY * 1e-6 / INTERCEPT_NUM_CHANNELS) for i in range(INTERCEPT_NUM_CHANNELS)]
     self.channel_frequency_str    = ["{:.3f}".format(self.channel_frequency[i]) for i in range(INTERCEPT_NUM_CHANNELS)]
 
     if len(self.dwell_data["include_freqs"]) > 0:
